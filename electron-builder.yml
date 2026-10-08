@@ -1,0 +1,134 @@
+appId: com.libercast.app
+productName: LiberCast
+copyright: Copyright © 2026 LiberCast contributors
+directories:
+  buildResources: resources
+  output: release
+
+# Chromium ships 55 locale files, 39 MB of them, and they are only used for the
+# strings Chromium itself draws — the context menu, the spellchecker, the
+# certificate warnings. LiberCast's own interface is translated separately, so
+# the list here matches the languages the application offers. Keeping three
+# instead of 55 saves about 37 MB installed.
+electronLanguages:
+  - en-US
+  - tr
+  - de
+# Only `out/` and the production dependencies belong in the package. Everything
+# listed here is either a source file, a build input, or output.
+#
+# Each directory is excluded twice, as the name and as its contents. The
+# shorthand for that is `name{,/**/*}`, and electron-builder's own defaults use
+# it — but the empty first alternative in those braces does not match on every
+# platform, and when it silently fails on the output directory the result is a
+# build that packs the previous build's output, so every installer is larger
+# than the last. Spelled out, it cannot misfire.
+files:
+  - '!.vscode'
+  - '!.vscode/**/*'
+  - '!src'
+  - '!src/**/*'
+  - '!test'
+  - '!test/**/*'
+  - '!docs'
+  - '!docs/**/*'
+  - '!tools'
+  - '!tools/**/*'
+  - '!.github'
+  - '!.github/**/*'
+
+  # The output directory, stated here as well as in electron-builder's defaults
+  # precisely because relying on those defaults is what went wrong.
+  - '!release'
+  - '!release/**/*'
+
+  - '!electron.vite.config.{js,ts,mjs,cjs}'
+  - '!{.eslintrc,.editorconfig,.gitignore,README.md,FEATURES.md,THIRD-PARTY-NOTICES.md}'
+  - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+  - '!*.tsbuildinfo'
+  - '!package-lock.json'
+
+  # Scratch that accumulates in a working folder: files delivered into the
+  # project, and the reports written by tools/asar-report.mjs.
+  - '!Claude outputs'
+  - '!Claude outputs/**/*'
+  - '!asar-*.txt'
+
+  - '!node_modules/ffprobe-static/tests/**'
+# Fails the build if the package came out far larger than the application is,
+# rather than letting an oversized installer reach someone's download folder.
+afterPack: tools/after-pack.cjs
+
+asarUnpack:
+  # ffmpeg and ffprobe are real executables and cannot be run from inside asar.
+  - resources/**
+  - node_modules/ffmpeg-static/**
+  - node_modules/ffprobe-static/**
+
+# Put beside LiberCast.exe rather than inside the asar, because the GPL text
+# has to be findable by someone who received the installer, and a licence
+# buried in an archive is not.
+extraFiles:
+  - from: LICENSE
+    to: LICENSE.txt
+  - from: THIRD-PARTY-NOTICES.md
+    to: THIRD-PARTY-NOTICES.md
+  # The GPL text is committed rather than copied out of node_modules. The
+  # licence itself never varies, and ffmpeg-static names its copy after the
+  # binary — ffmpeg.LICENSE on Linux but ffmpeg.exe.LICENSE on Windows — so a
+  # fixed path here builds on one platform and fails on the other.
+  #
+  # The committed file is named for the component it covers. LiberCast's own
+  # code is MIT; a bare GPL-3.0.txt sitting in the repository invites the
+  # reasonable but wrong conclusion that the project is GPL.
+  - from: resources/licenses/ffmpeg-GPL-3.0.txt
+    to: licenses/ffmpeg-GPL-3.0.txt
+  # The build manifest does vary: it names the exact ffmpeg version and the
+  # libraries compiled into it, which is the part that has to describe the
+  # binary actually being shipped. Matched by pattern for the same naming
+  # reason, and absent rather than fatal if the package did not fetch it.
+  - from: node_modules/ffmpeg-static
+    to: licenses
+    filter:
+      - 'ffmpeg*.README'
+      - 'ffmpeg*.LICENSE'
+win:
+  # resources/icon.ico carries every size from 16px up; Windows picks the one it
+  # needs, and a missing small size is what makes a taskbar icon look smeared.
+  icon: resources/icon.ico
+  files:
+    # ffprobe-static ships a binary for every platform it supports — around
+    # 336 MB of them, of which a Windows x64 build needs 61 MB. Scoped to the
+    # Windows build so a build for anything else still gets its own ffprobe.
+    - '!node_modules/ffprobe-static/bin/{darwin,linux}/**'
+    - '!node_modules/ffprobe-static/bin/win32/ia32/**'
+  target:
+    - target: nsis
+      arch: [x64]
+    - target: portable
+      arch: [x64]
+  artifactName: ${productName}-${version}-setup.${ext}
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  deleteAppDataOnUninstall: false
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: LiberCast
+  uninstallDisplayName: LiberCast ${version}
+  # The agreement page. A beta notice rather than a formal EULA: it says the
+  # software is unfinished, that LiberCast supplies no channels and the person
+  # installing is responsible for what they play, that nothing is sent
+  # anywhere, and that the bundled ffmpeg is under a different licence.
+  license: resources/eula.txt
+portable:
+  artifactName: ${productName}-${version}-portable.${ext}
+# No publish target is configured on purpose: a placeholder owner makes
+# `electron-builder --publish` upload to a repository that does not exist, and
+# fail late. Add this block once the repository is real:
+#
+# publish:
+#   provider: github
+#   owner: <your github user or org>
+#   repo: libercast

@@ -1,0 +1,50 @@
+{
+  "name": "libercast",
+  "version": "0.9.0-beta.1",
+  "description": "LiberCast \u2014 a free, open-source IPTV player for Windows. Xtream Codes, M3U and XMLTV EPG.",
+  "license": "MIT",
+  "author": "Veysel Olgac",
+  "main": "./out/main/index.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "electron-vite dev",
+    "start": "electron-vite preview",
+    "build": "npm run typecheck && electron-vite build",
+    "typecheck": "npm run typecheck:node && npm run typecheck:web",
+    "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
+    "typecheck:web": "tsc --noEmit -p tsconfig.web.json",
+    "test": "node test/run.mjs",
+    "postinstall": "electron-builder install-app-deps",
+    "pack:win": "npm run build && electron-builder --win --publish never",
+    "pack:win:dir": "npm run build && electron-builder --win --dir --publish never",
+    "verify:player": "esbuild src/main/media/streamServer.ts --bundle --platform=node --format=cjs --outfile=node_modules/.cache/verify-player/streamServer.cjs --alias:@main=./src/main --alias:@shared=./src/shared --alias:electron=./test/electron-stub.cjs --external:better-sqlite3 --external:ffmpeg-static --external:ffprobe-static --log-level=error && esbuild src/renderer/src/features/player/subtitleStyle.ts --bundle --platform=node --format=cjs --outfile=node_modules/.cache/verify-player/subtitleStyle.cjs --alias:@shared=./src/shared --log-level=error && electron test/browser/verify-player.cjs"
+  },
+  "dependencies": {
+    "@electron-toolkit/preload": "^3.0.1",
+    "@electron-toolkit/utils": "^3.0.0",
+    "better-sqlite3": "^11.3.0",
+    "ffmpeg-static": "^5.3.0",
+    "ffprobe-static": "^3.1.0"
+  },
+  "devDependencies": {
+    "@electron-toolkit/tsconfig": "^1.0.1",
+    "@tanstack/react-query": "^5.56.2",
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/node": "^20.16.5",
+    "@types/react": "^18.3.5",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "electron": "^31.6.0",
+    "electron-builder": "^24.13.3",
+    "electron-vite": "^2.3.0",
+    "esbuild": "^0.21.5",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "typescript": "^5.6.2",
+    "vite": "^5.4.5",
+    "zustand": "^4.5.5"
+  },
+  "productName": "LiberCast"
+}

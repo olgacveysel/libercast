@@ -1,0 +1,20 @@
+# One line ending in the repository, whatever platform commits. Without this a
+# Windows checkout stores CRLF and every file looks rewritten when anything
+# touches it from Linux or CI.
+* text=auto eol=lf
+
+# The exception. This is the text NSIS draws on the installer's agreement page,
+# in a plain Windows text control that runs lines together on a bare LF. It is
+# written CRLF on purpose and has to survive a round trip through git.
+resources/eula.txt text eol=crlf
+
+# Not text. Marking them stops git from trying to normalise line endings inside
+# binary files, which corrupts them.
+*.png binary
+*.ico binary
+*.icns binary
+*.jpg binary
+*.woff binary
+*.woff2 binary
+*.exe binary
+*.dll binary

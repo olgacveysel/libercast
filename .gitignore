@@ -1,0 +1,27 @@
+# Build output
+node_modules/
+out/
+dist/
+.vite/
+*.tsbuildinfo
+
+# electron-builder. The numbered and renamed variants exist because Windows
+# sometimes holds a file in release/ open and the only way past it is to build
+# somewhere else.
+release/
+release2/
+release-locked/
+
+# Reports from tools/asar-report.mjs
+asar-*.txt
+
+# Files delivered into the working folder rather than committed
+Claude outputs/
+
+# Local and incidental
+*.log
+.env
+.env.local
+.DS_Store
+Thumbs.db
+resources/bin/
