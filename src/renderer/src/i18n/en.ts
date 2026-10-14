@@ -89,6 +89,22 @@ export const en = {
   'live.removeFavorite': 'Remove from favorites',
   'live.noChannelNumber': 'No channel {number}',
   'live.syncNow': 'Sync now',
+  'live.hideLists': 'Hide the categories and channel list',
+  'live.showLists': 'Show the categories and channel list',
+
+  'sleep.label': 'Sleep',
+  'sleep.title': 'Stop playback after a while',
+  'sleep.minutes': '{minutes} min',
+  'sleep.offHint': 'Keep playing until you stop it.',
+
+  'health.scan': 'Check favorites',
+  'health.title': 'Checking your favorites',
+  'health.body':
+    'Each one is opened in turn, one at a time so the scan does not collide with your own connection limit. Leaving this stops it.',
+  'health.checking': 'Checking {done} of {total} — {name}',
+  'health.allWell': 'All {count} favorites answered.',
+  'health.summary': '{failed} of {total} did not answer.',
+  'health.noReason': 'No reason given.',
 
   /* ---------------- player ---------------- */
   'player.fullscreen': 'Fullscreen',
@@ -243,6 +259,13 @@ export const en = {
   'mv.noSourceBody': 'Multi-view needs a source with channels.',
   'mv.connectionWarning':
     "Every tile opens its own connection to your provider. Most accounts allow only one or two at a time, so tiles beyond that limit will fail to start — check your account's connection count in Settings.",
+  'settings.updates': 'Updates',
+  'settings.updatesBody': 'Checked only when you ask. Nothing is sent automatically.',
+  'settings.checkUpdates': 'Check now',
+  'settings.updateFound': 'Version {version} is available.',
+  'settings.updateOpen': 'Open the release page',
+  'settings.updateNone': 'You are on the newest release.',
+  'settings.updateFailed': 'Could not check: {reason}',
   'settings.logs': 'Log file',
   'settings.logsBody':
     'What the application recorded, with passwords removed. Attach it to a bug report.',

@@ -124,6 +124,14 @@ export function IconVolume(props: Props & { muted?: boolean; quiet?: boolean }):
   )
 }
 
+export function IconSleep(props: Props): JSX.Element {
+  return (
+    <svg {...base(props)}>
+      <path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z" />
+    </svg>
+  )
+}
+
 export function IconSidebar(props: Props): JSX.Element {
   return (
     <svg {...base(props)}>

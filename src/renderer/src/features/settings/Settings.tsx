@@ -19,6 +19,14 @@ interface Props {
   onAddSource: () => void
 }
 
+/** What the update row is showing. */
+type UpdateState =
+  | { state: 'idle' }
+  | { state: 'checking' }
+  | { state: 'current' }
+  | { state: 'found'; version: string; url: string }
+  | { state: 'failed'; reason: string }
+
 export function Settings({ onAddSource }: Props): JSX.Element {
   // Read from the packaged app rather than duplicated in the UI, so a release
   // cannot ship a version number that disagrees with itself.
@@ -35,6 +43,7 @@ export function Settings({ onAddSource }: Props): JSX.Element {
   const [error, setError] = useState<string | null>(null)
   const [editing, setEditing] = useState<number | null>(null)
   const [logMessage, setLogMessage] = useState<string | null>(null)
+  const [update, setUpdate] = useState<UpdateState>({ state: 'idle' })
 
   const refreshNow = async (): Promise<void> => {
     setRefreshing(true)
@@ -551,6 +560,53 @@ export function Settings({ onAddSource }: Props): JSX.Element {
                 {t('settings.version', { version: version ?? '…' })} · {t('home.welcomeBody')}
               </span>
             </div>
+          </div>
+
+          {/*
+            Checked on demand only. The installer's notice promises that
+            nothing leaves the machine except the requests the user makes, and
+            a call to GitHub on every launch would make that untrue.
+          */}
+          <div className="settings__row">
+            <div>
+              <strong>{t('settings.updates')}</strong>
+              <span>
+                {update.state === 'found' ? (
+                  <>
+                    {t('settings.updateFound', { version: update.version })}{' '}
+                    <a href={update.url} target="_blank" rel="noreferrer">
+                      {t('settings.updateOpen')}
+                    </a>
+                  </>
+                ) : update.state === 'current' ? (
+                  t('settings.updateNone')
+                ) : update.state === 'failed' ? (
+                  t('settings.updateFailed', { reason: update.reason })
+                ) : (
+                  t('settings.updatesBody')
+                )}
+              </span>
+            </div>
+            <button
+              className="btn"
+              disabled={update.state === 'checking'}
+              onClick={() => {
+                setUpdate({ state: 'checking' })
+                void invoke('app:checkUpdate')
+                  .then((result) =>
+                    setUpdate(
+                      result.error !== null
+                        ? { state: 'failed', reason: result.error }
+                        : result.update
+                          ? { state: 'found', version: result.update.version, url: result.update.url }
+                          : { state: 'current' }
+                    )
+                  )
+                  .catch((error) => setUpdate({ state: 'failed', reason: messageOf(error) }))
+              }}
+            >
+              {update.state === 'checking' ? t('settings.checking') : t('settings.checkUpdates')}
+            </button>
           </div>
 
           {/*

@@ -36,7 +36,27 @@ const NAV: { route: Route; label: TranslationKey; icon: ReactNode }[] = [
 
 export function Sidebar({ onAddSource, collapsed }: Props): JSX.Element {
   const { route, setRoute, playlists, activePlaylistId, setActivePlaylist } = useAppStore()
+  const settings = useAppStore((state) => state.settings)
+  const updateSettings = useAppStore((state) => state.updateSettings)
   const t = useT()
+
+  /**
+   * Clicking a navigation item you are already on folds that screen's lists
+   * away, leaving the picture. Clicking again brings them back.
+   *
+   * Only Live TV and Favorites have lists to fold, and they are the two
+   * screens built around watching something. Everywhere else a second click
+   * stays what it has always been: nothing.
+   */
+  const onNavClick = (next: Route): void => {
+    if (route !== next) {
+      setRoute(next)
+      return
+    }
+    if (next === 'live' || next === 'favorites') {
+      void updateSettings({ liveListsCollapsed: !settings.liveListsCollapsed })
+    }
+  }
 
   // A tooltip is only added in rail mode. On a labelled button it is noise: the
   // same words appear twice, one of them after a delay.
@@ -49,7 +69,7 @@ export function Sidebar({ onAddSource, collapsed }: Props): JSX.Element {
           <button
             key={item.route}
             className={`navitem ${route === item.route ? 'navitem--active' : ''}`}
-            onClick={() => setRoute(item.route)}
+            onClick={() => onNavClick(item.route)}
             {...tip(t(item.label))}
           >
             {item.icon}

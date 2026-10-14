@@ -85,6 +85,22 @@ export const tr: Record<TranslationKey, string> = {
   'live.removeFavorite': 'Favorilerden çıkar',
   'live.noChannelNumber': '{number} numaralı kanal yok',
   'live.syncNow': 'Şimdi eşitle',
+  'live.hideLists': 'Kategorileri ve kanal listesini gizle',
+  'live.showLists': 'Kategorileri ve kanal listesini göster',
+
+  'sleep.label': 'Uyku',
+  'sleep.title': 'Bir süre sonra oynatmayı durdur',
+  'sleep.minutes': '{minutes} dk',
+  'sleep.offHint': 'Sen durdurana kadar oynatmaya devam eder.',
+
+  'health.scan': 'Favorileri kontrol et',
+  'health.title': 'Favorilerin kontrol ediliyor',
+  'health.body':
+    'Her biri sırayla, teker teker açılır; böylece tarama kendi bağlantı sınırınla çakışmaz. Bu pencereyi kapatmak taramayı durdurur.',
+  'health.checking': '{total} kanaldan {done}. kontrol ediliyor — {name}',
+  'health.allWell': '{count} favorinin hepsi yanıt verdi.',
+  'health.summary': '{total} kanaldan {failed} tanesi yanıt vermedi.',
+  'health.noReason': 'Sebep belirtilmedi.',
 
   'player.fullscreen': 'Tam ekran',
   'player.audio': 'Ses',
@@ -232,6 +248,13 @@ export const tr: Record<TranslationKey, string> = {
   'mv.noSourceBody': 'Çoklu görünüm için kanalı olan bir kaynak gerekir.',
   'mv.connectionWarning':
     'Her kare sağlayıcına ayrı bir bağlantı açar. Çoğu hesap aynı anda yalnızca bir ya da iki bağlantıya izin verir; bu sınırın ötesindeki kareler başlamaz. Hesabının bağlantı sayısını Ayarlar’dan görebilirsin.',
+  'settings.updates': 'Güncellemeler',
+  'settings.updatesBody': 'Yalnızca sen istediğinde kontrol edilir. Kendiliğinden hiçbir şey gönderilmez.',
+  'settings.checkUpdates': 'Şimdi kontrol et',
+  'settings.updateFound': '{version} sürümü mevcut.',
+  'settings.updateOpen': 'Sürüm sayfasını aç',
+  'settings.updateNone': 'En güncel sürümdesin.',
+  'settings.updateFailed': 'Kontrol edilemedi: {reason}',
   'settings.logs': 'Günlük dosyası',
   'settings.logsBody':
     'Uygulamanın kaydettikleri; şifreler çıkarılmış olarak. Hata bildirimine ekleyebilirsin.',

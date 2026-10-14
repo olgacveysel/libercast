@@ -469,6 +469,28 @@ select {
   grid-template-columns: 210px 320px 1fr;
   flex: 1;
   min-height: 0;
+  /* Animating the columns rather than each pane's width keeps the player,
+     which is mounted in the last one, in step with the fold. */
+  transition: grid-template-columns 0.16s var(--ease);
+}
+
+/* Favorites renders no category pane. Without this the two panes it does
+   render land in the 210px and 320px columns and the player is squeezed into
+   320px with the 1fr column standing empty. */
+.live--nocats {
+  grid-template-columns: 320px 1fr;
+}
+
+/* Folded: the lists keep their place in the grid at zero width, so the
+   transition has something to animate between. */
+.live--collapsed {
+  grid-template-columns: 0 0 1fr;
+}
+.live--nocats.live--collapsed {
+  grid-template-columns: 0 1fr;
+}
+.live--collapsed .pane {
+  border-right: none;
 }
 
 .pane {
@@ -476,6 +498,9 @@ select {
   flex-direction: column;
   min-height: 0;
   border-right: 1px solid var(--border);
+  /* A grid column at zero width does not clip its contents on its own; without
+     this the folded lists spill across the picture. */
+  overflow: hidden;
 }
 .pane--last {
   border-right: none;
@@ -2954,4 +2979,42 @@ kbd {
 }
 .vodplayer--idle .vodplayer__top {
   transform: translateY(-100%);
+}
+
+/* Favourites health scan --------------------------------------------- */
+
+.health__progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 4px;
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+
+.health__row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.health__row:last-child {
+  border-bottom: none;
+}
+.health__name {
+  font-weight: 550;
+  flex-shrink: 0;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.health__reason {
+  font-size: 12px;
+  color: var(--text-dim);
+  /* The provider's own wording, which is often a whole sentence. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

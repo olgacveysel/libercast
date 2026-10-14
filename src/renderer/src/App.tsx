@@ -4,6 +4,7 @@ import { useAppStore } from '@renderer/store/useAppStore'
 import { Empty } from '@renderer/ui/Empty'
 import { Sidebar } from '@renderer/ui/Sidebar'
 import { useSidebarRail } from '@renderer/ui/useSidebarRail'
+import { useSleepTimer } from '@renderer/features/player/useSleepTimer'
 import { TitleBar } from '@renderer/ui/TitleBar'
 import { Guide } from '@renderer/features/guide/Guide'
 import { Home } from '@renderer/features/home/Home'
@@ -29,6 +30,10 @@ export function App(): JSX.Element {
   const [showAddSource, setShowAddSource] = useState(false)
   const [showPalette, setShowPalette] = useState(false)
   const rail = useSidebarRail()
+
+  // Runs for the whole session, not inside a player: the timer has to keep
+  // counting while you are browsing the guide or the catalogue.
+  useSleepTimer()
 
   useEffect(() => {
     void bootstrap()

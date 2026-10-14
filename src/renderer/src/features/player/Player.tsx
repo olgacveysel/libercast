@@ -19,6 +19,7 @@ import { useFullscreen } from './useFullscreen'
 import { useIdleControls } from './useIdleControls'
 import { ChannelSchedule } from './ChannelSchedule'
 import { PictureFitMenu } from './PictureFitMenu'
+import { SleepMenu } from './SleepMenu'
 import { nextFit, videoFitStyle } from './videoFit'
 import { useT } from '@renderer/i18n'
 import { StreamStats } from './StreamStats'
@@ -313,6 +314,8 @@ export function Player({
               onOffsetChange={setSubtitleOffset}
               note="Switching subtitles reconnects to the channel."
             />
+
+            <SleepMenu />
 
             <button
               className={`btn ${recordingId !== null ? 'btn--rec' : 'btn--ghost'}`}

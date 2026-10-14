@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { app, dialog, ipcMain, shell } from 'electron'
-import type { IpcChannel, IpcRequest, IpcResponse } from '@shared/ipc'
+import type { IpcChannel, IpcEventName, IpcEvents, IpcRequest, IpcResponse } from '@shared/ipc'
 import type { PlaylistDraft, SyncProgress } from '@shared/types'
 import * as catalog from '@main/db/repo/catalog'
 import * as epgRepo from '@main/db/repo/epg'
@@ -28,6 +28,8 @@ import { XtreamClient } from '@main/sources/xtream'
 import { createLogger, errorMessage } from '@main/util/logger'
 import { getMainWindow } from '@main/window'
 import { logFilePath, logFolder } from '@main/util/logfile'
+import { checkForUpdate } from '@main/updates'
+import { cancelScan, scanFavorites } from '@main/media/healthScan'
 
 const log = createLogger('ipc')
 
@@ -52,6 +54,11 @@ function handle<C extends IpcChannel>(
 
 function emitProgress(progress: SyncProgress): void {
   getMainWindow()?.webContents.send('sync:progress', progress)
+}
+
+/** Sends one of the main-to-renderer events declared in the contract. */
+function emit<E extends IpcEventName>(event: E, payload: IpcEvents[E]): void {
+  getMainWindow()?.webContents.send(event, payload)
 }
 
 export function registerIpcHandlers(): void {
@@ -379,6 +386,13 @@ export function registerIpcHandlers(): void {
   handle('sources:refreshNow', () => autoRefresh.run())
 
   handle('app:version', () => app.getVersion())
+
+  handle('app:checkUpdate', () => checkForUpdate())
+
+  handle('health:scanFavorites', (playlistId: number) =>
+    scanFavorites(playlistId, (progress) => emit('health:progress', progress))
+  )
+  handle('health:cancel', () => cancelScan())
 
   handle('app:showLogs', () => {
     const path = logFilePath()

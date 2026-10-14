@@ -86,6 +86,22 @@ export const de: Record<TranslationKey, string> = {
   'live.removeFavorite': 'Aus Favoriten entfernen',
   'live.noChannelNumber': 'Kein Sender {number}',
   'live.syncNow': 'Jetzt synchronisieren',
+  'live.hideLists': 'Kategorien und Senderliste ausblenden',
+  'live.showLists': 'Kategorien und Senderliste einblenden',
+
+  'sleep.label': 'Sleeptimer',
+  'sleep.title': 'Wiedergabe nach einer Weile beenden',
+  'sleep.minutes': '{minutes} Min.',
+  'sleep.offHint': 'Läuft weiter, bis du sie beendest.',
+
+  'health.scan': 'Favoriten prüfen',
+  'health.title': 'Favoriten werden geprüft',
+  'health.body':
+    'Jeder wird nacheinander geöffnet, einzeln, damit die Prüfung nicht mit dem eigenen Verbindungslimit kollidiert. Schließen beendet sie.',
+  'health.checking': 'Prüfe {done} von {total} — {name}',
+  'health.allWell': 'Alle {count} Favoriten haben geantwortet.',
+  'health.summary': '{failed} von {total} haben nicht geantwortet.',
+  'health.noReason': 'Kein Grund angegeben.',
 
   'player.fullscreen': 'Vollbild',
   'player.audio': 'Ton',
@@ -233,6 +249,13 @@ export const de: Record<TranslationKey, string> = {
   'mv.noSourceBody': 'Die Mehrfachansicht braucht eine Quelle mit Sendern.',
   'mv.connectionWarning':
     'Jedes Feld öffnet eine eigene Verbindung zum Anbieter. Die meisten Konten erlauben nur eine oder zwei gleichzeitig — Felder darüber hinaus starten nicht. Die Anzahl steht in den Einstellungen unter Konto.',
+  'settings.updates': 'Aktualisierungen',
+  'settings.updatesBody': 'Wird nur auf Wunsch geprüft. Von selbst wird nichts gesendet.',
+  'settings.checkUpdates': 'Jetzt prüfen',
+  'settings.updateFound': 'Version {version} ist verfügbar.',
+  'settings.updateOpen': 'Release-Seite öffnen',
+  'settings.updateNone': 'Du hast die neueste Version.',
+  'settings.updateFailed': 'Prüfung nicht möglich: {reason}',
   'settings.logs': 'Protokolldatei',
   'settings.logsBody':
     'Was die Anwendung aufgezeichnet hat, ohne Passwörter. Einer Fehlermeldung beilegen.',

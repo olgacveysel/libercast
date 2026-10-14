@@ -23,6 +23,7 @@ import { useIdleControls } from '@renderer/features/player/useIdleControls'
 import { StreamStats } from '@renderer/features/player/StreamStats'
 import { useHotkeys } from '@renderer/features/player/useHotkeys'
 import { PictureFitMenu } from '@renderer/features/player/PictureFitMenu'
+import { SleepMenu } from '@renderer/features/player/SleepMenu'
 import { formatSpeed, nextFit, SPEEDS, stepSpeed, videoFitStyle } from '@renderer/features/player/videoFit'
 import { useT } from '@renderer/i18n'
 import { stepVolume } from '@renderer/features/player/volume'
@@ -616,6 +617,9 @@ export function VodPlayer({ target, onClose, onPlayEpisode }: Props): JSX.Elemen
           onSelect={setSpeed}
           title={`Playback speed: ${formatSpeed(speed)} ([ and ])`}
         />
+
+        <SleepMenu />
+
 
         <PictureFitMenu />
 

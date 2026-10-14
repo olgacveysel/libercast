@@ -4,12 +4,13 @@ import { invoke, messageOf } from '@renderer/lib/api'
 import { formatCount } from '@renderer/lib/format'
 import { useAppStore } from '@renderer/store/useAppStore'
 import { Empty } from '@renderer/ui/Empty'
-import { IconEye, IconRefresh, IconSearch } from '@renderer/ui/Icon'
+import { IconEye, IconRefresh, IconSearch, IconSidebar } from '@renderer/ui/Icon'
 import { ListSkeleton } from '@renderer/ui/Skeletons'
 import { VirtualList } from '@renderer/ui/VirtualList'
 import { Player } from '@renderer/features/player/Player'
 import { CHANNEL_ROW_HEIGHT, ChannelRow } from './ChannelRow'
 import { useNumberEntry } from './useNumberEntry'
+import { HealthScan } from './HealthScan'
 import { useT } from '@renderer/i18n'
 
 interface Props {
@@ -22,6 +23,9 @@ type Sort = NonNullable<ChannelQuery['sort']>
 
 export function LiveTv({ mode, onAddSource }: Props): JSX.Element {
   const { activePlaylistId, playlists, activeChannel, setActiveChannel, capabilities, setRoute } = useAppStore()
+  const settings = useAppStore((state) => state.settings)
+  const updateSettings = useAppStore((state) => state.updateSettings)
+  const listsCollapsed = settings.liveListsCollapsed
 
   const [categories, setCategories] = useState<Category[]>([])
   const [categoryId, setCategoryId] = useState<number | null>(null)
@@ -39,6 +43,7 @@ export function LiveTv({ mode, onAddSource }: Props): JSX.Element {
    * one-way door.
    */
   const [showHidden, setShowHidden] = useState(false)
+  const [scanning, setScanning] = useState(false)
   const t = useT()
   /**
    * Whether a channel has been chosen since this view was opened.
@@ -234,6 +239,32 @@ export function LiveTv({ mode, onAddSource }: Props): JSX.Element {
 
         <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{formatCount(total)} {t('common.channels')}</span>
 
+        {/*
+          The same fold the sidebar's own toggle does, for this screen's lists.
+          Clicking Live TV in the sidebar while already on it does this too;
+          this is the part you can see.
+        */}
+        <button
+          className="btn btn--ghost"
+          onClick={() => void updateSettings({ liveListsCollapsed: !listsCollapsed })}
+          title={listsCollapsed ? t('live.showLists') : t('live.hideLists')}
+          aria-label={listsCollapsed ? t('live.showLists') : t('live.hideLists')}
+          aria-pressed={listsCollapsed}
+        >
+          <IconSidebar size={15} />
+        </button>
+
+        {/*
+          Only offered on Favorites. Checking eight thousand channels one at a
+          time would run for a day and hammer an account that allows one
+          connection; thirty favourites is a job worth doing.
+        */}
+        {mode === 'favorites' && activePlaylistId !== null && (
+          <button className="btn btn--ghost" onClick={() => setScanning(true)}>
+            {t('health.scan')}
+          </button>
+        )}
+
         <button className="btn" onClick={() => void runSync()} disabled={syncing}>
           {syncing ? <span className="spinner" /> : <IconRefresh size={15} />}
           {syncing ? t('common.syncing') : t('common.sync')}
@@ -257,7 +288,15 @@ export function LiveTv({ mode, onAddSource }: Props): JSX.Element {
         </div>
       )}
 
-      <div className="live">
+      {scanning && activePlaylistId !== null && (
+        <HealthScan playlistId={activePlaylistId} onClose={() => setScanning(false)} />
+      )}
+
+      <div
+        className={`live ${mode === 'favorites' ? 'live--nocats' : ''} ${
+          listsCollapsed ? 'live--collapsed' : ''
+        }`}
+      >
         {mode === 'live' && (
           <div className="pane">
             <div className="pane__head">{t('live.categories')}</div>

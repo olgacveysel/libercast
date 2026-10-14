@@ -26,11 +26,19 @@ interface AppState {
   syncing: SyncProgress | null
   capabilities: MediaCapabilities | null
   ready: boolean
+  /**
+   * When the sleep timer should stop playback, as a timestamp, or null.
+   *
+   * Deliberately not persisted: a timer that survived a restart would stop
+   * playback at a time nobody set, hours later, with no way to see why.
+   */
+  sleepAt: number | null
 
   setRoute: (route: Route) => void
   setActivePlaylist: (id: number | null) => void
   setActiveChannel: (channel: ChannelWithState | null) => void
   setSyncing: (progress: SyncProgress | null) => void
+  setSleepAt: (at: number | null) => void
 
   bootstrap: () => Promise<void>
   refreshPlaylists: () => Promise<Playlist[]>
@@ -47,11 +55,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   syncing: null,
   capabilities: null,
   ready: false,
+  sleepAt: null,
 
   setRoute: (route) => set({ route }),
   setActivePlaylist: (activePlaylistId) => set({ activePlaylistId }),
   setActiveChannel: (activeChannel) => set({ activeChannel }),
   setSyncing: (syncing) => set({ syncing }),
+  setSleepAt: (sleepAt) => set({ sleepAt }),
 
   bootstrap: async () => {
     const [settings, playlists, capabilities] = await Promise.all([

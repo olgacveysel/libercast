@@ -1,3 +1,4 @@
+import type { AvailableUpdate } from '@shared/releases'
 import type {
   AppSettings,
   AutoRefreshReport,
@@ -5,6 +6,7 @@ import type {
   BackupSummary,
   Category,
   Channel,
+  ChannelHealth,
   ChannelQuery,
   ChannelWithState,
   ContentKind,
@@ -176,6 +178,22 @@ export interface IpcContract {
    * tell the difference between "opened it" and "nothing to open".
    */
   'app:showLogs': { req: void; res: string | null }
+
+  /**
+   * Asks GitHub whether a newer release exists.
+   *
+   * Only ever in response to a button. `error` is set when the check could not
+   * be made at all, which is worth showing and is not the same as being up to
+   * date.
+   */
+  'app:checkUpdate': {
+    req: void
+    res: { update: AvailableUpdate | null; current: string; error: string | null }
+  }
+
+  /** Checks every favourite in turn and reports which no longer play. */
+  'health:scanFavorites': { req: number; res: ChannelHealth[] }
+  'health:cancel': { req: void; res: void }
 }
 
 export type IpcChannel = keyof IpcContract
@@ -192,6 +210,8 @@ export interface IpcEvents {
   'reminders:tune': EpgReminder
   /** An automatic refresh finished; screens showing catalogue data should reload. */
   'sources:refreshed': AutoRefreshReport
+  /** How far through a favourites scan we are. */
+  'health:progress': { done: number; total: number; current: string }
 }
 
 export type IpcEventName = keyof IpcEvents
@@ -270,7 +290,10 @@ export const IPC_CHANNELS: IpcChannel[] = [
   'reminders:find',
   'sources:refreshNow',
   'app:version',
-  'app:showLogs'
+  'app:showLogs',
+  'app:checkUpdate',
+  'health:scanFavorites',
+  'health:cancel'
 ]
 
 export const IPC_EVENTS: IpcEventName[] = [
@@ -279,7 +302,8 @@ export const IPC_EVENTS: IpcEventName[] = [
   'recordings:changed',
   'downloads:changed',
   'reminders:tune',
-  'sources:refreshed'
+  'sources:refreshed',
+  'health:progress'
 ]
 
 // Re-exported so the renderer can import everything from one module.

@@ -179,6 +179,16 @@ export interface SyncProgress {
   progress: number | null
 }
 
+/** The result of checking whether one favourite still plays. */
+export interface ChannelHealth {
+  channelId: number
+  name: string
+  ok: boolean
+  /** The provider's own wording where there is any, for a failure. */
+  reason: string | null
+  checkedAt: number
+}
+
 export interface ChannelQuery {
   playlistId: number
   /** Defaults to 'live'. Movies and series live in the same table. */
@@ -254,6 +264,16 @@ export interface AppSettings {
    * without changing this — so widening the window restores what they picked.
    */
   sidebarCollapsed: boolean
+  /**
+   * Live TV reduced to the picture, with the category and channel lists
+   * hidden.
+   *
+   * Clicking Live TV in the sidebar while already on it toggles this, the way
+   * clicking the sidebar toggle folds the sidebar. The toolbar carries a
+   * button for it too, because a gesture with no visible control is a gesture
+   * nobody finds.
+   */
+  liveListsCollapsed: boolean
   /** Channel ids pinned to the multi-view tiles, by position. */
   multiViewChannels: (number | null)[]
   /** Tiles across and down in multi-view. */
@@ -318,6 +338,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   videoZoom: 1,
   uiScale: 1,
   sidebarCollapsed: false,
+  liveListsCollapsed: false,
   multiViewChannels: [null, null, null, null],
   multiViewColumns: 2,
   multiViewRows: 2,
