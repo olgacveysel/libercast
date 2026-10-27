@@ -59,6 +59,32 @@ export const ChannelRow = memo(function ChannelRow({
             </span>
           )}
           {channel.name}
+          {/*
+            Only a failure is marked. A green tick beside every channel that
+            happened to answer once would be noise on a list of thousands, and
+            would read as a promise this cannot keep — a channel that answered
+            an hour ago can be dead now.
+          */}
+          {/*
+            Not decoration: more than one provider carrying this channel is
+            exactly the condition under which a dead stream has somewhere to
+            fall back to, so it is worth being able to see at a glance.
+          */}
+          {channel.sources > 1 && (
+            <span className="chanrow__sources" title={t('live.sourcesTitle', { count: channel.sources })}>
+              {channel.sources}
+            </span>
+          )}
+
+          {channel.health?.ok === false && (
+            <span
+              className="chanrow__dead"
+              title={channel.health.reason ?? t('health.deadTitle')}
+              aria-label={t('health.dead')}
+            >
+              {t('health.dead')}
+            </span>
+          )}
         </div>
 
         {channel.now ? (

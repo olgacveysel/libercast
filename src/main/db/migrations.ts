@@ -315,6 +315,70 @@ export const MIGRATIONS: Migration[] = [
 
       CREATE INDEX idx_stream_probes_age ON stream_probes(updated_at);
     `
+  },
+  {
+    version: 8,
+    name: 'channel-health',
+    up: `
+      -- What the last favourites scan found, per channel.
+      --
+      -- The scan is slow by necessity — one channel at a time, because the
+      -- account allows one or two connections — so throwing the answer away
+      -- when the panel closes means paying for it again every time. Kept here,
+      -- a favourite that failed last night is marked in the list this morning.
+      CREATE TABLE channel_health (
+        channel_id  INTEGER PRIMARY KEY REFERENCES channels(id) ON DELETE CASCADE,
+        ok          INTEGER NOT NULL,
+        -- The provider's own wording, where it gave any.
+        reason      TEXT,
+        checked_at  INTEGER NOT NULL
+      );
+
+      CREATE INDEX idx_channel_health_age ON channel_health(checked_at);
+    `
+  },
+  {
+    version: 9,
+    name: 'catchup-window',
+    up: `
+      -- How many days of this channel the panel keeps.
+      --
+      -- Xtream reports it per channel and it varies wildly inside one account:
+      -- the sports channels often keep a week while everything else keeps
+      -- none. Storing it means a finished programme can be offered for replay
+      -- only where there is actually something to replay — offering it
+      -- everywhere and letting the provider refuse would spend a connection to
+      -- learn what the listing already said.
+      ALTER TABLE channels ADD COLUMN catchup_days INTEGER NOT NULL DEFAULT 0;
+
+      -- The panel's own timezone, as it reports it.
+      --
+      -- Catch-up URLs carry a start time as local wall clock on the server,
+      -- not as UTC and not as the viewer's clock. Guessing the viewer's is
+      -- right only while viewer and panel share a timezone, which is the
+      -- common case and exactly the kind of assumption that breaks silently
+      -- for everyone it does not hold for — an hour out is a programme that
+      -- starts in the wrong place with nothing on screen to explain it.
+      ALTER TABLE playlists ADD COLUMN server_timezone TEXT;
+    `
+  },
+  {
+    version: 10,
+    name: 'cross-source-match-key',
+    up: `
+      -- The identifying words of a channel name, normalised.
+      --
+      -- Two providers almost never spell a channel the same way — "beIN
+      -- Sports 2 HD", "BEIN SPORTS 2", "TR | beIN Sports 2 (Hat 1)" — so
+      -- showing them as one list means grouping on something other than the
+      -- name. Scoring every pair in JavaScript would mean thousands of
+      -- comparisons on every keystroke, so the normalised form is computed
+      -- once at import and grouped on here. Digits survive normalisation,
+      -- which is what keeps beIN 2 and beIN 4 apart.
+      ALTER TABLE channels ADD COLUMN match_key TEXT NOT NULL DEFAULT '';
+
+      CREATE INDEX idx_channels_match ON channels(kind, match_key);
+    `
   }
 ]
 

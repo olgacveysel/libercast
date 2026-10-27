@@ -12,6 +12,7 @@ import { formatRelative, formatTime } from '@renderer/lib/format'
 import { useAppStore } from '@renderer/store/useAppStore'
 import { Empty } from '@renderer/ui/Empty'
 import { IconBell, IconRecord, IconRefresh } from '@renderer/ui/Icon'
+import { useT } from '@renderer/i18n'
 import { GuideMatching } from './GuideMatching'
 
 interface Props {
@@ -38,6 +39,7 @@ function floorToSlot(timestamp: number): number {
 
 export function Guide({ onAddSource, capabilities }: Props): JSX.Element {
   const { activePlaylistId, playlists, setActiveChannel, setRoute } = useAppStore()
+  const t = useT()
 
   const [categories, setCategories] = useState<Category[]>([])
   const [categoryId, setCategoryId] = useState<number | null>(null)
@@ -137,12 +139,9 @@ export function Guide({ onAddSource, capabilities }: Props): JSX.Element {
       const result = await invoke('epg:refresh', activePlaylistId)
       setState(await invoke('epg:state', activePlaylistId))
       if (result.programmes === 0) {
-        setError('The EPG source returned no programmes. Check the XMLTV URL in Settings.')
+        setError(t('guide.noProgrammes'))
       } else if (result.matchedChannels === 0) {
-        setError(
-          `Downloaded ${result.programmes.toLocaleString()} programmes but none matched a channel — ` +
-            'the guide ids do not line up with this playlist.'
-        )
+        setError(t('guide.noneMatched', { count: result.programmes.toLocaleString() }))
       }
       await load()
     } catch (e) {
@@ -166,11 +165,11 @@ export function Guide({ onAddSource, capabilities }: Props): JSX.Element {
   if (!playlist) {
     return (
       <Empty
-        title="No source selected"
-        description="The guide needs a source with EPG data."
+        title={t('mv.noSource')}
+        description={t('guide.noSourceBody')}
         action={
           <button className="btn btn--primary" onClick={onAddSource}>
-            Add a source
+            {t('nav.addSource')}
           </button>
         }
       />
@@ -180,10 +179,15 @@ export function Guide({ onAddSource, capabilities }: Props): JSX.Element {
   const nowOffset = ((now - start) / 60_000) * PX_PER_MIN
   const nowVisible = now >= start && now <= end
 
+  // The button's name is emphasised inside the sentence, so the sentence is
+  // split at its placeholder rather than broken into two keys: a translator
+  // keeps the whole thing and can put the name wherever their grammar wants it.
+  const [noDataBefore, noDataAfter] = t('guide.noDataYet').split('{action}')
+
   return (
     <>
       <div className="toolbar">
-        <h1 className="toolbar__title">Guide</h1>
+        <h1 className="toolbar__title">{t('guide.title')}</h1>
 
         <select
           className="input"
@@ -194,7 +198,7 @@ export function Guide({ onAddSource, capabilities }: Props): JSX.Element {
             setPage(0)
           }}
         >
-          <option value="">All channels</option>
+          <option value="">{t('live.allChannels')}</option>
           {categories.map((category) => (
             <option key={category.id} value={category.id}>
               {category.name}
@@ -204,7 +208,7 @@ export function Guide({ onAddSource, capabilities }: Props): JSX.Element {
 
         <div className="segmented">
           <button onClick={() => setStart(start - 2 * 3_600_000)}>−2h</button>
-          <button onClick={jumpToNow}>Now</button>
+          <button onClick={jumpToNow}>{t('guide.now')}</button>
           <button onClick={() => setStart(start + 2 * 3_600_000)}>+2h</button>
         </div>
 
@@ -216,17 +220,20 @@ export function Guide({ onAddSource, capabilities }: Props): JSX.Element {
 
         {state && (
           <span style={{ fontSize: 11.5, color: 'var(--text-dim)' }}>
-            {state.matchedChannels} channels matched · updated {formatRelative(state.refreshedAt)}
+            {t('guide.matchedSummary', {
+              count: state.matchedChannels,
+              when: formatRelative(state.refreshedAt)
+            })}
           </span>
         )}
 
         <button className="btn" onClick={() => setMatching(true)} disabled={!state}>
-          Fix matching
+          {t('guide.fixMatching')}
         </button>
 
         <button className="btn" onClick={() => void refresh()} disabled={refreshing}>
           {refreshing ? <span className="spinner" /> : <IconRefresh size={15} />}
-          {refreshing ? 'Downloading…' : 'Refresh EPG'}
+          {refreshing ? t('guide.downloading') : t('guide.refreshEpg')}
         </button>
       </div>
 
@@ -238,16 +245,17 @@ export function Guide({ onAddSource, capabilities }: Props): JSX.Element {
 
       {!state && !refreshing && (
         <div className="notice" style={{ margin: '10px 14px 0', background: 'var(--bg-raised)' }}>
-          No guide data yet. Hit <strong>Refresh EPG</strong> to download it from your provider.
+          {noDataBefore}
+          <strong>{t('guide.refreshEpg')}</strong>
+          {noDataAfter}
         </div>
       )}
 
       {state && state.matchedChannels === 0 && (
         <div className="notice notice--error" style={{ margin: '10px 14px 0' }}>
-          {state.programmeCount.toLocaleString()} programmes were downloaded, but none of them are attached
-          to a channel — the guide ids do not line up with this playlist.{' '}
+          {t('guide.downloadedNoneAttached', { count: state.programmeCount.toLocaleString() })}{' '}
           <button className="btn btn--ghost" onClick={() => setMatching(true)}>
-            Fix matching
+            {t('guide.fixMatching')}
           </button>
         </div>
       )}
@@ -284,7 +292,7 @@ export function Guide({ onAddSource, capabilities }: Props): JSX.Element {
             )}
 
             {loading && !guide ? (
-              <div style={{ padding: 20, color: 'var(--text-dim)' }}>Loading guide…</div>
+              <div style={{ padding: 20, color: 'var(--text-dim)' }}>{t('guide.loading')}</div>
             ) : (
               guide?.rows.map((row) => (
                 <div key={row.channel.id} className="guide__row">
@@ -296,11 +304,13 @@ export function Guide({ onAddSource, capabilities }: Props): JSX.Element {
                         favorite: false,
                         lastWatchedAt: null,
                         now: null,
-                        next: null
+                        next: null,
+                        health: null,
+                        sources: 1
                       })
                       setRoute('live')
                     }}
-                    title={`Watch ${row.channel.name}`}
+                    title={t('guide.watchChannel', { name: row.channel.name })}
                   >
                     {row.channel.logoUrl && <img src={row.channel.logoUrl} alt="" loading="lazy" />}
                     <span>{row.channel.name}</span>
@@ -308,7 +318,7 @@ export function Guide({ onAddSource, capabilities }: Props): JSX.Element {
 
                   <div className="guide__track" style={{ width: trackWidth }}>
                     {row.programmes.length === 0 ? (
-                      <div className="guide__gap">No guide data</div>
+                      <div className="guide__gap">{t('guide.noData')}</div>
                     ) : (
                       row.programmes.map((programme) => {
                         const left = Math.max(0, ((programme.startsAt - start) / 60_000) * PX_PER_MIN)
@@ -350,12 +360,14 @@ export function Guide({ onAddSource, capabilities }: Props): JSX.Element {
         {guide && guide.rows.length === PAGE_SIZE && (
           <div className="dialog__foot" style={{ borderTop: '1px solid var(--border)' }}>
             <button className="btn" onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0}>
-              Previous {PAGE_SIZE}
+              {t('guide.previousPage', { count: PAGE_SIZE })}
             </button>
-            <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>Rows {page * PAGE_SIZE + 1}–{(page + 1) * PAGE_SIZE}</span>
+            <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>
+              {t('guide.rowsRange', { from: page * PAGE_SIZE + 1, to: (page + 1) * PAGE_SIZE })}
+            </span>
             <div className="spacer" />
             <button className="btn" onClick={() => setPage((p) => p + 1)}>
-              Next {PAGE_SIZE}
+              {t('guide.nextPage', { count: PAGE_SIZE })}
             </button>
           </div>
         )}
@@ -388,7 +400,7 @@ export function Guide({ onAddSource, capabilities }: Props): JSX.Element {
 
             <div className="dialog__body">
               <p style={{ margin: 0, lineHeight: 1.6, color: 'var(--text-muted)' }}>
-                {selected.programme.description ?? 'No description provided.'}
+                {selected.programme.description ?? t('guide.noDescription')}
               </p>
 
               {scheduleNote && (
@@ -406,9 +418,9 @@ export function Guide({ onAddSource, capabilities }: Props): JSX.Element {
                 }
                 title={
                   capabilities?.ffmpeg === false
-                    ? 'Recording needs ffmpeg'
+                    ? t('guide.needsFfmpeg')
                     : selected.programme.endsAt <= Date.now()
-                      ? 'This programme has already finished'
+                      ? t('guide.alreadyFinished')
                       : undefined
                 }
                 onClick={() => {
@@ -425,14 +437,14 @@ export function Guide({ onAddSource, capabilities }: Props): JSX.Element {
                     .then(() =>
                       setScheduleNote({
                         kind: 'ok',
-                        text: 'Scheduled. It will appear in Library, with 2 minutes before and 5 after.'
+                        text: t('guide.scheduleNote')
                       })
                     )
                     .catch((e) => setScheduleNote({ kind: 'error', text: messageOf(e) }))
                 }}
               >
                 <IconRecord size={15} />
-                Record
+                {t('guide.record')}
               </button>
 
               {/* Recording needs ffmpeg and disk; a reminder needs neither, so
@@ -442,17 +454,17 @@ export function Guide({ onAddSource, capabilities }: Props): JSX.Element {
                 disabled={selected.programme.startsAt <= Date.now()}
                 title={
                   selected.programme.startsAt <= Date.now()
-                    ? 'This programme has already started'
+                    ? t('guide.alreadyStarted')
                     : reminder
-                      ? 'Cancel this reminder'
-                      : 'Get a notification 5 minutes before it starts'
+                      ? t('guide.cancelReminder')
+                      : t('guide.reminderHint')
                 }
                 onClick={() => {
                   if (reminder) {
                     void invoke('reminders:remove', reminder.id)
                       .then(() => {
                         setReminder(null)
-                        setScheduleNote({ kind: 'ok', text: 'Reminder cancelled.' })
+                        setScheduleNote({ kind: 'ok', text: t('guide.reminderCancelled') })
                       })
                       .catch((e) => setScheduleNote({ kind: 'error', text: messageOf(e) }))
                     return
@@ -469,19 +481,19 @@ export function Guide({ onAddSource, capabilities }: Props): JSX.Element {
                       setReminder(created)
                       setScheduleNote({
                         kind: 'ok',
-                        text: 'You will get a notification 5 minutes before it starts. Clicking it tunes to the channel.'
+                        text: t('guide.reminderNote')
                       })
                     })
                     .catch((e) => setScheduleNote({ kind: 'error', text: messageOf(e) }))
                 }}
               >
                 <IconBell size={15} filled={reminder !== null} />
-                {reminder ? 'Reminder set' : 'Remind me'}
+                {reminder ? t('guide.reminderSet') : t('guide.remindMe')}
               </button>
 
               <div className="spacer" />
               <button className="btn" onClick={() => setSelected(null)}>
-                Close
+                {t('common.close')}
               </button>
             </div>
           </div>

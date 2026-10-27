@@ -3,6 +3,7 @@ import type { PlaylistDraft, SourceKind, XtreamAccountInfo } from '@shared/types
 import { invoke, messageOf } from '@renderer/lib/api'
 import { formatDate } from '@renderer/lib/format'
 import { useAppStore } from '@renderer/store/useAppStore'
+import { useT } from '@renderer/i18n'
 
 interface Props {
   onClose: () => void
@@ -17,6 +18,7 @@ type Status =
 
 export function AddSourceDialog({ onClose, onCreated }: Props): JSX.Element {
   const refreshPlaylists = useAppStore((s) => s.refreshPlaylists)
+  const t = useT()
 
   const [kind, setKind] = useState<SourceKind>('xtream')
   const [name, setName] = useState('')
@@ -75,10 +77,10 @@ export function AddSourceDialog({ onClose, onCreated }: Props): JSX.Element {
 
   return (
     <div className="scrim" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <div className="dialog" role="dialog" aria-modal="true" aria-label="Add a source">
+      <div className="dialog" role="dialog" aria-modal="true" aria-label={t('source.add')}>
         <div className="dialog__head">
-          <h2>Add a source</h2>
-          <p>LiberCast plays your own subscription. It does not supply channels.</p>
+          <h2>{t('source.add')}</h2>
+          <p>{t('source.addBody')}</p>
         </div>
 
         <div className="dialog__body">
@@ -87,18 +89,18 @@ export function AddSourceDialog({ onClose, onCreated }: Props): JSX.Element {
               Xtream Codes
             </button>
             <button aria-pressed={kind === 'm3u'} onClick={() => setKind('m3u')}>
-              M3U playlist
+              {t('source.m3u')}
             </button>
           </div>
 
           <div className="field">
             <label className="field__label" htmlFor="src-name">
-              Name
+              {t('source.name')}
             </label>
             <input
               id="src-name"
               className="input"
-              placeholder={kind === 'xtream' ? 'My provider' : 'My playlist'}
+              placeholder={kind === 'xtream' ? t('source.nameProvider') : t('source.namePlaylist')}
               value={name}
               onChange={(event) => setName(event.target.value)}
             />
@@ -108,7 +110,7 @@ export function AddSourceDialog({ onClose, onCreated }: Props): JSX.Element {
             <>
               <div className="field">
                 <label className="field__label" htmlFor="src-url">
-                  Server URL
+                  {t('source.serverUrl')}
                 </label>
                 <input
                   id="src-url"
@@ -118,15 +120,13 @@ export function AddSourceDialog({ onClose, onCreated }: Props): JSX.Element {
                   onChange={(event) => setUrl(event.target.value)}
                   spellCheck={false}
                 />
-                <span className="field__hint">
-                  Paste the host your provider gave you. Any trailing path is removed automatically.
-                </span>
+                <span className="field__hint">{t('source.serverUrlHint')}</span>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div className="field">
                   <label className="field__label" htmlFor="src-user">
-                    Username
+                    {t('settings.username')}
                   </label>
                   <input
                     id="src-user"
@@ -139,7 +139,7 @@ export function AddSourceDialog({ onClose, onCreated }: Props): JSX.Element {
                 </div>
                 <div className="field">
                   <label className="field__label" htmlFor="src-pass">
-                    Password
+                    {t('source.password')}
                   </label>
                   <input
                     id="src-pass"
@@ -152,15 +152,13 @@ export function AddSourceDialog({ onClose, onCreated }: Props): JSX.Element {
                 </div>
               </div>
 
-              <span className="field__hint">
-                The password is encrypted with Windows DPAPI and never leaves this machine.
-              </span>
+              <span className="field__hint">{t('source.passwordHint')}</span>
             </>
           ) : (
             <>
               <div className="field">
                 <label className="field__label" htmlFor="src-m3u">
-                  Playlist URL
+                  {t('source.playlistUrl')}
                 </label>
                 <input
                   id="src-m3u"
@@ -176,10 +174,10 @@ export function AddSourceDialog({ onClose, onCreated }: Props): JSX.Element {
               </div>
 
               <div className="field">
-                <span className="field__label">…or a local file</span>
+                <span className="field__label">{t('source.orLocalFile')}</span>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   <button className="btn" onClick={() => void browse()}>
-                    Browse…
+                    {t('source.browse')}
                   </button>
                   <span
                     style={{
@@ -190,7 +188,7 @@ export function AddSourceDialog({ onClose, onCreated }: Props): JSX.Element {
                       whiteSpace: 'nowrap'
                     }}
                   >
-                    {filePath ?? 'No file selected'}
+                    {filePath ?? t('source.noFile')}
                   </span>
                 </div>
               </div>
@@ -203,15 +201,18 @@ export function AddSourceDialog({ onClose, onCreated }: Props): JSX.Element {
             <div className="notice notice--success">
               {status.account ? (
                 <>
-                  Connected as <strong>{status.account.username}</strong> — status {status.account.status},{' '}
-                  {status.account.activeConnections}/{status.account.maxConnections} connections in use
+                  {t('source.connectedAs', {
+                    username: status.account.username,
+                    status: status.account.status,
+                    active: status.account.activeConnections,
+                    max: status.account.maxConnections
+                  })}
                   {status.account.expiresAt
-                    ? `, expires ${formatDate(status.account.expiresAt)}`
-                    : ', no expiry'}
-                  .
+                    ? t('source.expiresOn', { date: formatDate(status.account.expiresAt) })
+                    : t('source.noExpiry')}
                 </>
               ) : (
-                'Playlist reachable and parsed successfully.'
+                t('source.playlistOk')
               )}
             </div>
           )}
@@ -220,15 +221,15 @@ export function AddSourceDialog({ onClose, onCreated }: Props): JSX.Element {
         <div className="dialog__foot">
           <button className="btn" onClick={() => void test()} disabled={!canSubmit || status.kind === 'testing'}>
             {status.kind === 'testing' ? <span className="spinner" /> : null}
-            Test connection
+            {t('source.test')}
           </button>
           <div className="spacer" />
           <button className="btn btn--ghost" onClick={onClose}>
-            Cancel
+            {t('common.cancel')}
           </button>
           <button className="btn btn--primary" onClick={() => void save()} disabled={!canSubmit || saving}>
             {saving ? <span className="spinner" /> : null}
-            Add source
+            {t('source.addButton')}
           </button>
         </div>
       </div>

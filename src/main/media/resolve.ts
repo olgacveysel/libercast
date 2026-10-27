@@ -1,4 +1,5 @@
 import type { StreamSource } from '@shared/types'
+import { canReplay, durationMinutes, formatStart } from '@shared/catchup'
 import { getChannel } from '@main/db/repo/catalog'
 import { getPlaylist } from '@main/db/repo/playlists'
 import { getDownload } from '@main/db/repo/downloads'
@@ -116,6 +117,35 @@ export function resolveProviderStream(source: StreamSource): ProviderStream {
 
   const playlist = getPlaylist(channel.playlistId)
   if (!playlist) throw new Error('Playlist not found')
+
+  if (source.type === 'catchup') {
+    if (playlist.kind !== 'xtream') throw new Error('Catch-up needs an Xtream source')
+    if (channel.catchupDays <= 0) throw new Error('This channel has no catch-up archive')
+    if (!canReplay(source, channel.catchupDays)) {
+      throw new Error('That programme is outside the archive this channel keeps')
+    }
+
+    const client = xtreamClientFor(playlist)
+    const start = formatStart(source.startsAt, playlist.serverTimezone)
+    const minutes = durationMinutes(source)
+
+    // Panels are split roughly evenly between the query form and the path
+    // form, neither is documented, and the one that is not supported answers
+    // with an error page rather than a redirect. Offering both lets the
+    // existing "the provider serves something else here" path sort it out with
+    // one small request instead of a support thread.
+    return {
+      url: client.timeshiftUrl(channel.externalId, start, minutes),
+      userAgent: playlist.userAgent,
+      referrer: playlist.referrer,
+      label: `${channel.name} (catch-up)`,
+      durationSecs: Math.round((source.endsAt - source.startsAt) / 1000),
+      // Not live: it is a finished recording with a known length, and treating
+      // it as live would cost it its seek bar.
+      isLive: false,
+      alternates: [client.timeshiftPathUrl(channel.externalId, start, minutes)]
+    }
+  }
 
   let url = channel.streamUrl
   let alternates: string[] = []

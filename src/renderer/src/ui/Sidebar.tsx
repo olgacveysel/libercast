@@ -35,7 +35,8 @@ const NAV: { route: Route; label: TranslationKey; icon: ReactNode }[] = [
 ]
 
 export function Sidebar({ onAddSource, collapsed }: Props): JSX.Element {
-  const { route, setRoute, playlists, activePlaylistId, setActivePlaylist } = useAppStore()
+  const { route, setRoute, playlists, activePlaylistId, allSources, setActivePlaylist, setAllSources } =
+    useAppStore()
   const settings = useAppStore((state) => state.settings)
   const updateSettings = useAppStore((state) => state.updateSettings)
   const t = useT()
@@ -85,10 +86,32 @@ export function Sidebar({ onAddSource, collapsed }: Props): JSX.Element {
           <p className="sidebar__hint">{t('nav.noSources')}</p>
         )}
 
+        {/*
+          Only offered once there is something to merge. With one source it
+          would be a second button that does exactly what the first one does.
+        */}
+        {playlists.length > 1 && (
+          <button
+            className={`navitem ${allSources ? 'navitem--active' : ''}`}
+            onClick={() => {
+              setAllSources()
+              if (route === 'home' || route === 'settings') setRoute('live')
+            }}
+            title={t('nav.allSourcesBody')}
+          >
+            <span className="navitem__dot navitem__dot--ok" aria-hidden="true">
+              {playlists.length}
+            </span>
+            <span className="navitem__label navitem__label--grow">{t('nav.allSources')}</span>
+          </button>
+        )}
+
         {playlists.map((playlist) => (
           <button
             key={playlist.id}
-            className={`navitem ${activePlaylistId === playlist.id ? 'navitem--active' : ''}`}
+            className={`navitem ${
+              activePlaylistId === playlist.id && !allSources ? 'navitem--active' : ''
+            }`}
             onClick={() => {
               setActivePlaylist(playlist.id)
               if (route === 'home' || route === 'settings') setRoute('live')

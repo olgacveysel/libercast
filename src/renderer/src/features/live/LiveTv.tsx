@@ -22,7 +22,8 @@ interface Props {
 type Sort = NonNullable<ChannelQuery['sort']>
 
 export function LiveTv({ mode, onAddSource }: Props): JSX.Element {
-  const { activePlaylistId, playlists, activeChannel, setActiveChannel, capabilities, setRoute } = useAppStore()
+  const { activePlaylistId, allSources, playlists, activeChannel, setActiveChannel, capabilities, setRoute } =
+    useAppStore()
   const settings = useAppStore((state) => state.settings)
   const updateSettings = useAppStore((state) => state.updateSettings)
   const listsCollapsed = settings.liveListsCollapsed
@@ -80,25 +81,28 @@ export function LiveTv({ mode, onAddSource }: Props): JSX.Element {
   useEffect(() => {
     setCategoryId(null)
     setSearch('')
-    if (activePlaylistId == null) {
+    // Categories are each provider's own invention and do not line up between
+    // them, so a merged list has none. Search and the channel list carry it
+    // instead, which is what the Favorites screen already does.
+    if (activePlaylistId == null || allSources) {
       setCategories([])
       return
     }
     void invoke('categories:list', { playlistId: activePlaylistId, kind: 'live' })
       .then(setCategories)
       .catch((e) => setError(messageOf(e)))
-  }, [activePlaylistId])
+  }, [activePlaylistId, allSources])
 
   const loadChannels = useCallback(async () => {
-    if (activePlaylistId == null) {
+    if (activePlaylistId == null && !allSources) {
       setChannels([])
       setTotal(0)
       return
     }
 
     const query: ChannelQuery = {
-      playlistId: activePlaylistId,
-      categoryId: mode === 'favorites' ? null : categoryId,
+      ...(allSources ? { merge: true } : { playlistId: activePlaylistId! }),
+      categoryId: allSources || mode === 'favorites' ? null : categoryId,
       search: debounced || undefined,
       favoritesOnly: mode === 'favorites',
       includeHidden: showHidden,
@@ -117,7 +121,7 @@ export function LiveTv({ mode, onAddSource }: Props): JSX.Element {
     } finally {
       setLoading(false)
     }
-  }, [activePlaylistId, categoryId, debounced, sort, mode, showHidden])
+  }, [activePlaylistId, allSources, categoryId, debounced, sort, mode, showHidden])
 
   useEffect(() => {
     void loadChannels()
@@ -188,14 +192,17 @@ export function LiveTv({ mode, onAddSource }: Props): JSX.Element {
     }
   }
 
-  if (!playlist) {
+  // In merged mode there is no single playlist behind the screen, so the
+  // guard below has to let it through — it is asking "is there a source at
+  // all", not "which one".
+  if (!playlist && !(allSources && playlists.length > 0)) {
     return (
       <Empty
-        title="No source selected"
-        description="Add an Xtream Codes account or an M3U playlist to start browsing channels."
+        title={t('mv.noSource')}
+        description={t('live.noSourceBody')}
         action={
           <button className="btn btn--primary" onClick={onAddSource}>
-            Add a source
+            {t('nav.addSource')}
           </button>
         }
       />
@@ -259,16 +266,23 @@ export function LiveTv({ mode, onAddSource }: Props): JSX.Element {
           time would run for a day and hammer an account that allows one
           connection; thirty favourites is a job worth doing.
         */}
-        {mode === 'favorites' && activePlaylistId !== null && (
+        {mode === 'favorites' && activePlaylistId !== null && !allSources && (
           <button className="btn btn--ghost" onClick={() => setScanning(true)}>
             {t('health.scan')}
           </button>
         )}
 
-        <button className="btn" onClick={() => void runSync()} disabled={syncing}>
-          {syncing ? <span className="spinner" /> : <IconRefresh size={15} />}
-          {syncing ? t('common.syncing') : t('common.sync')}
-        </button>
+        {/*
+          Syncing is a conversation with one provider, so it is offered only
+          when one is selected. Left visible in the merged list it would
+          silently sync whichever source happened to be chosen last.
+        */}
+        {!allSources && (
+          <button className="btn" onClick={() => void runSync()} disabled={syncing}>
+            {syncing ? <span className="spinner" /> : <IconRefresh size={15} />}
+            {syncing ? t('common.syncing') : t('common.sync')}
+          </button>
+        )}
       </div>
 
       {error && (
@@ -293,11 +307,11 @@ export function LiveTv({ mode, onAddSource }: Props): JSX.Element {
       )}
 
       <div
-        className={`live ${mode === 'favorites' ? 'live--nocats' : ''} ${
+        className={`live ${mode === 'favorites' || allSources ? 'live--nocats' : ''} ${
           listsCollapsed ? 'live--collapsed' : ''
         }`}
       >
-        {mode === 'live' && (
+        {mode === 'live' && !allSources && (
           <div className="pane">
             <div className="pane__head">{t('live.categories')}</div>
             <div className="pane__scroll">
@@ -324,7 +338,8 @@ export function LiveTv({ mode, onAddSource }: Props): JSX.Element {
 
         <div className="pane">
           <div className="pane__head">
-            Channels {total > channels.length && `(showing ${formatCount(channels.length)})`}
+            {t('live.channelsHead')}{' '}
+            {total > channels.length && t('live.showingCount', { count: formatCount(channels.length) })}
           </div>
 
           {loading && channels.length === 0 ? (
@@ -337,16 +352,16 @@ export function LiveTv({ mode, onAddSource }: Props): JSX.Element {
               keyOf={(channel) => channel.id}
               emptyState={
                 <Empty
-                  title={mode === 'favorites' ? 'No favorites yet' : 'No channels'}
+                  title={mode === 'favorites' ? t('live.noFavorites') : t('live.noChannels')}
                   description={
                     mode === 'favorites'
-                      ? 'Star a channel to keep it here.'
-                      : playlist.lastSyncedAt
-                        ? 'Nothing matches this filter.'
-                        : 'This source has not been synced yet.'
+                      ? t('live.noFavoritesBody')
+                      : playlist?.lastSyncedAt !== null || allSources
+                        ? t('live.noMatches')
+                        : t('live.notSynced')
                   }
                   action={
-                    !playlist.lastSyncedAt && mode === 'live' ? (
+                    playlist && !playlist.lastSyncedAt && mode === 'live' ? (
                       <button className="btn btn--primary" onClick={() => void runSync()} disabled={syncing}>
                         {t('live.syncNow')}
                       </button>

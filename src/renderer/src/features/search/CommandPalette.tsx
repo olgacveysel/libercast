@@ -4,6 +4,7 @@ import { invoke, messageOf } from '@renderer/lib/api'
 import { initials } from '@renderer/lib/format'
 import { useAppStore, type Route } from '@renderer/store/useAppStore'
 import { IconFilm, IconGuide, IconGrid, IconLibrary, IconSearch, IconStack, IconTv } from '@renderer/ui/Icon'
+import { useT } from '@renderer/i18n'
 
 interface Props {
   onClose: () => void
@@ -34,6 +35,7 @@ const EMPTY: SearchResults = {
  */
 export function CommandPalette({ onClose }: Props): JSX.Element {
   const { activePlaylistId, setRoute, setActiveChannel, playlists } = useAppStore()
+  const t = useT()
 
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResults>(EMPTY)
@@ -71,13 +73,13 @@ export function CommandPalette({ onClose }: Props): JSX.Element {
   // the user having to know it is in the sidebar.
   const navigationRows: Row[] = useMemo(() => {
     const screens: { route: Route; label: string; icon: ReactNode }[] = [
-      { route: 'live', label: 'Live TV', icon: <IconTv size={15} /> },
-      { route: 'guide', label: 'Guide', icon: <IconGuide size={15} /> },
-      { route: 'multiview', label: 'Multi-view', icon: <IconGrid size={15} /> },
-      { route: 'movies', label: 'Movies', icon: <IconFilm size={15} /> },
-      { route: 'series', label: 'Series', icon: <IconStack size={15} /> },
-      { route: 'library', label: 'Library', icon: <IconLibrary size={15} /> },
-      { route: 'settings', label: 'Settings', icon: <IconSearch size={15} /> }
+      { route: 'live', label: t('nav.live'), icon: <IconTv size={15} /> },
+      { route: 'guide', label: t('nav.guide'), icon: <IconGuide size={15} /> },
+      { route: 'multiview', label: t('nav.multiview'), icon: <IconGrid size={15} /> },
+      { route: 'movies', label: t('nav.movies'), icon: <IconFilm size={15} /> },
+      { route: 'series', label: t('nav.series'), icon: <IconStack size={15} /> },
+      { route: 'library', label: t('nav.library'), icon: <IconLibrary size={15} /> },
+      { route: 'settings', label: t('nav.settings'), icon: <IconSearch size={15} /> }
     ]
 
     const needle = query.trim().toLowerCase()
@@ -87,10 +89,10 @@ export function CommandPalette({ onClose }: Props): JSX.Element {
         key: `route:${screen.route}`,
         icon: screen.icon,
         title: screen.label,
-        hint: 'Go to',
+        hint: t('palette.goTo'),
         run: () => goTo(screen.route)
       }))
-  }, [query, goTo])
+  }, [query, goTo, t])
 
   useEffect(() => {
     const needle = query.trim()
@@ -129,12 +131,12 @@ export function CommandPalette({ onClose }: Props): JSX.Element {
       }))
 
     return [
-      ...contentRows(results.live, 'Live'),
-      ...contentRows(results.movies, 'Movie'),
-      ...contentRows(results.series, 'Series'),
+      ...contentRows(results.live, t('palette.live')),
+      ...contentRows(results.movies, t('palette.movie')),
+      ...contentRows(results.series, t('nav.series')),
       ...navigationRows
     ]
-  }, [results, navigationRows, openChannel])
+  }, [results, navigationRows, openChannel, t])
 
   useEffect(() => setActive(0), [rows.length])
 
@@ -165,20 +167,20 @@ export function CommandPalette({ onClose }: Props): JSX.Element {
 
   return (
     <div className="scrim scrim--top" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <div className="palette" role="dialog" aria-modal="true" aria-label="Search">
+      <div className="palette" role="dialog" aria-modal="true" aria-label={t('nav.search')}>
         <div className="palette__input">
           <IconSearch size={17} />
           <input
             autoFocus
             placeholder={
               playlists.length === 0
-                ? 'Add a source to search your channels…'
-                : 'Search channels, movies, series — or jump to a screen'
+                ? t('palette.needsSource')
+                : t('palette.placeholder')
             }
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={onKeyDown}
-            aria-label="Search"
+            aria-label={t('nav.search')}
           />
           {loading && <span className="spinner" />}
           <kbd>Esc</kbd>
@@ -204,21 +206,21 @@ export function CommandPalette({ onClose }: Props): JSX.Element {
           {rows.length === 0 && (
             <p className="palette__empty">
               {query.trim().length < 2
-                ? 'Type at least two characters.'
-                : 'Nothing matched. Try a shorter search, or sync the source first.'}
+                ? t('palette.typeMore')
+                : t('palette.noResults')}
             </p>
           )}
         </div>
 
         <div className="palette__foot">
           <span>
-            <kbd>↑</kbd> <kbd>↓</kbd> to move
+            <kbd>↑</kbd> <kbd>↓</kbd> {t('palette.toMove')}
           </span>
           <span>
-            <kbd>↵</kbd> to open
+            <kbd>↵</kbd> {t('palette.toOpen')}
           </span>
           <span className="spacer" />
-          {totals > rows.length && <span>{totals.toLocaleString()} matches in total</span>}
+          {totals > rows.length && <span>{t('palette.matchesTotal', { count: totals.toLocaleString() })}</span>}
         </div>
       </div>
     </div>

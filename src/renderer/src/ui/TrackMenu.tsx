@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type JSX, type ReactNode } from 'react'
 import type { MediaTrack } from '@shared/types'
+import { useT } from '@renderer/i18n'
 
 interface Props {
   label: string
@@ -45,6 +46,7 @@ export function TrackMenu({
 }: Props): JSX.Element | null {
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
+  const t = useT()
 
   useEffect(() => {
     if (!open) return
@@ -69,7 +71,7 @@ export function TrackMenu({
   if (tracks.length <= 1 && !allowNone) return null
 
   const current = selected === null ? null : tracks.find((track) => track.index === selected) ?? null
-  const currentLabel = externalLabel ?? (current ? shortLabel(current) : 'Off')
+  const currentLabel = externalLabel ?? (current ? shortLabel(current) : t('common.off'))
 
   return (
     <div className="trackmenu" ref={containerRef}>
@@ -79,7 +81,7 @@ export function TrackMenu({
         disabled={disabled || (tracks.length === 0 && !allowNone)}
         aria-haspopup="menu"
         aria-expanded={open}
-        title={`${label}: ${externalLabel ?? current?.label ?? 'Off'}`}
+        title={`${label}: ${externalLabel ?? current?.label ?? t('common.off')}`}
       >
         {icon}
         <span className="trackmenu__current">{currentLabel}</span>
@@ -101,7 +103,7 @@ export function TrackMenu({
               }}
             >
               <span className="trackmenu__tick">{selected === null && !externalLabel ? '✓' : ''}</span>
-              Off
+              {t('common.off')}
             </button>
           )}
 
@@ -114,7 +116,7 @@ export function TrackMenu({
             >
               <span className="trackmenu__tick">✓</span>
               <span className="trackmenu__label">{externalLabel}</span>
-              <span className="trackmenu__codec">file</span>
+              <span className="trackmenu__codec">{t('tracks.file')}</span>
             </button>
           )}
 
@@ -137,7 +139,7 @@ export function TrackMenu({
           ))}
 
           {tracks.length === 0 && !externalLabel && (
-            <div className="trackmenu__empty">This title has no subtitle tracks.</div>
+            <div className="trackmenu__empty">{t('tracks.noSubtitleTracks')}</div>
           )}
 
           {onOpenFile && (
@@ -150,12 +152,12 @@ export function TrackMenu({
                 }}
               >
                 <span className="trackmenu__tick" />
-                <span className="trackmenu__label">Open subtitle file…</span>
+                <span className="trackmenu__label">{t('tracks.openFile')}</span>
               </button>
 
               {externalLabel && onOffsetChange && (
                 <div className="trackmenu__offset">
-                  <span>Timing</span>
+                  <span>{t('tracks.timing')}</span>
                   <button className="btn btn--ghost" onClick={() => onOffsetChange(offsetSecs - 0.5)}>
                     −0.5s
                   </button>

@@ -1,15 +1,19 @@
-import { useCallback, useEffect, useMemo, useState, type JSX } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from 'react'
 import type { ChannelWithState } from '@shared/types'
 import { invoke, messageOf } from '@renderer/lib/api'
 import { initials } from '@renderer/lib/format'
 import { useAppStore } from '@renderer/store/useAppStore'
 import { Empty } from '@renderer/ui/Empty'
-import { IconClose, IconPlus, IconSearch, IconVolume } from '@renderer/ui/Icon'
 import { useStream } from '@renderer/features/player/useStream'
+import { SwitchedNotice } from '@renderer/features/player/SwitchedNotice'
 import { useHotkeys } from '@renderer/features/player/useHotkeys'
 import { formatVolume, stepVolume, volumeLevel, VOLUME_STEP } from '@renderer/features/player/volume'
 import { useT } from '@renderer/i18n'
+import { nextAudioTile } from '@shared/detached'
 import { clampAudioTile, tileFromKey } from './audioFocus'
+import { clampFocus, gridStyle, nextFocus } from './layout'
+import { useDetached } from './useDetached'
+import { IconClose, IconFullscreen, IconPlus, IconSearch, IconVolume } from '@renderer/ui/Icon'
 
 interface Props {
   onAddSource: () => void
@@ -30,9 +34,42 @@ export function MultiView({ onAddSource }: Props): JSX.Element {
   const tileCount = settings.multiViewColumns * settings.multiViewRows
 
   // One tile carries the audio; the rest are muted. Watching four channels with
-  // four soundtracks at once is unusable, so this is not optional.
-  const [audioTile, setAudioTile] = useState(0)
+  // four soundtracks at once is unusable, so this is not optional. It can be
+  // nothing at all once every tile is playing in a window of its own.
+  const [audioTile, setAudioTile] = useState<number | null>(0)
+  const detached = useDetached()
   const [picking, setPicking] = useState<number | null>(null)
+  /** The tile currently filling the top of the grid, or null for an even grid. */
+  const [focused, setFocused] = useState<number | null>(null)
+  const gridRef = useRef<HTMLDivElement>(null)
+
+  /**
+   * Promoting a tile moves the sound to it as well.
+   *
+   * On a goal you want that match bigger *and* audible, and making it one
+   * gesture rather than two is the whole point of the control.
+   */
+  const promote = useCallback((index: number) => {
+    setFocused((current) => nextFocus(current, index))
+    setAudioTile(index)
+  }, [])
+
+  /**
+   * A detached window carries its own sound and its own picture, so the grid
+   * gives both up for that tile: the audio moves to one still in the grid, and
+   * a promoted tile that has left stops filling the top row.
+   */
+  useEffect(() => {
+    setAudioTile((current) => nextAudioTile(current ?? 0, detached, tileCount))
+    setFocused((current) => (current !== null && detached.includes(current) ? null : current))
+  }, [detached, tileCount])
+
+  const toggleFullscreen = useCallback(() => {
+    const root = gridRef.current
+    if (!root) return
+    if (document.fullscreenElement) void document.exitFullscreen()
+    else void root.requestFullscreen()
+  }, [])
 
   // The level is the application's, not this screen's: the volume you set here
   // is the volume the full player opens at, which is what you would expect
@@ -45,7 +82,8 @@ export function MultiView({ onAddSource }: Props): JSX.Element {
   useHotkeys({
     adjustVolume: (delta) =>
       void updateSettings({ volume: stepVolume(settings.volume, delta), muted: false }),
-    toggleMute: () => void updateSettings({ muted: !settings.muted })
+    toggleMute: () => void updateSettings({ muted: !settings.muted }),
+    toggleFullscreen
   })
 
   // The number keys move the sound between tiles. Handled here rather than in
@@ -98,7 +136,8 @@ export function MultiView({ onAddSource }: Props): JSX.Element {
 
   const setLayout = (columns: number, rows: number): void => {
     void updateSettings({ multiViewColumns: columns, multiViewRows: rows })
-    setAudioTile((current) => clampAudioTile(current, columns * rows))
+    setAudioTile((current) => clampAudioTile(current ?? 0, columns * rows))
+    setFocused((current) => clampFocus(current, columns * rows))
   }
 
   if (!playlist) {
@@ -181,6 +220,15 @@ export function MultiView({ onAddSource }: Props): JSX.Element {
 
         <button
           className="btn btn--ghost"
+          onClick={toggleFullscreen}
+          title={`${t('player.fullscreen')} (F)`}
+          aria-label={t('player.fullscreen')}
+        >
+          <IconFullscreen size={15} />
+        </button>
+
+        <button
+          className="btn btn--ghost"
           onClick={() => void updateSettings({ multiViewChannels: [] })}
           disabled={filled === 0}
         >
@@ -195,27 +243,42 @@ export function MultiView({ onAddSource }: Props): JSX.Element {
       )}
 
       <div
-        className="mvgrid"
-        style={{
-          gridTemplateColumns: `repeat(${settings.multiViewColumns}, 1fr)`,
-          gridTemplateRows: `repeat(${settings.multiViewRows}, 1fr)`
-        }}
+        ref={gridRef}
+        className={`mvgrid ${focused !== null ? 'mvgrid--focus' : ''}`}
+        style={gridStyle(settings.multiViewColumns, settings.multiViewRows, focused)}
       >
-        {Array.from({ length: tileCount }, (_, index) => (
-          <Tile
-            key={index}
-            index={index}
-            channelId={channels[index] ?? null}
-            hasAudio={audioTile === index}
-            onFocusAudio={() => setAudioTile(index)}
-            onPick={() => setPicking(index)}
-            onClear={() => setTile(index, null)}
-            onExpand={(channel) => {
-              setActiveChannel(channel)
-              setRoute('live')
-            }}
-          />
-        ))}
+        {Array.from({ length: tileCount }, (_, index) => {
+          const channelId = channels[index] ?? null
+
+          // A detached tile renders a placeholder rather than a muted player.
+          // That is the whole point: each tile is its own provider connection,
+          // and most accounts allow very few, so the same channel must never be
+          // open in the grid and in a window at the same time.
+          if (channelId !== null && detached.includes(index)) {
+            return <DetachedTile key={index} index={index} channelId={channelId} />
+          }
+
+          return (
+            <Tile
+              key={index}
+              index={index}
+              channelId={channelId}
+              hasAudio={audioTile === index}
+              isFocused={focused === index}
+              onFocusAudio={() => setAudioTile(index)}
+              onPromote={() => promote(index)}
+              onDetach={() => {
+                if (channelId !== null) void invoke('multiview:detach', { channelId, tile: index })
+              }}
+              onPick={() => setPicking(index)}
+              onClear={() => setTile(index, null)}
+              onExpand={(channel) => {
+                setActiveChannel(channel)
+                setRoute('live')
+              }}
+            />
+          )
+        })}
       </div>
 
       {picking !== null && (
@@ -232,11 +295,39 @@ export function MultiView({ onAddSource }: Props): JSX.Element {
   )
 }
 
+/**
+ * The stand-in for a tile that is playing in a window of its own.
+ *
+ * It looks up the channel so the placeholder can name it — seeing which match
+ * went to the other monitor matters when four of them are running.
+ */
+function DetachedTile({ index, channelId }: { index: number; channelId: number }): JSX.Element {
+  const [channel, setChannel] = useState<ChannelWithState | null>(null)
+  const t = useT()
+
+  useEffect(() => {
+    void invoke('channels:get', channelId).then(setChannel).catch(() => setChannel(null))
+  }, [channelId])
+
+  return (
+    <div className="mvtile mvtile--detached">
+      <strong>{channel?.name ?? t('common.loading')}</strong>
+      <span>{t('mv.detached')}</span>
+      <button className="btn" onClick={() => void invoke('multiview:attach', index)}>
+        {t('mv.returnToGrid')}
+      </button>
+    </div>
+  )
+}
+
 interface TileProps {
   index: number
   channelId: number | null
   hasAudio: boolean
+  isFocused: boolean
   onFocusAudio: () => void
+  onPromote: () => void
+  onDetach: () => void
   onPick: () => void
   onClear: () => void
   onExpand: (channel: ChannelWithState) => void
@@ -246,7 +337,10 @@ function Tile({
   index,
   channelId,
   hasAudio,
+  isFocused,
   onFocusAudio,
+  onPromote,
+  onDetach,
   onPick,
   onClear,
   onExpand
@@ -287,8 +381,17 @@ function Tile({
   }
 
   return (
-    <div className={`mvtile ${hasAudio ? 'mvtile--audio' : ''}`} onClick={onFocusAudio}>
+    <div
+      className={`mvtile ${hasAudio ? 'mvtile--audio' : ''} ${isFocused ? 'mvtile--focused' : ''}`}
+      onClick={onFocusAudio}
+      // One click moves the sound, two enlarge. The first click of a
+      // double-click moving the sound first is harmless, because promoting
+      // moves it to the same tile anyway.
+      onDoubleClick={onPromote}
+    >
       <video ref={videoRef} className="mvtile__video" playsInline autoPlay muted />
+
+      <SwitchedNotice switched={state.switched} />
 
       {state.status !== 'playing' && (
         <div className="mvtile__overlay">
@@ -339,6 +442,36 @@ function Tile({
         </button>
 
         <button
+          className={`mvtile__act ${isFocused ? 'mvtile__act--on' : ''}`}
+          onClick={(event) => {
+            event.stopPropagation()
+            onPromote()
+          }}
+          title={isFocused ? t('mv.shrink') : t('mv.enlarge')}
+          aria-label={isFocused ? t('mv.shrink') : t('mv.enlarge')}
+          aria-pressed={isFocused}
+        >
+          {isFocused ? '⤡' : '⤢'}
+        </button>
+
+        {/*
+          Detaching is what makes two monitors worth having: the window can be
+          dragged to the other screen and fullscreened there while the grid
+          keeps playing the rest.
+        */}
+        <button
+          className="mvtile__act"
+          onClick={(event) => {
+            event.stopPropagation()
+            onDetach()
+          }}
+          title={t('mv.detach')}
+          aria-label={t('mv.detach')}
+        >
+          ⧉
+        </button>
+
+        <button
           className="mvtile__act"
           onClick={(event) => {
             event.stopPropagation()
@@ -347,7 +480,7 @@ function Tile({
           title={t('mv.watchFull')}
           aria-label={t('mv.watchFull')}
         >
-          ⤢
+          ▶
         </button>
 
         <button
@@ -385,6 +518,7 @@ interface PickerProps {
 }
 
 function ChannelPicker({ playlistId, onClose, onPick }: PickerProps): JSX.Element {
+  const t = useT()
   const [search, setSearch] = useState('')
   const [results, setResults] = useState<ChannelWithState[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -407,10 +541,10 @@ function ChannelPicker({ playlistId, onClose, onPick }: PickerProps): JSX.Elemen
 
   return (
     <div className="scrim" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <div className="dialog" role="dialog" aria-modal="true" aria-label="Choose a channel">
+      <div className="dialog" role="dialog" aria-modal="true" aria-label={t('mv.chooseChannel')}>
         <div className="dialog__head">
-          <h2>Choose a channel</h2>
-          <p>Recently watched channels are listed first.</p>
+          <h2>{t('mv.chooseChannel')}</h2>
+          <p>{t('mv.chooseChannelBody')}</p>
         </div>
 
         <div className="dialog__body" style={{ gap: 10 }}>
@@ -418,7 +552,7 @@ function ChannelPicker({ playlistId, onClose, onPick }: PickerProps): JSX.Elemen
             <IconSearch size={15} />
             <input
               className="input"
-              placeholder="Search channels…"
+              placeholder={t('live.searchChannels')}
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               autoFocus
@@ -443,7 +577,7 @@ function ChannelPicker({ playlistId, onClose, onPick }: PickerProps): JSX.Elemen
 
             {results.length === 0 && (
               <p style={{ padding: 12, color: 'var(--text-dim)', fontSize: 12.5, margin: 0 }}>
-                No channels match that search.
+                {t('mv.noMatches')}
               </p>
             )}
           </div>
@@ -452,7 +586,7 @@ function ChannelPicker({ playlistId, onClose, onPick }: PickerProps): JSX.Elemen
         <div className="dialog__foot">
           <div className="spacer" />
           <button className="btn" onClick={onClose}>
-            Cancel
+            {t('common.cancel')}
           </button>
         </div>
       </div>

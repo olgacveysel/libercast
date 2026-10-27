@@ -22,6 +22,14 @@ interface AppState {
   settings: AppSettings
   playlists: Playlist[]
   activePlaylistId: number | null
+  /**
+   * Show every source as one list instead of one source at a time.
+   *
+   * A separate flag rather than a null playlist id: null already means "no
+   * source at all", and a screen that cannot tell those two apart shows an
+   * empty state to someone who has just asked to see everything.
+   */
+  allSources: boolean
   activeChannel: ChannelWithState | null
   syncing: SyncProgress | null
   capabilities: MediaCapabilities | null
@@ -36,6 +44,7 @@ interface AppState {
 
   setRoute: (route: Route) => void
   setActivePlaylist: (id: number | null) => void
+  setAllSources: () => void
   setActiveChannel: (channel: ChannelWithState | null) => void
   setSyncing: (progress: SyncProgress | null) => void
   setSleepAt: (at: number | null) => void
@@ -51,6 +60,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   settings: DEFAULT_SETTINGS,
   playlists: [],
   activePlaylistId: null,
+  allSources: false,
   activeChannel: null,
   syncing: null,
   capabilities: null,
@@ -58,7 +68,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   sleepAt: null,
 
   setRoute: (route) => set({ route }),
-  setActivePlaylist: (activePlaylistId) => set({ activePlaylistId }),
+  setActivePlaylist: (activePlaylistId) => set({ activePlaylistId, allSources: false }),
+  setAllSources: () => set({ allSources: true }),
   setActiveChannel: (activeChannel) => set({ activeChannel }),
   setSyncing: (syncing) => set({ syncing }),
   setSleepAt: (sleepAt) => set({ sleepAt }),

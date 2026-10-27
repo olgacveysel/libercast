@@ -1,6 +1,7 @@
 import { join } from 'node:path'
 import { app } from 'electron'
 import Database from 'better-sqlite3'
+import { backfillMatchKeys } from './backfill'
 import { migrate } from './migrations'
 import { adoptPreviousUserData, databaseFileName } from './relocate'
 
@@ -25,6 +26,9 @@ export function getDb(): Database.Database {
   db.pragma('cache_size = -32000')
 
   migrate(db)
+  // Needs JavaScript, so it cannot live in a migration.
+  backfillMatchKeys(db)
+
   instance = db
   return db
 }

@@ -63,3 +63,65 @@ export function pickUpdate(
 export function onPrereleaseLine(current: string): boolean {
   return /-/.test(current.trim())
 }
+
+/**
+ * How long a check is good for.
+ *
+ * Once a day is often enough to hear about a build within a day of it
+ * existing, and rare enough that someone who leaves the application open for a
+ * week makes seven requests rather than one per launch of their machine.
+ */
+export const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000
+
+export interface CheckSchedule {
+  autoCheckUpdates: boolean | null
+  lastUpdateCheck: number | null
+}
+
+/**
+ * Whether to ask GitHub on this launch.
+ *
+ * `null` — nobody has been asked yet — behaves exactly like `false`. That is
+ * the whole point: until the user answers the prompt, the application makes no
+ * request it was not told to make, and the installer's notice stays true.
+ */
+export function shouldCheckNow(settings: CheckSchedule, now = Date.now()): boolean {
+  if (settings.autoCheckUpdates !== true) return false
+
+  const last = settings.lastUpdateCheck
+  if (last === null || !Number.isFinite(last)) return true
+
+  // A clock that has gone backwards — a timezone change, a correction, a
+  // restored backup — must not lock checking out until it catches up.
+  if (last > now) return true
+
+  return now - last >= CHECK_INTERVAL_MS
+}
+
+export interface RememberedUpdate {
+  knownUpdateVersion: string | null
+  knownUpdateUrl: string | null
+  dismissedUpdate: string | null
+}
+
+/**
+ * The update worth putting on screen right now, from what was remembered.
+ *
+ * Re-checks that the remembered version is still newer than what is running:
+ * after updating, the note has to disappear on its own rather than waiting for
+ * the next check to clear it.
+ */
+export function bannerUpdate(
+  remembered: RememberedUpdate,
+  current: string
+): { version: string; url: string } | null {
+  const version = remembered.knownUpdateVersion?.trim()
+  const url = remembered.knownUpdateUrl?.trim()
+
+  if (!version || !url) return null
+  if (!url.startsWith('https://github.com/')) return null
+  if (!isNewer(version, current)) return null
+  if (remembered.dismissedUpdate === version) return null
+
+  return { version, url }
+}

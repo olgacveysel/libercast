@@ -11,6 +11,8 @@ import { reminderScheduler } from './epgReminders'
 import { autoRefresh } from './autoRefresh'
 import { streamServer } from './media/streamServer'
 import { createWindow, getMainWindow } from './window'
+import { closeAllDetached } from './windows/detached'
+import { checkOnLaunch } from './updates'
 import { createLogger, errorMessage } from './util/logger'
 
 const log = createLogger('app')
@@ -32,7 +34,9 @@ function bootstrap(): void {
   }
 
   app.on('second-instance', () => {
-    const [existing] = BrowserWindow.getAllWindows()
+    // The main window, not whichever window happens to be first: a detached
+    // tile on a second monitor must not be what a second launch brings up.
+    const existing = getMainWindow() ?? BrowserWindow.getAllWindows()[0]
     if (existing) {
       if (existing.isMinimized()) existing.restore()
       existing.focus()
@@ -86,7 +90,21 @@ function bootstrap(): void {
       optimizer.watchWindowShortcuts(window)
     })
 
-    createWindow()
+    // A detached tile has nowhere to return to once the grid is gone, and on
+    // Windows it would keep the whole application alive with no way back to it.
+    const main = createWindow()
+    main.on('closed', closeAllDetached)
+
+    // Only runs at all once the user has turned it on, and at most once a day
+    // after that. Deliberately after the window exists, so a slow or refused
+    // request never delays the application appearing.
+    main.webContents.once('did-finish-load', () => {
+      void checkOnLaunch()
+        .then((update) => {
+          if (update) main.webContents.send('updates:available', update)
+        })
+        .catch(() => undefined)
+    })
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow()
@@ -103,6 +121,7 @@ function bootstrap(): void {
     scheduler.stop()
     reminderScheduler.stop()
     autoRefresh.stop()
+    closeAllDetached()
     recorder.stopAll()
     downloader.stopAll()
     streamServer.closeAll()

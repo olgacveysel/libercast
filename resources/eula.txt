@@ -1,6 +1,6 @@
-LiberCast — beta software notice
+LiberCast -- beta software notice
 
-Version 0.9.0-beta.1
+Version 0.9.0-beta.3
 
 Please read this before installing. Installing LiberCast means you accept it.
 
@@ -54,7 +54,7 @@ LiberCast's own source code is open source under the MIT licence, which is in
 LICENSE in the installation folder.
 
 This installer also contains ffmpeg, which is licensed under the GNU General
-Public License version 3 or later — a different licence from LiberCast's own.
+Public License version 3 or later -- a different licence from LiberCast's own.
 The full text and details of where to obtain ffmpeg's source are in
 THIRD-PARTY-NOTICES.md in the installation folder.
 

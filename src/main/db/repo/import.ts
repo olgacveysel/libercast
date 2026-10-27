@@ -1,4 +1,5 @@
 import type { ContentKind } from '@shared/types'
+import { normalizedKey } from '@main/sources/epgMatch'
 import type { ParsedCategory, ParsedChannel } from '@main/sources/types'
 import { fold, getDb } from '../index'
 
@@ -43,8 +44,9 @@ export function importCatalog(
   const upsertChannel = db.prepare(
     `INSERT INTO channels
        (playlist_id, category_id, external_id, kind, name, name_folded, number, logo_url,
-        epg_channel_id, stream_url, container_extension, is_adult, hidden, added_at, seen_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
+        epg_channel_id, stream_url, container_extension, is_adult, catchup_days, match_key,
+        hidden, added_at, seen_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
      ON CONFLICT(playlist_id, external_id) DO UPDATE SET
        category_id = excluded.category_id,
        kind = excluded.kind,
@@ -56,6 +58,8 @@ export function importCatalog(
        stream_url = excluded.stream_url,
        container_extension = excluded.container_extension,
        is_adult = excluded.is_adult,
+       catchup_days = excluded.catchup_days,
+       match_key = excluded.match_key,
        seen_at = excluded.seen_at`
   )
 
@@ -85,6 +89,9 @@ export function importCatalog(
         channel.streamUrl,
         channel.containerExtension ?? null,
         channel.isAdult ? 1 : 0,
+        Math.max(0, Math.trunc(channel.catchupDays ?? 0)),
+        // What the same channel on another provider will also normalise to.
+        normalizedKey(channel.name),
         stamp,
         stamp
       )

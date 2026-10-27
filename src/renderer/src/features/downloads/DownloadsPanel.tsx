@@ -1,21 +1,23 @@
 import { useCallback, useEffect, useState, type JSX } from 'react'
 import type { Download } from '@shared/types'
 import { invoke, messageOf, subscribe } from '@renderer/lib/api'
+import { useT, type TranslationKey } from '@renderer/i18n'
 import { Empty } from '@renderer/ui/Empty'
 import { IconFolder, IconPause, IconPlay, IconTrash } from '@renderer/ui/Icon'
 import { VodPlayer, type VodTarget } from '@renderer/features/vod/VodPlayer'
 import { estimateRemaining, formatBytes, formatSpeed } from './useDownload'
 
-const STATUS_LABEL: Record<Download['status'], string> = {
-  queued: 'Queued',
-  downloading: 'Downloading',
-  paused: 'Paused',
-  completed: 'Ready',
-  failed: 'Failed',
-  cancelled: 'Cancelled'
+const STATUS_LABEL: Record<Download['status'], TranslationKey> = {
+  queued: 'downloads.queued',
+  downloading: 'downloads.downloading',
+  paused: 'downloads.paused',
+  completed: 'common.ready',
+  failed: 'common.failed',
+  cancelled: 'common.cancelled'
 }
 
 export function DownloadsPanel(): JSX.Element {
+  const t = useT()
   const [downloads, setDownloads] = useState<Download[]>([])
   const [error, setError] = useState<string | null>(null)
   const [playing, setPlaying] = useState<VodTarget | null>(null)
@@ -52,7 +54,7 @@ export function DownloadsPanel(): JSX.Element {
   const remove = async (download: Download): Promise<void> => {
     const hasFile = download.filePath && download.bytesDone > 0
     const deleteFile = hasFile
-      ? window.confirm(`Delete the downloaded file as well?\n\n${download.filePath}`)
+      ? window.confirm(`${t('downloads.deleteFile')}\n\n${download.filePath}`)
       : false
 
     await act(() => invoke('downloads:remove', { id: download.id, deleteFile }))
@@ -61,10 +63,7 @@ export function DownloadsPanel(): JSX.Element {
 
   if (downloads.length === 0 && !loading) {
     return (
-      <Empty
-        title="Nothing downloaded"
-        description="Open a film or an episode and choose Download to keep it for offline viewing."
-      />
+      <Empty title={t('downloads.emptyTitle')} description={t('downloads.emptyBody')} />
     )
   }
 
@@ -104,9 +103,12 @@ export function DownloadsPanel(): JSX.Element {
               <span>
                 {download.status === 'completed'
                   ? formatBytes(download.bytesTotal)
-                  : `${formatBytes(download.bytesDone)}${
-                      download.bytesTotal > 0 ? ` of ${formatBytes(download.bytesTotal)}` : ''
-                    }`}
+                  : download.bytesTotal > 0
+                    ? t('downloads.ofTotal', {
+                        done: formatBytes(download.bytesDone),
+                        total: formatBytes(download.bytesTotal)
+                      })
+                    : formatBytes(download.bytesDone)}
                 {active && download.speed ? ` · ${formatSpeed(download.speed)}` : ''}
                 {active && estimateRemaining(download) ? ` · ${estimateRemaining(download)}` : ''}
               </span>
@@ -114,7 +116,7 @@ export function DownloadsPanel(): JSX.Element {
               {download.error && <span style={{ color: 'var(--danger)' }}>{download.error}</span>}
             </div>
 
-            <span className={`badge ${active ? 'badge--live' : ''}`}>{STATUS_LABEL[download.status]}</span>
+            <span className={`badge ${active ? 'badge--live' : ''}`}>{t(STATUS_LABEL[download.status])}</span>
 
             {download.status === 'completed' && (
               <>
@@ -131,13 +133,13 @@ export function DownloadsPanel(): JSX.Element {
                   }
                 >
                   <IconPlay size={14} />
-                  Play
+                  {t('common.play')}
                 </button>
                 <button
                   className="btn btn--ghost"
                   onClick={() => void invoke('downloads:reveal', download.id)}
-                  aria-label="Show in folder"
-                  title="Show in folder"
+                  aria-label={t('library.showInFolder')}
+                  title={t('library.showInFolder')}
                 >
                   <IconFolder size={15} />
                 </button>
@@ -147,18 +149,18 @@ export function DownloadsPanel(): JSX.Element {
             {(download.status === 'downloading' || download.status === 'queued') && (
               <button className="btn" onClick={() => void act(() => invoke('downloads:pause', download.id))}>
                 <IconPause size={14} />
-                Pause
+                {t('common.pause')}
               </button>
             )}
 
             {(download.status === 'paused' || download.status === 'failed') && (
               <button className="btn" onClick={() => void act(() => invoke('downloads:resume', download.id))}>
                 <IconPlay size={14} />
-                Resume
+                {t('downloads.resume')}
               </button>
             )}
 
-            <button className="btn btn--danger" onClick={() => void remove(download)} aria-label="Remove">
+            <button className="btn btn--danger" onClick={() => void remove(download)} aria-label={t('common.remove')}>
               <IconTrash size={15} />
             </button>
           </div>

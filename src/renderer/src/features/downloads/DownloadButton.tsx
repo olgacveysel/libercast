@@ -2,6 +2,7 @@ import { useState, type JSX } from 'react'
 import type { Download, ProgressItemType } from '@shared/types'
 import { invoke, messageOf } from '@renderer/lib/api'
 import { IconDownload, IconPause, IconPlay, IconTrash } from '@renderer/ui/Icon'
+import { useT } from '@renderer/i18n'
 import { estimateRemaining, formatBytes, useDownload } from './useDownload'
 
 interface Props {
@@ -20,6 +21,7 @@ interface Props {
 export function DownloadButton(props: Props): JSX.Element {
   const { download } = useDownload(props.itemType, props.itemId)
   const [busy, setBusy] = useState(false)
+  const t = useT()
 
   const act = async (fn: () => Promise<unknown>): Promise<void> => {
     setBusy(true)
@@ -53,10 +55,10 @@ export function DownloadButton(props: Props): JSX.Element {
           void start()
         }}
         disabled={busy || props.disabled}
-        title={download?.error ?? 'Download for offline viewing'}
+        title={download?.error ?? t('downloads.offlineHint')}
       >
         <IconDownload size={15} />
-        {!props.compact && (download?.status === 'failed' ? 'Retry download' : 'Download')}
+        {!props.compact && t(download?.status === 'failed' ? 'downloads.retry' : 'downloads.download')}
       </button>
     )
   }
@@ -64,7 +66,7 @@ export function DownloadButton(props: Props): JSX.Element {
   if (download.status === 'completed') {
     return (
       <span className={`badge ${props.compact ? '' : 'badge--done'}`} title={download.filePath ?? undefined}>
-        ✓ {props.compact ? '' : `Downloaded · ${formatBytes(download.bytesTotal)}`}
+        ✓ {props.compact ? '' : t('downloads.downloadedSize', { size: formatBytes(download.bytesTotal) })}
       </span>
     )
   }
@@ -81,7 +83,7 @@ export function DownloadButton(props: Props): JSX.Element {
             void act(() => invoke('downloads:resume', download.id))
           }}
           disabled={busy}
-          aria-label="Resume download"
+          aria-label={t('downloads.resumeDownload')}
         >
           <IconPlay size={14} />
         </button>
@@ -93,7 +95,7 @@ export function DownloadButton(props: Props): JSX.Element {
             void act(() => invoke('downloads:pause', download.id))
           }}
           disabled={busy}
-          aria-label="Pause download"
+          aria-label={t('downloads.pauseDownload')}
         >
           <IconPause size={14} />
         </button>
@@ -106,7 +108,7 @@ export function DownloadButton(props: Props): JSX.Element {
           void act(() => invoke('downloads:cancel', download.id))
         }}
         disabled={busy}
-        aria-label="Cancel download"
+        aria-label={t('downloads.cancelDownload')}
       >
         <IconTrash size={14} />
       </button>
@@ -115,14 +117,15 @@ export function DownloadButton(props: Props): JSX.Element {
 }
 
 function ProgressPill({ download }: { download: Download }): JSX.Element {
+  const t = useT()
   const percent =
     download.bytesTotal > 0 ? Math.min(100, (download.bytesDone / download.bytesTotal) * 100) : 0
 
   const label =
     download.status === 'queued'
-      ? 'Queued'
+      ? t('downloads.queued')
       : download.status === 'paused'
-        ? `Paused · ${percent.toFixed(0)}%`
+        ? t('downloads.pausedPercent', { percent: percent.toFixed(0) })
         : `${percent.toFixed(0)}%`
 
   return (

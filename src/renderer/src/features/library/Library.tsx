@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type JSX } from 'react'
 import type { EpgReminder, MediaCapabilities, Recording, RecordingStatus } from '@shared/types'
 import { invoke, messageOf, subscribe } from '@renderer/lib/api'
 import { formatDate, formatTime } from '@renderer/lib/format'
-import { useT } from '@renderer/i18n'
+import { useT, type TranslationKey } from '@renderer/i18n'
 import { Empty } from '@renderer/ui/Empty'
 import { IconFolder, IconPlay, IconRecord, IconTrash } from '@renderer/ui/Icon'
 import { VodPlayer, type VodTarget } from '@renderer/features/vod/VodPlayer'
@@ -13,12 +13,12 @@ interface Props {
   onOpenSettings: () => void
 }
 
-const STATUS_LABEL: Record<RecordingStatus, string> = {
-  scheduled: 'Scheduled',
-  recording: 'Recording',
-  completed: 'Ready',
-  failed: 'Failed',
-  cancelled: 'Cancelled'
+const STATUS_LABEL: Record<RecordingStatus, TranslationKey> = {
+  scheduled: 'library.scheduled',
+  recording: 'library.recording',
+  completed: 'common.ready',
+  failed: 'common.failed',
+  cancelled: 'common.cancelled'
 }
 
 export function Library({ capabilities, onOpenSettings }: Props): JSX.Element {
@@ -76,7 +76,7 @@ export function Library({ capabilities, onOpenSettings }: Props): JSX.Element {
   const remove = async (recording: Recording): Promise<void> => {
     const hasFile = recording.status === 'completed' && recording.filePath
     const deleteFile = hasFile
-      ? window.confirm(`Delete the recorded file as well?\n\n${recording.filePath}`)
+      ? window.confirm(`${t('library.deleteFile')}\n\n${recording.filePath}`)
       : false
 
     try {
@@ -94,11 +94,11 @@ export function Library({ capabilities, onOpenSettings }: Props): JSX.Element {
           <h1 className="toolbar__title">{t('library.title')}</h1>
         </div>
         <Empty
-          title="Recording needs ffmpeg"
-          description="No working ffmpeg was found, so recordings cannot be made or played back."
+          title={t('guide.needsFfmpeg')}
+          description={t('library.needsFfmpegBody')}
           action={
             <button className="btn btn--primary" onClick={onOpenSettings}>
-              Open settings
+              {t('library.openSettings')}
             </button>
           }
         />
@@ -127,8 +127,10 @@ export function Library({ capabilities, onOpenSettings }: Props): JSX.Element {
 
         {tab === 'recordings' && (
           <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>
-            {recordings.filter((r) => r.status === 'completed').length} ready ·{' '}
-            {recordings.filter((r) => r.status === 'scheduled').length} scheduled
+            {t('library.counts', {
+              ready: recordings.filter((r) => r.status === 'completed').length,
+              scheduled: recordings.filter((r) => r.status === 'scheduled').length
+            })}
           </span>
         )}
       </div>
@@ -165,7 +167,7 @@ export function Library({ capabilities, onOpenSettings }: Props): JSX.Element {
               </div>
 
               <span className={`badge ${recording.status === 'recording' ? 'badge--live' : ''}`}>
-                {STATUS_LABEL[recording.status]}
+                {t(STATUS_LABEL[recording.status])}
               </span>
 
               {recording.status === 'completed' && (
@@ -184,7 +186,7 @@ export function Library({ capabilities, onOpenSettings }: Props): JSX.Element {
                     }
                   >
                     <IconPlay size={14} />
-                    Play
+                    {t('common.play')}
                   </button>
                   <button
                     className="btn btn--ghost"
@@ -200,14 +202,14 @@ export function Library({ capabilities, onOpenSettings }: Props): JSX.Element {
               {(recording.status === 'recording' || recording.status === 'scheduled') && (
                 <button className="btn" onClick={() => void stop(recording.id)}>
                   <IconRecord size={14} filled />
-                  {recording.status === 'recording' ? 'Stop' : 'Cancel'}
+                  {t(recording.status === 'recording' ? 'library.stop' : 'common.cancel')}
                 </button>
               )}
 
               <button
                 className="btn btn--danger"
                 onClick={() => void remove(recording)}
-                aria-label="Remove"
+                aria-label={t('common.remove')}
               >
                 <IconTrash size={15} />
               </button>
@@ -260,7 +262,8 @@ function RemindersList({
               <span>
                 {reminder.channelName} · {formatDate(reminder.startsAt)} {formatTime(reminder.startsAt)}–
                 {formatTime(reminder.endsAt)}
-                {reminder.leadMinutes > 0 && ` · alerts ${reminder.leadMinutes} min before`}
+                {reminder.leadMinutes > 0 &&
+                  ` · ${t('library.alertsBefore', { minutes: reminder.leadMinutes })}`}
               </span>
             </div>
 
@@ -268,16 +271,16 @@ function RemindersList({
               {reminder.notifiedAt
                 ? t('library.notified')
                 : minutesAway > 90
-                  ? `in ${Math.round(minutesAway / 60)} h`
+                  ? t('library.inHours', { hours: Math.round(minutesAway / 60) })
                   : minutesAway > 0
-                    ? `in ${minutesAway} min`
+                    ? t('library.inMinutes', { minutes: minutesAway })
                     : t('library.onNow')}
             </span>
 
             <button
               className="btn btn--danger"
               onClick={() => void onRemove(reminder.id)}
-              aria-label={`Cancel the reminder for ${reminder.title}`}
+              aria-label={t('library.cancelReminder', { title: reminder.title })}
             >
               <IconTrash size={15} />
             </button>

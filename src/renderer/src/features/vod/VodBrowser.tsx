@@ -3,6 +3,7 @@ import type { Category, ChannelQuery, ChannelWithState, ContentKind, SeriesEpiso
 import { invoke, messageOf } from '@renderer/lib/api'
 import { formatCount, initials } from '@renderer/lib/format'
 import { useAppStore } from '@renderer/store/useAppStore'
+import { useT } from '@renderer/i18n'
 import { Empty } from '@renderer/ui/Empty'
 import { IconRefresh, IconSearch } from '@renderer/ui/Icon'
 import { VodDetail } from './VodDetail'
@@ -18,6 +19,7 @@ const PAGE_SIZE = 300
 
 export function VodBrowser({ kind, onAddSource }: Props): JSX.Element {
   const { activePlaylistId, playlists } = useAppStore()
+  const t = useT()
 
   const [categories, setCategories] = useState<Category[]>([])
   const [categoryId, setCategoryId] = useState<number | null>(null)
@@ -36,7 +38,7 @@ export function VodBrowser({ kind, onAddSource }: Props): JSX.Element {
     [playlists, activePlaylistId]
   )
 
-  const label = kind === 'movie' ? 'Movies' : 'Series'
+  const isMovies = kind === 'movie'
 
   useEffect(() => {
     const timer = setTimeout(() => setDebounced(search), 220)
@@ -141,11 +143,11 @@ export function VodBrowser({ kind, onAddSource }: Props): JSX.Element {
   if (!playlist) {
     return (
       <Empty
-        title="No source selected"
-        description={`Add a source to browse ${label.toLowerCase()}.`}
+        title={t('mv.noSource')}
+        description={t(isMovies ? 'vod.addSourceMovies' : 'vod.addSourceSeries')}
         action={
           <button className="btn btn--primary" onClick={onAddSource}>
-            Add a source
+            {t('nav.addSource')}
           </button>
         }
       />
@@ -155,13 +157,13 @@ export function VodBrowser({ kind, onAddSource }: Props): JSX.Element {
   return (
     <>
       <div className="toolbar">
-        <h1 className="toolbar__title">{label}</h1>
+        <h1 className="toolbar__title">{t(isMovies ? 'nav.movies' : 'nav.series')}</h1>
 
         <div className="search">
           <IconSearch size={15} />
           <input
             className="input"
-            placeholder={`Search ${label.toLowerCase()}…`}
+            placeholder={t(isMovies ? 'vod.searchMovies' : 'vod.searchSeries')}
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
@@ -170,12 +172,12 @@ export function VodBrowser({ kind, onAddSource }: Props): JSX.Element {
         <div className="spacer" />
 
         <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>
-          {formatCount(total)} {total > PAGE_SIZE ? `(showing ${PAGE_SIZE})` : ''}
+          {formatCount(total)} {total > PAGE_SIZE ? t('vod.showing', { count: PAGE_SIZE }) : ''}
         </span>
 
         <button className="btn" onClick={() => void runSync()} disabled={syncing}>
           {syncing ? <span className="spinner" /> : <IconRefresh size={15} />}
-          Sync
+          {t('common.sync')}
         </button>
       </div>
 
@@ -187,13 +189,13 @@ export function VodBrowser({ kind, onAddSource }: Props): JSX.Element {
 
       <div className="vod" style={{ position: 'relative' }}>
         <div className="pane">
-          <div className="pane__head">Categories</div>
+          <div className="pane__head">{t('live.categories')}</div>
           <div className="pane__scroll">
             <button
               className={`catitem ${categoryId === null ? 'catitem--active' : ''}`}
               onClick={() => setCategoryId(null)}
             >
-              <span className="catitem__name">All {label.toLowerCase()}</span>
+              <span className="catitem__name">{t(isMovies ? 'vod.allMovies' : 'vod.allSeries')}</span>
             </button>
             {categories.map((category) => (
               <button
@@ -211,16 +213,12 @@ export function VodBrowser({ kind, onAddSource }: Props): JSX.Element {
 
         {items.length === 0 && !loading ? (
           <Empty
-            title={`No ${label.toLowerCase()} found`}
-            description={
-              playlist.lastSyncedAt
-                ? 'Nothing matches this filter, or this provider exposes no VOD catalog.'
-                : 'This source has not been synced yet.'
-            }
+            title={t(isMovies ? 'vod.noMovies' : 'vod.noSeries')}
+            description={t(playlist.lastSyncedAt ? 'vod.noMatches' : 'vod.notSynced')}
             action={
               !playlist.lastSyncedAt ? (
                 <button className="btn btn--primary" onClick={() => void runSync()} disabled={syncing}>
-                  Sync now
+                  {t('live.syncNow')}
                 </button>
               ) : undefined
             }

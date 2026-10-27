@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type JSX } from 'react'
 import type { VideoInfo } from '@shared/types'
+import { useT } from '@renderer/i18n'
 
 interface Props {
   videoRef: React.RefObject<HTMLVideoElement>
@@ -29,6 +30,7 @@ interface Measured {
 export function StreamStats({ videoRef, declared, pipeline, visible }: Props): JSX.Element | null {
   const [measured, setMeasured] = useState<Measured | null>(null)
   const frames = useRef<number[]>([])
+  const t = useT()
 
   useEffect(() => {
     const element = videoRef.current
@@ -100,7 +102,7 @@ export function StreamStats({ videoRef, declared, pipeline, visible }: Props): J
   return (
     <div className="stats" aria-live="off">
       <span className="stats__row">
-        <span className="stats__key">Resolution</span>
+        <span className="stats__key">{t('stats.resolution')}</span>
         <span className="stats__value">
           {width > 0 ? `${width} × ${height}` : '—'}
           {height > 0 && <span className="stats__note">{resolutionName(height)}</span>}
@@ -108,16 +110,18 @@ export function StreamStats({ videoRef, declared, pipeline, visible }: Props): J
       </span>
 
       <span className="stats__row">
-        <span className="stats__key">Frame rate</span>
+        <span className="stats__key">{t('stats.frameRate')}</span>
         <span className="stats__value">
           {measured && measured.fps > 0 ? `${measured.fps} fps` : '—'}
-          {declared?.fps ? <span className="stats__note">{declared.fps.toFixed(2)} declared</span> : null}
+          {declared?.fps ? (
+            <span className="stats__note">{t('stats.declaredFps', { fps: declared.fps.toFixed(2) })}</span>
+          ) : null}
         </span>
       </span>
 
       {measured && measured.total > 0 && (
         <span className="stats__row">
-          <span className="stats__key">Dropped</span>
+          <span className="stats__key">{t('stats.dropped')}</span>
           <span className={`stats__value ${dropRate > 1 ? 'stats__value--warn' : ''}`}>
             {measured.dropped}
             <span className="stats__note">{dropRate.toFixed(1)}%</span>
@@ -126,7 +130,7 @@ export function StreamStats({ videoRef, declared, pipeline, visible }: Props): J
       )}
 
       <span className="stats__row">
-        <span className="stats__key">Codec</span>
+        <span className="stats__key">{t('stats.codec')}</span>
         <span className="stats__value">
           {declared?.codec ?? '—'}
           {declared?.bitrate ? (
@@ -137,7 +141,7 @@ export function StreamStats({ videoRef, declared, pipeline, visible }: Props): J
 
       {pipeline && (
         <span className="stats__row">
-          <span className="stats__key">Pipeline</span>
+          <span className="stats__key">{t('stats.pipeline')}</span>
           <span className="stats__value">{pipeline}</span>
         </span>
       )}

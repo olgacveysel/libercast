@@ -4,6 +4,7 @@ import { invoke, messageOf } from '@renderer/lib/api'
 import { initials } from '@renderer/lib/format'
 import { IconClose, IconSearch } from '@renderer/ui/Icon'
 import { VirtualList } from '@renderer/ui/VirtualList'
+import { useT } from '@renderer/i18n'
 
 interface Props {
   playlistId: number
@@ -24,6 +25,7 @@ const ROW_HEIGHT = 58
  * channel.
  */
 export function GuideMatching({ playlistId, onClose, onChanged }: Props): JSX.Element {
+  const t = useT()
   const [rows, setRows] = useState<EpgMatchRow[]>([])
   const [onlyUnmatched, setOnlyUnmatched] = useState(true)
   const [search, setSearch] = useState('')
@@ -62,11 +64,13 @@ export function GuideMatching({ playlistId, onClose, onChanged }: Props): JSX.El
       const result = await invoke('epg:autoMatch', playlistId)
       setNotice(
         result.matched > 0
-          ? `Matched ${result.matched} channel${result.matched === 1 ? '' : 's'} by name.` +
+          ? (result.matched === 1
+              ? t('guide.matchedOne')
+              : t('guide.matchedMany', { count: result.matched })) +
               (result.ambiguous > 0
-                ? ` ${result.ambiguous} were too ambiguous to guess and need choosing by hand.`
+                ? ` ${t('guide.matchedAmbiguous', { count: result.ambiguous })}`
                 : '')
-          : 'Nothing new could be matched by name. Pick the right guide channel below.'
+          : t('guide.matchedNone')
       )
       reload()
       onChanged()
@@ -90,17 +94,14 @@ export function GuideMatching({ playlistId, onClose, onChanged }: Props): JSX.El
 
   return (
     <div className="sheet">
-      <button className="btn btn--ghost sheet__close" onClick={onClose} aria-label="Close">
+      <button className="btn btn--ghost sheet__close" onClick={onClose} aria-label={t('common.close')}>
         <IconClose size={17} />
       </button>
 
       <div className="matching">
         <header className="matching__head">
-          <h2>Guide matching</h2>
-          <p>
-            A channel only shows guide data when its id appears in the XMLTV feed. {matchedCount} of{' '}
-            {rows.length} are matched. The rest can be matched by name, or picked by hand.
-          </p>
+          <h2>{t('guide.matching')}</h2>
+          <p>{t('guide.matchingBody', { matched: matchedCount, total: rows.length })}</p>
         </header>
 
         <div className="matching__bar">
@@ -108,7 +109,7 @@ export function GuideMatching({ playlistId, onClose, onChanged }: Props): JSX.El
             <IconSearch size={15} />
             <input
               className="input"
-              placeholder="Search channels…"
+              placeholder={t('live.searchChannels')}
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
@@ -116,10 +117,10 @@ export function GuideMatching({ playlistId, onClose, onChanged }: Props): JSX.El
 
           <div className="segmented">
             <button aria-pressed={onlyUnmatched} onClick={() => setOnlyUnmatched(true)}>
-              Needs fixing ({rows.length - matchedCount})
+              {t('guide.needsFixing', { count: rows.length - matchedCount })}
             </button>
             <button aria-pressed={!onlyUnmatched} onClick={() => setOnlyUnmatched(false)}>
-              All ({rows.length})
+              {t('guide.allCount', { count: rows.length })}
             </button>
           </div>
 
@@ -127,7 +128,7 @@ export function GuideMatching({ playlistId, onClose, onChanged }: Props): JSX.El
 
           <button className="btn btn--primary" onClick={() => void runAutoMatch()} disabled={busy}>
             {busy ? <span className="spinner" /> : null}
-            Match by name
+            {t('guide.matchByName')}
           </button>
         </div>
 
@@ -135,12 +136,10 @@ export function GuideMatching({ playlistId, onClose, onChanged }: Props): JSX.El
         {notice && <div className="notice notice--success">{notice}</div>}
 
         {loading ? (
-          <p style={{ color: 'var(--text-dim)', fontSize: 13 }}>Loading…</p>
+          <p style={{ color: 'var(--text-dim)', fontSize: 13 }}>{t('common.loading')}</p>
         ) : visible.length === 0 ? (
           <p style={{ color: 'var(--text-dim)', fontSize: 13 }}>
-            {onlyUnmatched
-              ? 'Every channel is matched to the guide.'
-              : 'No channels match that search.'}
+            {onlyUnmatched ? t('guide.allMatched') : t('guide.noSearchMatch')}
           </p>
         ) : (
           <VirtualList
@@ -176,6 +175,8 @@ function MatchRow({
   onPick: () => void
   onClear: () => void
 }): JSX.Element {
+  const t = useT()
+
   return (
     <div className="matchrow" style={{ height: ROW_HEIGHT }}>
       <span className="matchrow__logo">
@@ -187,29 +188,29 @@ function MatchRow({
         <span>
           {row.matched ? (
             <>
-              <span className="matchrow__ok">✓ {row.matchedName ?? 'matched'}</span>
+              <span className="matchrow__ok">✓ {row.matchedName ?? t('guide.matched')}</span>
               {row.overrideId && (
-                <span className="matchrow__tag">{row.overrideAuto ? 'auto' : 'manual'}</span>
+                <span className="matchrow__tag">
+                  {row.overrideAuto ? t('guide.overrideAuto') : t('guide.overrideManual')}
+                </span>
               )}
             </>
           ) : row.providerEpgId ? (
-            <span className="matchrow__bad">
-              id &ldquo;{row.providerEpgId}&rdquo; is not in the guide
-            </span>
+            <span className="matchrow__bad">{t('guide.idNotInGuide', { id: row.providerEpgId })}</span>
           ) : (
-            <span className="matchrow__bad">the provider gave this channel no guide id</span>
+            <span className="matchrow__bad">{t('guide.noProviderId')}</span>
           )}
         </span>
       </span>
 
       {row.overrideId && (
-        <button className="btn btn--ghost" onClick={onClear} title="Go back to the provider's own id">
-          Reset
+        <button className="btn btn--ghost" onClick={onClear} title={t('guide.resetToProviderId')}>
+          {t('player.reset')}
         </button>
       )}
 
       <button className={`btn ${row.matched ? 'btn--ghost' : ''}`} onClick={onPick}>
-        {row.matched ? 'Change' : 'Choose…'}
+        {row.matched ? t('guide.change') : t('settings.choose')}
       </button>
     </div>
   )
@@ -226,6 +227,7 @@ function SuggestionPicker({
   onClose: () => void
   onPick: (epgChannelId: string) => void
 }): JSX.Element {
+  const t = useT()
   const [suggestions, setSuggestions] = useState<EpgMatchSuggestion[]>([])
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
@@ -242,8 +244,8 @@ function SuggestionPicker({
     <div className="scrim" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
       <div className="dialog" role="dialog" aria-modal="true">
         <div className="dialog__head">
-          <h2>Guide channel for {row.channelName}</h2>
-          <p>Ranked by how closely the names match. Type to search the feed for something else.</p>
+          <h2>{t('guide.channelFor', { name: row.channelName })}</h2>
+          <p>{t('guide.rankedBody')}</p>
         </div>
 
         <div className="dialog__body" style={{ gap: 10 }}>
@@ -259,11 +261,13 @@ function SuggestionPicker({
           </div>
 
           <div style={{ maxHeight: 320, overflowY: 'auto', margin: '0 -4px' }}>
-            {loading && <p style={{ padding: 10, color: 'var(--text-dim)', fontSize: 12.5 }}>Searching…</p>}
+            {loading && (
+              <p style={{ padding: 10, color: 'var(--text-dim)', fontSize: 12.5 }}>{t('guide.searching')}</p>
+            )}
 
             {!loading && suggestions.length === 0 && (
               <p style={{ padding: 10, color: 'var(--text-dim)', fontSize: 12.5, margin: 0 }}>
-                Nothing in the guide resembles that. The feed may not cover this channel at all.
+                {t('guide.noSuggestions')}
               </p>
             )}
 
@@ -285,7 +289,7 @@ function SuggestionPicker({
         <div className="dialog__foot">
           <div className="spacer" />
           <button className="btn" onClick={onClose}>
-            Cancel
+            {t('common.cancel')}
           </button>
         </div>
       </div>

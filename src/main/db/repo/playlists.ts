@@ -17,6 +17,7 @@ interface PlaylistRow {
   sort_order: number
   last_synced_at: number | null
   created_at: number
+  server_timezone: string | null
 }
 
 function toPlaylist(row: PlaylistRow): Playlist {
@@ -35,8 +36,19 @@ function toPlaylist(row: PlaylistRow): Playlist {
     enabled: row.enabled === 1,
     sortOrder: row.sort_order,
     lastSyncedAt: row.last_synced_at,
-    createdAt: row.created_at
+    createdAt: row.created_at,
+    serverTimezone: row.server_timezone
   }
+}
+
+/**
+ * Records the panel's own timezone, learned from its account report.
+ *
+ * Kept on the playlist rather than asked for each time: catch-up URLs need it
+ * on every play, and asking the panel costs a request it will not thank us for.
+ */
+export function setServerTimezone(playlistId: number, timezone: string | null): void {
+  getDb().prepare('UPDATE playlists SET server_timezone = ? WHERE id = ?').run(timezone, playlistId)
 }
 
 export function listPlaylists(): Playlist[] {

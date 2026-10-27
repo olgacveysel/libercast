@@ -126,12 +126,12 @@ export function VodPlayer({ target, onClose, onPlayEpisode }: Props): JSX.Elemen
     // process has nothing to open.
     const path = (file as File & { path?: string }).path
     if (!path) {
-      setSubtitleError('That file could not be read. Use the subtitles menu to open it instead.')
+      setSubtitleError(t('vod.subtitleUnreadable'))
       return
     }
 
     if (!/\.(srt|vtt|ass|ssa|sub)$/i.test(path)) {
-      setSubtitleError('That is not a subtitle file. Drop an .srt, .vtt or .ass file.')
+      setSubtitleError(t('vod.subtitleWrongType'))
       return
     }
 
@@ -425,7 +425,7 @@ export function VodPlayer({ target, onClose, onPlayEpisode }: Props): JSX.Elemen
       <div className="vodplayer__top">
         <strong>{target.title}</strong>
         {state.pipeline && state.pipeline !== 'direct copy' && (
-          <span className="badge" title="ffmpeg is converting this stream">
+          <span className="badge" title={t('vod.converting')}>
             {state.pipeline}
           </span>
         )}
@@ -460,10 +460,10 @@ export function VodPlayer({ target, onClose, onPlayEpisode }: Props): JSX.Elemen
                   {/* Most of these failures are the provider's connection limit,
                       which clears on its own within seconds. */}
                   <button className="btn btn--primary" onClick={reload}>
-                    Try again
+                    {t('common.retry')}
                   </button>
                   <button className="btn" onClick={onClose}>
-                    Close
+                    {t('common.close')}
                   </button>
                 </div>
               </div>
@@ -512,8 +512,12 @@ export function VodPlayer({ target, onClose, onPlayEpisode }: Props): JSX.Elemen
             disabled={!previous}
             title={
               previous
-                ? `Previous: S${String(previous.season).padStart(2, '0')}E${String(previous.episode).padStart(2, '0')} ${previous.title}`
-                : 'This is the first episode'
+                ? t('vod.previousIs', {
+                    season: String(previous.season).padStart(2, '0'),
+                    episode: String(previous.episode).padStart(2, '0'),
+                    title: previous.title
+                  })
+                : t('vod.firstEpisode')
             }
             aria-label={t('player.previousEpisode')}
           >
@@ -525,7 +529,7 @@ export function VodPlayer({ target, onClose, onPlayEpisode }: Props): JSX.Elemen
           className="btn btn--ghost"
           onClick={() => videoRef.current?.[videoRef.current.paused ? 'play' : 'pause']()}
           aria-label={paused ? t('common.play') : t('common.pause')}
-          title={paused ? 'Play (Space)' : 'Pause (Space)'}
+          title={t(paused ? 'vod.playHint' : 'vod.pauseHint')}
         >
           {paused ? <IconPlay size={16} /> : <IconPause size={16} />}
         </button>
@@ -537,8 +541,12 @@ export function VodPlayer({ target, onClose, onPlayEpisode }: Props): JSX.Elemen
             disabled={!nextUp}
             title={
               nextUp
-                ? `Next: S${String(nextUp.season).padStart(2, '0')}E${String(nextUp.episode).padStart(2, '0')} ${nextUp.title}`
-                : 'This is the last episode'
+                ? t('vod.nextIs', {
+                    season: String(nextUp.season).padStart(2, '0'),
+                    episode: String(nextUp.episode).padStart(2, '0'),
+                    title: nextUp.title
+                  })
+                : t('vod.lastEpisode')
             }
             aria-label={t('player.nextEpisode')}
           >
@@ -583,7 +591,7 @@ export function VodPlayer({ target, onClose, onPlayEpisode }: Props): JSX.Elemen
           tracks={state.tracks.audio}
           selected={state.audioTrack}
           onSelect={(index) => index !== null && changeTrack({ audio: index })}
-          note="Switching audio restarts the stream from this point."
+          note={t('vod.audioNote')}
         />
 
         <TrackMenu
@@ -598,11 +606,7 @@ export function VodPlayer({ target, onClose, onPlayEpisode }: Props): JSX.Elemen
           onClearExternal={() => setExternalSubtitle(null)}
           offsetSecs={subtitleOffset}
           onOffsetChange={setSubtitleOffset}
-          note={
-            state.subtitlesBurnedIn
-              ? 'This subtitle is an image, so it is drawn into the picture and the video is re-encoded.'
-              : 'Switching subtitles restarts the stream from this point.'
-          }
+          note={t(state.subtitlesBurnedIn ? 'vod.subtitlesBurnedIn' : 'vod.subtitleNote')}
         />
 
         <PickerMenu<number>
@@ -615,7 +619,7 @@ export function VodPlayer({ target, onClose, onPlayEpisode }: Props): JSX.Elemen
           }))}
           selected={speed}
           onSelect={setSpeed}
-          title={`Playback speed: ${formatSpeed(speed)} ([ and ])`}
+          title={t('vod.speedTitle', { speed: formatSpeed(speed) })}
         />
 
         <SleepMenu />
@@ -627,7 +631,7 @@ export function VodPlayer({ target, onClose, onPlayEpisode }: Props): JSX.Elemen
           className="btn btn--ghost"
           style={{ padding: 6 }}
           onClick={toggleFullscreen}
-          title={fullscreen ? 'Leave fullscreen (F or Esc)' : 'Fullscreen (F, or double-click the video)'}
+          title={t(fullscreen ? 'vod.leaveFullscreenHint' : 'vod.fullscreenHint')}
           aria-label={t('player.fullscreen')}
         >
           <IconFullscreen size={17} />

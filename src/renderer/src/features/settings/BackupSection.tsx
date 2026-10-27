@@ -2,6 +2,7 @@ import { useState, type JSX } from 'react'
 import type { BackupSummary, RestoreSummary } from '@shared/types'
 import { invoke, messageOf } from '@renderer/lib/api'
 import { useAppStore } from '@renderer/store/useAppStore'
+import { useT } from '@renderer/i18n'
 
 /**
  * Backup and restore.
@@ -12,6 +13,7 @@ import { useAppStore } from '@renderer/store/useAppStore'
  */
 export function BackupSection(): JSX.Element {
   const refreshPlaylists = useAppStore((s) => s.refreshPlaylists)
+  const t = useT()
 
   const [includeCredentials, setIncludeCredentials] = useState(false)
   const [passphrase, setPassphrase] = useState('')
@@ -52,7 +54,7 @@ export function BackupSection(): JSX.Element {
 
       if (
         mode === 'replace' &&
-        !window.confirm('Replace removes every source, favorite and watch position first. Continue?')
+        !window.confirm(t('backup.replaceConfirm'))
       ) {
         return
       }
@@ -76,11 +78,8 @@ export function BackupSection(): JSX.Element {
     <>
       <div className="settings__row">
         <div>
-          <strong>Include provider passwords</strong>
-          <span>
-            Off by default. Turning it on requires a passphrase, and the whole backup is then encrypted
-            with it.
-          </span>
+          <strong>{t('backup.includePasswords')}</strong>
+          <span>{t('backup.includePasswordsBody')}</span>
         </div>
         <input
           type="checkbox"
@@ -94,14 +93,14 @@ export function BackupSection(): JSX.Element {
 
       <div className="settings__row">
         <div>
-          <strong>Create a backup</strong>
-          <span>Sources, favorites, watch history and positions, and your settings.</span>
+          <strong>{t('backup.create')}</strong>
+          <span>{t('backup.createBody')}</span>
         </div>
         <input
           className="input"
           style={{ width: 170 }}
           type="password"
-          placeholder={includeCredentials ? 'Passphrase (required)' : 'Passphrase (optional)'}
+          placeholder={t(includeCredentials ? 'backup.passphraseRequired' : 'backup.passphraseOptional')}
           value={passphrase}
           onChange={(event) => setPassphrase(event.target.value)}
         />
@@ -111,33 +110,42 @@ export function BackupSection(): JSX.Element {
           onClick={() => void runExport()}
         >
           {busy ? <span className="spinner" /> : null}
-          Export…
+          {t('backup.export')}
         </button>
       </div>
 
       {exported && (
         <div className="notice notice--success">
-          Saved {exported.playlists} source{exported.playlists === 1 ? '' : 's'}, {exported.favorites}{' '}
-          favorites and {exported.progress} watch positions
-          {exported.encrypted ? ', encrypted' : ''} to {exported.filePath}
+          {t(
+            exported.playlists === 1
+              ? exported.encrypted
+                ? 'backup.savedOneEncrypted'
+                : 'backup.savedOne'
+              : exported.encrypted
+                ? 'backup.savedManyEncrypted'
+                : 'backup.savedMany',
+            {
+              playlists: exported.playlists,
+              favorites: exported.favorites,
+              progress: exported.progress,
+              path: exported.filePath
+            }
+          )}
         </div>
       )}
 
       <div className="settings__row">
         <div>
-          <strong>Restore</strong>
-          <span>
-            Merge keeps what you already have. Replace clears everything first. Favorites and positions
-            reattach after the sources are synced.
-          </span>
+          <strong>{t('backup.restore')}</strong>
+          <span>{t('backup.restoreBody')}</span>
         </div>
 
         <div className="segmented">
           <button aria-pressed={mode === 'merge'} onClick={() => setMode('merge')}>
-            Merge
+            {t('backup.merge')}
           </button>
           <button aria-pressed={mode === 'replace'} onClick={() => setMode('replace')}>
-            Replace
+            {t('backup.replace')}
           </button>
         </div>
 
@@ -145,26 +153,29 @@ export function BackupSection(): JSX.Element {
           className="input"
           style={{ width: 150 }}
           type="password"
-          placeholder="Passphrase"
+          placeholder={t('backup.passphrase')}
           value={restorePassphrase}
           onChange={(event) => setRestorePassphrase(event.target.value)}
         />
         <button className="btn" disabled={busy} onClick={() => void runImport()}>
-          Open…
+          {t('backup.open')}
         </button>
       </div>
 
       {restored && (
         <div className="notice notice--success">
-          Restored {restored.playlists} source{restored.playlists === 1 ? '' : 's'}, {restored.favorites}{' '}
-          favorites, {restored.progress} watch positions.
+          {t(restored.playlists === 1 ? 'backup.restoredOne' : 'backup.restoredMany', {
+            playlists: restored.playlists,
+            favorites: restored.favorites,
+            progress: restored.progress
+          })}
           {restored.needCredentials.length > 0 && (
             <>
               {' '}
-              Re-enter the password for: <strong>{restored.needCredentials.join(', ')}</strong>.
+              {t('backup.reenterPassword')} <strong>{restored.needCredentials.join(', ')}</strong>.
             </>
           )}{' '}
-          Sync each source to reattach anything that did not match yet.
+          {t('backup.syncToReattach')}
         </div>
       )}
 

@@ -15,7 +15,7 @@
 const { app, BrowserWindow } = require('electron')
 const { createServer } = require('node:http')
 const { execFileSync } = require('node:child_process')
-const { mkdtempSync } = require('node:fs')
+const { mkdtempSync, writeFileSync } = require('node:fs')
 const { tmpdir } = require('node:os')
 const { join } = require('node:path')
 
@@ -37,9 +37,12 @@ function check(label, condition, detail) {
 
 async function main() {
   const work = mkdtempSync(join(tmpdir(), 'ediag-'))
+  // Written with fs rather than shelled out to `printf`: there is no `sh` on
+  // Windows, and this has to run on the platform the app ships for.
   const srt = join(work, 's.srt')
-  execFileSync('sh', ['-c',
-    `printf '1\\n00:00:06,000 --> 00:00:12,000\\nFIRST LINE\\n\\n2\\n00:00:14,000 --> 00:00:19,000\\nSECOND LINE\\n\\n' > ${srt}`])
+  writeFileSync(srt,
+    '1\n00:00:06,000 --> 00:00:12,000\nFIRST LINE\n\n' +
+    '2\n00:00:14,000 --> 00:00:19,000\nSECOND LINE\n\n')
 
   const fixture = join(work, 'clip.mkv')
   execFileSync('ffmpeg', ['-hide_banner','-loglevel','error',

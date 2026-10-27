@@ -22,7 +22,7 @@ import { autoRefresh } from '@main/autoRefresh'
 import { downloader } from '@main/media/downloader'
 import { recorder } from '@main/media/recorder'
 import { loadSubtitleFile, SUBTITLE_EXTENSIONS } from '@main/media/externalSubtitles'
-import { resolveProviderStream } from '@main/media/resolve'
+import { openStream } from '@main/media/openStream'
 import { streamServer } from '@main/media/streamServer'
 import { XtreamClient } from '@main/sources/xtream'
 import { createLogger, errorMessage } from '@main/util/logger'
@@ -30,6 +30,7 @@ import { getMainWindow } from '@main/window'
 import { logFilePath, logFolder } from '@main/util/logfile'
 import { checkForUpdate } from '@main/updates'
 import { cancelScan, scanFavorites } from '@main/media/healthScan'
+import { closeDetached, detachedTiles, openDetached } from '@main/windows/detached'
 
 const log = createLogger('ipc')
 
@@ -112,25 +113,8 @@ export function registerIpcHandlers(): void {
 
   /* ---------------- playback ---------------- */
 
-  handle('stream:open', async ({ source, seekSecs, audioTrack, subtitleTrack, owner }) => {
-    const provider = resolveProviderStream(source)
-    const current = settings.getSettings()
-
-    const session = await streamServer.open({
-      url: provider.url,
-      alternates: provider.alternates,
-      isLive: provider.isLive,
-      frugal: current.singleConnection,
-      userAgent: provider.userAgent,
-      referrer: provider.referrer,
-      seekSecs,
-      label: provider.label,
-      owner,
-      audioTrack,
-      subtitleTrack,
-      preferredAudioLanguages: current.preferredAudioLanguages,
-      preferredSubtitleLanguages: current.preferredSubtitleLanguages
-    })
+  handle('stream:open', async (request) => {
+    const { session, provider, switched, playingChannelId } = await openStream(request)
 
     return {
       id: session.id,
@@ -147,7 +131,9 @@ export function registerIpcHandlers(): void {
       subtitlesUrl: session.subtitlesUrl,
       subtitlesBurnedIn: session.subtitlesBurnedIn,
       absoluteTimeline: session.absoluteTimeline,
-      warning: session.warning
+      warning: session.warning,
+      switched,
+      playingChannelId
     }
   })
 
@@ -393,6 +379,10 @@ export function registerIpcHandlers(): void {
     scanFavorites(playlistId, (progress) => emit('health:progress', progress))
   )
   handle('health:cancel', () => cancelScan())
+
+  handle('multiview:detach', ({ channelId, tile }) => openDetached(channelId, tile))
+  handle('multiview:attach', (tile) => closeDetached(tile))
+  handle('multiview:detached', () => detachedTiles())
 
   handle('app:showLogs', () => {
     const path = logFilePath()

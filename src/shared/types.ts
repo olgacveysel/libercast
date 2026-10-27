@@ -33,6 +33,14 @@ export interface Playlist {
   sortOrder: number
   lastSyncedAt: number | null
   createdAt: number
+  /**
+   * The panel's own timezone, as it reports it, learned on sync.
+   *
+   * Catch-up URLs carry a start time as wall clock on the server. Using the
+   * viewer's clock instead is right only while the two share a timezone, and
+   * wrong by a whole hour in a way nothing on screen would explain.
+   */
+  serverTimezone: string | null
 }
 
 export interface PlaylistDraft {
@@ -79,6 +87,14 @@ export interface Channel {
   isAdult: boolean
   hidden: boolean
   addedAt: number
+  /**
+   * Days of catch-up the provider keeps for this channel, 0 for none.
+   *
+   * Reported per channel and wildly uneven inside one account — the sports
+   * channels often keep a week while everything else keeps nothing — so it is
+   * stored rather than assumed.
+   */
+  catchupDays: number
 }
 
 /** A channel joined with its live EPG state, which is what the list UI renders. */
@@ -87,6 +103,21 @@ export interface ChannelWithState extends Channel {
   lastWatchedAt: number | null
   now: EpgProgram | null
   next: EpgProgram | null
+  /**
+   * What the last favourites scan found, if it was recent enough to still mean
+   * anything. Null for a channel never scanned, or scanned too long ago —
+   * provider lists rot in both directions, and a stale red mark on a channel
+   * that works again is worse than no mark, because it stops you trying it.
+   */
+  health: { ok: boolean; reason: string | null; checkedAt: number } | null
+  /**
+   * How many of your providers carry this channel.
+   *
+   * Always 1 in a single-source list. In a merged list, more than 1 means a
+   * dead stream has somewhere to fall back to — which is the main reason to
+   * show the number at all.
+   */
+  sources: number
 }
 
 export interface EpgProgram {
@@ -190,7 +221,15 @@ export interface ChannelHealth {
 }
 
 export interface ChannelQuery {
-  playlistId: number
+  /** Omit together with `merge` to span every enabled source. */
+  playlistId?: number
+  /**
+   * Collapse the same channel on different providers into one row.
+   *
+   * Grouping is by the normalised name stored at import, so "beIN Sports 2 HD"
+   * and "BEIN SPORTS 2" are one row while beIN 2 and beIN 4 stay two.
+   */
+  merge?: boolean
   /** Defaults to 'live'. Movies and series live in the same table. */
   kind?: ContentKind
   categoryId?: number | null
@@ -235,6 +274,35 @@ export interface AppSettings {
    * until it has been played once, since nothing has enumerated its tracks.
    */
   singleConnection: boolean
+  /**
+   * Play the same channel from another source when the first one refuses.
+   *
+   * One provider dying mid-match is the most common thing that goes wrong
+   * here, and someone with two sources is usually paying for the same match
+   * twice. On by default, because the alternative is a dead screen; off for
+   * anyone who would rather know their main source failed than quietly spend a
+   * connection on the backup.
+   */
+  sourceFailover: boolean
+  /**
+   * Ask GitHub about new versions without being told to.
+   *
+   * Three states, not two. `null` means nobody has been asked yet, which is
+   * what makes the first-run prompt possible without a second setting — and
+   * what keeps the installer's promise literally true until someone answers
+   * it, because `null` behaves exactly like `false`.
+   */
+  autoCheckUpdates: boolean | null
+  /** When GitHub was last asked, so it is asked at most once a day. */
+  lastUpdateCheck: number | null
+  /**
+   * The newest version the last check found, remembered so a restart does not
+   * mean either asking again or forgetting.
+   */
+  knownUpdateVersion: string | null
+  knownUpdateUrl: string | null
+  /** A version the user has waved away; the next one is announced again. */
+  dismissedUpdate: string | null
   /**
    * How the picture is fitted to the window. Providers frequently send content
    * pillarboxed, letterboxed, or with the wrong sample aspect ratio, and no
@@ -331,6 +399,12 @@ export const DEFAULT_SETTINGS: AppSettings = {
   maxConcurrentDownloads: 1,
   showStreamStats: false,
   singleConnection: false,
+  sourceFailover: true,
+  autoCheckUpdates: null,
+  lastUpdateCheck: null,
+  knownUpdateVersion: null,
+  knownUpdateUrl: null,
+  dismissedUpdate: null,
   autoRefreshHours: 0,
   autoRefreshEpg: true,
   lastAutoRefresh: null,
@@ -705,11 +779,36 @@ export interface StreamSession {
    * through anyway. Shown only if playback then fails.
    */
   warning: string | null
+  /**
+   * Set when this is the same channel from a different provider.
+   *
+   * The switch is silent as it happens — a dialog at the moment of a goal is
+   * worse than the outage — but it is reported afterwards, so a source that
+   * keeps dying is visible rather than mysterious.
+   */
+  switched: { channelName: string; from: string; to: string } | null
+  /**
+   * The channel actually playing, which is not the one asked for after a
+   * failover.
+   *
+   * The player needs it to tell the opener what died: a stream that opens and
+   * then stops is a failure the main process never sees, so without this the
+   * retry would go straight back to the source that just failed.
+   */
+  playingChannelId: number | null
 }
 
 export interface StreamRequest {
   source: StreamSource
   seekSecs?: number
+  /**
+   * Channels already found dead, which failover must not try again.
+   *
+   * A stream that opened and then died is not an error the opener ever saw, so
+   * the player has to say so on the retry — otherwise the second attempt goes
+   * straight back to the source that just failed.
+   */
+  exclude?: number[]
   /** Identifies the calling player, so its previous session can be retired. */
   owner?: string
   /** Index within the audio tracks. Omitted means "pick by preference". */
@@ -720,6 +819,14 @@ export interface StreamRequest {
 
 export type StreamSource =
   | { type: 'channel'; id: number }
+  /**
+   * A window of a live channel's archive, replayed.
+   *
+   * Carries the times rather than a programme id because the archive is
+   * addressed by clock, not by catalogue: the guide entry is only how the user
+   * picked the window.
+   */
+  | { type: 'catchup'; id: number; startsAt: number; endsAt: number }
   | { type: 'episode'; id: number }
   | { type: 'recording'; id: number }
   | { type: 'download'; id: number }

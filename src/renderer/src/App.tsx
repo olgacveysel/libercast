@@ -15,6 +15,9 @@ import { LiveTv } from '@renderer/features/live/LiveTv'
 import { VodBrowser } from '@renderer/features/vod/VodBrowser'
 import { AddSourceDialog } from '@renderer/features/onboarding/AddSourceDialog'
 import { Settings } from '@renderer/features/settings/Settings'
+import { UpdateBanner } from '@renderer/features/settings/UpdateBanner'
+import { UpdatePrompt } from '@renderer/features/settings/UpdatePrompt'
+import { useT } from '@renderer/i18n'
 
 /** Typing "/" in a field must insert a slash, not open the palette. */
 function isTyping(target: EventTarget | null): boolean {
@@ -30,6 +33,7 @@ export function App(): JSX.Element {
   const [showAddSource, setShowAddSource] = useState(false)
   const [showPalette, setShowPalette] = useState(false)
   const rail = useSidebarRail()
+  const t = useT()
 
   // Runs for the whole session, not inside a player: the timer has to keep
   // counting while you are browsing the guide or the catalogue.
@@ -95,12 +99,15 @@ export function App(): JSX.Element {
     <div className="app">
       <TitleBar onOpenSearch={() => setShowPalette(true)} />
 
+      <UpdatePrompt />
+      <UpdateBanner />
+
       <div className={`app-body ${rail.collapsed ? 'app-body--rail' : ''}`}>
         <Sidebar onAddSource={openAddSource} collapsed={rail.collapsed} />
 
         <main className="main">
           {!ready ? (
-            <Empty title="Starting up…" />
+            <Empty title={t('app.startingUp')} />
           ) : (
             <>
               {route === 'home' && (

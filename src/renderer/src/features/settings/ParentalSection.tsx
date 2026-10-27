@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type JSX } from 'react'
 import type { Category, ParentalStatus } from '@shared/types'
 import { invoke, messageOf } from '@renderer/lib/api'
 import { useAppStore } from '@renderer/store/useAppStore'
+import { useT } from '@renderer/i18n'
 
 /**
  * Parental controls.
@@ -23,6 +24,7 @@ export function ParentalSection(): JSX.Element {
   const [currentPin, setCurrentPin] = useState('')
   const [unlockPin, setUnlockPin] = useState('')
   const [keyword, setKeyword] = useState('')
+  const t = useT()
 
   const reload = useCallback(() => {
     void invoke('parental:status').then(setStatus).catch((e) => setError(messageOf(e)))
@@ -56,7 +58,7 @@ export function ParentalSection(): JSX.Element {
     }
   }
 
-  if (!status) return <p style={{ color: 'var(--text-dim)', fontSize: 12.5 }}>Loading…</p>
+  if (!status) return <p style={{ color: 'var(--text-dim)', fontSize: 12.5 }}>{t('common.loading')}</p>
 
   /* ---------------- no PIN yet ---------------- */
 
@@ -65,18 +67,15 @@ export function ParentalSection(): JSX.Element {
       <>
         <div className="settings__row">
           <div>
-            <strong>Set a PIN</strong>
-            <span>
-              4 to 8 digits. Locked categories, matching titles and adult content are hidden from every
-              screen — including search and Continue Watching — until it is entered.
-            </span>
+            <strong>{t('parental.setPin')}</strong>
+            <span>{t('parental.setPinBody')}</span>
           </div>
           <input
             className="input"
             style={{ width: 120 }}
             type="password"
             inputMode="numeric"
-            placeholder="New PIN"
+            placeholder={t('parental.newPin')}
             value={pin}
             onChange={(event) => setPin(event.target.value.replace(/\D/g, '').slice(0, 8))}
           />
@@ -84,12 +83,12 @@ export function ParentalSection(): JSX.Element {
             className="btn btn--primary"
             disabled={busy || pin.length < 4}
             onClick={() =>
-              void act(() => invoke('parental:setPin', { currentPin: null, newPin: pin }), 'PIN set.').then(
+              void act(() => invoke('parental:setPin', { currentPin: null, newPin: pin }), t('parental.pinSet')).then(
                 () => setPin('')
               )
             }
           >
-            Turn on
+            {t('parental.turnOn')}
           </button>
         </div>
 
@@ -106,15 +105,15 @@ export function ParentalSection(): JSX.Element {
       <>
         <div className="settings__row">
           <div>
-            <strong>Locked</strong>
-            <span>Enter your PIN to change these settings or reveal hidden content.</span>
+            <strong>{t('parental.locked')}</strong>
+            <span>{t('parental.lockedBody')}</span>
           </div>
           <input
             className="input"
             style={{ width: 120 }}
             type="password"
             inputMode="numeric"
-            placeholder="PIN"
+            placeholder={t('parental.pin')}
             value={unlockPin}
             onChange={(event) => setUnlockPin(event.target.value.replace(/\D/g, '').slice(0, 8))}
             onKeyDown={(event) => {
@@ -122,7 +121,7 @@ export function ParentalSection(): JSX.Element {
             }}
           />
           <button className="btn btn--primary" disabled={busy || unlockPin.length < 4} onClick={() => void unlock()}>
-            Unlock
+            {t('parental.unlock')}
           </button>
         </div>
 
@@ -151,13 +150,15 @@ export function ParentalSection(): JSX.Element {
   return (
     <>
       <div className="notice notice--success" style={{ marginBottom: 12 }}>
-        Unlocked. It re-locks {status.autoLockMinutes > 0 ? `after ${status.autoLockMinutes} minutes idle` : 'when the app closes'}.
+        {status.autoLockMinutes > 0
+          ? t('parental.unlockedTimed', { minutes: status.autoLockMinutes })
+          : t('parental.unlockedUntilClose')}
       </div>
 
       <div className="settings__row">
         <div>
-          <strong>Hide adult content</strong>
-          <span>Applies to anything the provider or the playlist parser flagged.</span>
+          <strong>{t('parental.hideAdult')}</strong>
+          <span>{t('parental.hideAdultBody')}</span>
         </div>
         <input
           type="checkbox"
@@ -170,8 +171,8 @@ export function ParentalSection(): JSX.Element {
 
       <div className="settings__row">
         <div>
-          <strong>Auto-lock after</strong>
-          <span>Minutes of inactivity before the PIN is needed again. 0 stays unlocked.</span>
+          <strong>{t('parental.autoLock')}</strong>
+          <span>{t('parental.autoLockBody')}</span>
         </div>
         <select
           className="input"
@@ -185,7 +186,7 @@ export function ParentalSection(): JSX.Element {
         >
           {[0, 5, 15, 30, 60, 120].map((value) => (
             <option key={value} value={value}>
-              {value === 0 ? 'Never' : `${value} min`}
+              {value === 0 ? t('common.never') : t('parental.minutes', { value })}
             </option>
           ))}
         </select>
@@ -193,15 +194,15 @@ export function ParentalSection(): JSX.Element {
 
       <div className="settings__row" style={{ alignItems: 'flex-start' }}>
         <div>
-          <strong>Blocked words</strong>
-          <span>Titles containing any of these are hidden while locked.</span>
+          <strong>{t('parental.keywords')}</strong>
+          <span>{t('parental.keywordsBody')}</span>
         </div>
         <div style={{ display: 'grid', gap: 8, justifyItems: 'end' }}>
           <div style={{ display: 'flex', gap: 6 }}>
             <input
               className="input"
               style={{ width: 150 }}
-              placeholder="Add a word"
+              placeholder={t('parental.addWord')}
               value={keyword}
               onChange={(event) => setKeyword(event.target.value)}
               onKeyDown={(event) => {
@@ -209,7 +210,7 @@ export function ParentalSection(): JSX.Element {
               }}
             />
             <button className="btn" onClick={addKeyword} disabled={busy || keyword.trim().length < 2}>
-              Add
+              {t('parental.add')}
             </button>
           </div>
 
@@ -227,7 +228,7 @@ export function ParentalSection(): JSX.Element {
                       })
                     )
                   }
-                  title="Remove"
+                  title={t('common.remove')}
                 >
                   {word} ✕
                 </button>
@@ -239,11 +240,14 @@ export function ParentalSection(): JSX.Element {
 
       <div className="settings__row" style={{ alignItems: 'flex-start' }}>
         <div>
-          <strong>Locked categories</strong>
+          <strong>{t('parental.lockedCategories')}</strong>
           <span>
             {categories.length === 0
-              ? 'Sync a source to list its categories.'
-              : `${status.lockedCategoryIds.length} of ${categories.length} locked.`}
+              ? t('parental.noCategories')
+              : t('parental.lockedCount', {
+                  locked: status.lockedCategoryIds.length,
+                  total: categories.length
+                })}
           </span>
         </div>
         <div className="catlock">
@@ -262,15 +266,15 @@ export function ParentalSection(): JSX.Element {
 
       <div className="settings__row">
         <div>
-          <strong>Change or remove the PIN</strong>
-          <span>Removing it makes all hidden content visible again.</span>
+          <strong>{t('parental.changePin')}</strong>
+          <span>{t('parental.changePinBody')}</span>
         </div>
         <input
           className="input"
           style={{ width: 100 }}
           type="password"
           inputMode="numeric"
-          placeholder="Current"
+          placeholder={t('parental.currentPin')}
           value={currentPin}
           onChange={(event) => setCurrentPin(event.target.value.replace(/\D/g, '').slice(0, 8))}
         />
@@ -279,7 +283,7 @@ export function ParentalSection(): JSX.Element {
           style={{ width: 100 }}
           type="password"
           inputMode="numeric"
-          placeholder="New"
+          placeholder={t('parental.newPinShort')}
           value={pin}
           onChange={(event) => setPin(event.target.value.replace(/\D/g, '').slice(0, 8))}
         />
@@ -287,34 +291,34 @@ export function ParentalSection(): JSX.Element {
           className="btn"
           disabled={busy || currentPin.length < 4 || pin.length < 4}
           onClick={() =>
-            void act(() => invoke('parental:setPin', { currentPin, newPin: pin }), 'PIN changed.').then(() => {
+            void act(() => invoke('parental:setPin', { currentPin, newPin: pin }), t('parental.pinChanged')).then(() => {
               setPin('')
               setCurrentPin('')
             })
           }
         >
-          Change
+          {t('parental.change')}
         </button>
         <button
           className="btn btn--danger"
           disabled={busy || currentPin.length < 4}
           onClick={() =>
-            void act(() => invoke('parental:disable', currentPin), 'Parental controls turned off.').then(
+            void act(() => invoke('parental:disable', currentPin), t('parental.turnedOff')).then(
               () => setCurrentPin('')
             )
           }
         >
-          Turn off
+          {t('parental.turnOff')}
         </button>
       </div>
 
       <div className="settings__row">
         <div>
-          <strong>Lock now</strong>
-          <span>Hides the locked content again without waiting for the timer.</span>
+          <strong>{t('parental.lockNow')}</strong>
+          <span>{t('parental.lockNowBody')}</span>
         </div>
-        <button className="btn" onClick={() => void act(() => invoke('parental:lock'), 'Locked.')}>
-          Lock
+        <button className="btn" onClick={() => void act(() => invoke('parental:lock'), t('parental.lockedNote'))}>
+          {t('parental.lock')}
         </button>
       </div>
 
@@ -328,7 +332,7 @@ export function ParentalSection(): JSX.Element {
     setError(null)
     try {
       const ok = await invoke('parental:unlock', unlockPin)
-      if (!ok) setError('That PIN is not correct.')
+      if (!ok) setError(t('parental.wrongPin'))
       else setUnlockPin('')
       reload()
     } catch (e) {

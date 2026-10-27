@@ -1,0 +1,66 @@
+LiberCast -- beta software notice
+
+Version {{version}}
+
+Please read this before installing. Installing LiberCast means you accept it.
+
+
+1. THIS IS A BETA
+
+LiberCast is unfinished software being tested. It may crash, lose settings, or
+stop working after an update. Do not rely on it for anything that matters, and
+do not use it as your only way to record something you cannot miss.
+
+
+2. LIBERCAST DOES NOT PROVIDE CHANNELS OR CONTENT
+
+LiberCast is a player. It contains no channels, no playlists, no accounts and
+no subscriptions, and it is not affiliated with any provider of those. It plays
+what you point it at.
+
+You are responsible for what you play through it. By installing, you confirm
+that you have the right to access the streams, playlists and accounts you use
+with it, and that you will not use LiberCast to access content you are not
+entitled to. Nothing here grants you any right to any content.
+
+
+3. NO WARRANTY
+
+LiberCast is provided "as is", without warranty of any kind, express or
+implied, including but not limited to the warranties of merchantability,
+fitness for a particular purpose and noninfringement. To the maximum extent
+permitted by law, the author is not liable for any claim, damages or other
+liability arising from the software or its use.
+
+
+4. WHAT IT DOES WITH YOUR DATA
+
+Nothing leaves your computer except the requests you ask for. LiberCast has no
+analytics, no telemetry and no account of its own. It talks to the provider you
+configure, to the guide URL you configure, and to nothing else.
+
+Your provider passwords are stored encrypted, using the Windows account you are
+signed in as, in your own user profile:
+
+    %APPDATA%\LiberCast
+
+Uninstalling leaves that folder in place so a reinstall keeps your sources. To
+remove everything, delete that folder by hand after uninstalling.
+
+
+5. LICENCE
+
+LiberCast's own source code is open source under the MIT licence, which is in
+LICENSE in the installation folder.
+
+This installer also contains ffmpeg, which is licensed under the GNU General
+Public License version 3 or later -- a different licence from LiberCast's own.
+The full text and details of where to obtain ffmpeg's source are in
+THIRD-PARTY-NOTICES.md in the installation folder.
+
+
+6. THIS BUILD IS NOT CODE-SIGNED
+
+Windows will warn you that the publisher is unknown, because this beta carries
+no code-signing certificate. Only install it if you obtained it directly from
+the author.

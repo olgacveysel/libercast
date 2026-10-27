@@ -15,6 +15,8 @@ export interface ParsedChannel {
   streamUrl: string
   containerExtension?: string | null
   isAdult?: boolean
+  /** Days of archive the provider keeps for this channel; 0 for none. */
+  catchupDays?: number | null
 }
 
 export interface ParsedCatalog {

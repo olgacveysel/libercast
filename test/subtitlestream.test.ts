@@ -49,11 +49,14 @@ async function main(): Promise<void> {
   // A clip with a real embedded subtitle track whose first cue is a few
   // seconds in — a subtitle file does not exist the moment ffmpeg starts, and
   // that delay is the whole point of this test.
+  // Written with fs rather than shelled out to `printf`: there is no `sh` on
+  // Windows, and this suite has to pass on the platform the app ships for.
   const srt = join(work, 'subs.srt')
-  await run('sh', [
-    '-c',
-    `printf '1\\n00:00:02,000 --> 00:00:05,000\\nIyi aksamlar\\n\\n2\\n00:00:06,000 --> 00:00:09,000\\nGorusmek uzere\\n\\n' > ${srt}`
-  ])
+  writeFileSync(
+    srt,
+    '1\n00:00:02,000 --> 00:00:05,000\nIyi aksamlar\n\n' +
+      '2\n00:00:06,000 --> 00:00:09,000\nGorusmek uzere\n\n'
+  )
 
   const fixture = join(work, 'clip.mkv')
   await run(ffmpeg!, [

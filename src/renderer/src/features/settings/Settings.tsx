@@ -5,7 +5,7 @@ import { formatRelative } from '@renderer/lib/format'
 import { useAppStore } from '@renderer/store/useAppStore'
 import { IconKeyboard, IconRefresh, IconTrash } from '@renderer/ui/Icon'
 import { SHORTCUTS } from '@renderer/features/player/useHotkeys'
-import { LANGUAGES, useT } from '@renderer/i18n'
+import { LANGUAGES, useT, type TranslationKey } from '@renderer/i18n'
 import { SubtitleAppearance } from './SubtitleAppearance'
 import { APP_NAME } from '@shared/app'
 import { AccountPanel } from './AccountPanel'
@@ -195,13 +195,8 @@ export function Settings({ onAddSource }: Props): JSX.Element {
 
           <div className="settings__row">
             <div>
-              <strong>Spend as few connections as possible</strong>
-              <span>
-                Playing a channel normally takes two connections in quick succession — one to
-                identify the stream, one to play it. If your account allows only one, the second is
-                refused and the channel opens only sometimes. Turn this on and a live channel that
-                has not been played before is started on assumption instead.
-              </span>
+              <strong>{t('settings.frugal')}</strong>
+              <span>{t('settings.frugalBody')}</span>
             </div>
             <input
               type="checkbox"
@@ -211,10 +206,20 @@ export function Settings({ onAddSource }: Props): JSX.Element {
           </div>
 
           <p style={{ fontSize: 12, color: 'var(--text-dim)', margin: '2px 2px 0', lineHeight: 1.5 }}>
-            Either way, what a stream turned out to be is remembered, so playing anything a second
-            time costs a single connection. The audio and subtitle menus for a live channel stay
-            empty until it has been played once.
+            {t('settings.frugalNote')}
           </p>
+
+          <div className="settings__row">
+            <div>
+              <strong>{t('settings.failover')}</strong>
+              <span>{t('settings.failoverBody')}</span>
+            </div>
+            <input
+              type="checkbox"
+              checked={settings.sourceFailover}
+              onChange={(event) => void updateSettings({ sourceFailover: event.target.checked })}
+            />
+          </div>
         </section>
 
         <section className="settings__group">
@@ -222,11 +227,8 @@ export function Settings({ onAddSource }: Props): JSX.Element {
 
           <div className="settings__row">
             <div>
-              <strong>Refresh sources every</strong>
-              <span>
-                Off by default. A refresh talks to your provider, and it is skipped while something
-                is playing so it can never take the connection a stream is using.
-              </span>
+              <strong>{t('settings.refreshEvery')}</strong>
+              <span>{t('settings.refreshEveryBody')}</span>
             </div>
             <select
               className="input"
@@ -236,7 +238,11 @@ export function Settings({ onAddSource }: Props): JSX.Element {
             >
               {[0, 6, 12, 24, 48, 168].map((hours) => (
                 <option key={hours} value={hours}>
-                  {hours === 0 ? 'Never' : hours === 168 ? 'Week' : `${hours} hours`}
+                  {hours === 0
+                    ? t('common.never')
+                    : hours === 168
+                      ? t('settings.everyWeek')
+                      : t('settings.everyHours', { hours })}
                 </option>
               ))}
             </select>
@@ -245,8 +251,8 @@ export function Settings({ onAddSource }: Props): JSX.Element {
           {settings.autoRefreshHours > 0 && (
             <div className="settings__row">
               <div>
-                <strong>Include the guide</strong>
-                <span>Downloads the EPG in the same pass.</span>
+                <strong>{t('settings.refreshEpg')}</strong>
+                <span>{t('settings.refreshEpgBody')}</span>
               </div>
               <input
                 type="checkbox"
@@ -258,12 +264,12 @@ export function Settings({ onAddSource }: Props): JSX.Element {
 
           <div className="settings__row" style={{ alignItems: 'flex-start' }}>
             <div>
-              <strong>Last automatic refresh</strong>
-              <span>{describeRefresh(settings.lastAutoRefresh)}</span>
+              <strong>{t('settings.lastRefresh')}</strong>
+              <span>{describeRefresh(settings.lastAutoRefresh, t)}</span>
             </div>
             <button className="btn" onClick={() => void refreshNow()} disabled={refreshing}>
               {refreshing ? <span className="spinner" /> : <IconRefresh size={15} />}
-              {refreshing ? 'Refreshing…' : 'Refresh now'}
+              {refreshing ? t('settings.refreshing') : t('settings.refreshNow')}
             </button>
           </div>
         </section>
@@ -317,22 +323,22 @@ export function Settings({ onAddSource }: Props): JSX.Element {
 
           <div className="settings__row">
             <div>
-              <strong>Interface size</strong>
-              <span>Scales everything. Useful on a big screen watched from the sofa.</span>
+              <strong>{t('settings.uiScale')}</strong>
+              <span>{t('settings.uiScaleBody')}</span>
             </div>
             <div className="segmented">
               {([
-                ['Small', 0.9],
-                ['Default', 1],
-                ['Large', 1.15],
-                ['Larger', 1.3]
+                ['settings.subtitleSmall', 0.9],
+                ['settings.subtitleDefault', 1],
+                ['settings.subtitleLarge', 1.15],
+                ['settings.subtitleLarger', 1.3]
               ] as const).map(([label, scale]) => (
                 <button
                   key={label}
                   aria-pressed={settings.uiScale === scale}
                   onClick={() => void updateSettings({ uiScale: scale })}
                 >
-                  {label}
+                  {t(label)}
                 </button>
               ))}
             </div>
@@ -340,8 +346,8 @@ export function Settings({ onAddSource }: Props): JSX.Element {
 
           <div className="settings__row">
             <div>
-              <strong>Accent colour</strong>
-              <span>Used for selection, focus rings and progress.</span>
+              <strong>{t('settings.accent')}</strong>
+              <span>{t('settings.accentBody')}</span>
             </div>
             <div className="swatches">
               {ACCENTS.map((color) => (
@@ -350,7 +356,7 @@ export function Settings({ onAddSource }: Props): JSX.Element {
                   className="swatch"
                   style={{ background: color }}
                   aria-pressed={settings.accentColor === color}
-                  aria-label={`Accent ${color}`}
+                  aria-label={t('settings.accentSwatch', { color })}
                   onClick={() => void updateSettings({ accentColor: color })}
                 />
               ))}
@@ -361,12 +367,12 @@ export function Settings({ onAddSource }: Props): JSX.Element {
         <SubtitleAppearance />
 
         <section className="settings__group">
-          <h3>Playback</h3>
+          <h3>{t('settings.playback')}</h3>
 
           <div className="settings__row">
             <div>
-              <strong>Hardware acceleration</strong>
-              <span>Uses the GPU to decode video. Turn off only if playback tears or crashes.</span>
+              <strong>{t('settings.hwAccel')}</strong>
+              <span>{t('settings.hwAccelBody')}</span>
             </div>
             <input
               type="checkbox"
@@ -377,11 +383,8 @@ export function Settings({ onAddSource }: Props): JSX.Element {
 
           <div className="settings__row">
             <div>
-              <strong>Show stream info</strong>
-              <span>
-                Resolution, measured frame rate, dropped frames and codec, over the picture. Hidden in
-                fullscreen. Press I to toggle while watching.
-              </span>
+              <strong>{t('settings.streamInfo')}</strong>
+              <span>{t('settings.streamInfoBody')}</span>
             </div>
             <input
               type="checkbox"
@@ -392,8 +395,8 @@ export function Settings({ onAddSource }: Props): JSX.Element {
 
           <div className="settings__row">
             <div>
-              <strong>Resume last channel on start</strong>
-              <span>Opens the channel you were last watching when the app launches.</span>
+              <strong>{t('settings.resumeLast')}</strong>
+              <span>{t('settings.resumeLastBody')}</span>
             </div>
             <input
               type="checkbox"
@@ -404,15 +407,12 @@ export function Settings({ onAddSource }: Props): JSX.Element {
         </section>
 
         <section className="settings__group">
-          <h3>Languages</h3>
+          <h3>{t('settings.languages')}</h3>
 
           <div className="settings__row">
             <div>
-              <strong>Preferred audio</strong>
-              <span>
-                Picked automatically when a title offers more than one language. Drag-free: click to toggle,
-                order follows the list below.
-              </span>
+              <strong>{t('settings.preferredAudio')}</strong>
+              <span>{t('settings.preferredAudioBody')}</span>
             </div>
             <LanguagePicker
               selected={settings.preferredAudioLanguages}
@@ -422,11 +422,8 @@ export function Settings({ onAddSource }: Props): JSX.Element {
 
           <div className="settings__row">
             <div>
-              <strong>Preferred subtitles</strong>
-              <span>
-                Turned on automatically when a matching track exists. Leave empty to keep subtitles off
-                unless you pick them.
-              </span>
+              <strong>{t('settings.preferredSubtitles')}</strong>
+              <span>{t('settings.preferredSubtitlesBody')}</span>
             </div>
             <LanguagePicker
               selected={settings.preferredSubtitleLanguages}
@@ -436,28 +433,27 @@ export function Settings({ onAddSource }: Props): JSX.Element {
         </section>
 
         <section className="settings__group">
-          <h3>Media engine</h3>
+          <h3>{t('settings.mediaEngine')}</h3>
 
           <div className="settings__row">
             <div>
               <strong>ffmpeg</strong>
               <span>
                 {capabilities?.ffmpeg
-                  ? `Working — using the ${capabilities.ffmpegSource} copy.`
-                  : 'Not found. MPEG-TS channels and recording are unavailable without it.'}
+                  ? t('settings.ffmpegWorking', { source: capabilities.ffmpegSource })
+                  : t('settings.ffmpegMissing')}
               </span>
             </div>
             <span className={`badge ${capabilities?.ffmpeg ? '' : 'badge--live'}`}>
-              {capabilities?.ffmpeg ? 'Ready' : 'Missing'}
+              {capabilities?.ffmpeg ? t('common.ready') : t('settings.missing')}
             </span>
           </div>
 
           <div className="settings__row">
             <div>
-              <strong>Custom ffmpeg folder</strong>
+              <strong>{t('settings.ffmpegFolder')}</strong>
               <span>
-                {settings.ffmpegPath ??
-                  'Not set. Point this at a folder containing ffmpeg and ffprobe if the bundled copy fails.'}
+                {settings.ffmpegPath ?? t('settings.ffmpegFolderBody')}
               </span>
             </div>
             <button className="btn" onClick={() => void pickFolder('ffmpegPath')}>
@@ -465,22 +461,19 @@ export function Settings({ onAddSource }: Props): JSX.Element {
             </button>
             {settings.ffmpegPath && (
               <button className="btn btn--ghost" onClick={() => void updateSettings({ ffmpegPath: null })}>
-                Clear
+                {t('settings.clear')}
               </button>
             )}
           </div>
         </section>
 
         <section className="settings__group">
-          <h3>Downloads</h3>
+          <h3>{t('settings.downloadsFolder')}</h3>
 
           <div className="settings__row">
             <div>
-              <strong>Simultaneous downloads</strong>
-              <span>
-                Each download holds a connection to your provider. Most accounts allow very few, so more
-                than one can stop playback working.
-              </span>
+              <strong>{t('settings.concurrentDownloads')}</strong>
+              <span>{t('settings.concurrentDownloadsBody')}</span>
             </div>
             <select
               className="input"
@@ -500,12 +493,12 @@ export function Settings({ onAddSource }: Props): JSX.Element {
         </section>
 
         <section className="settings__group">
-          <h3>Parental controls</h3>
+          <h3>{t('settings.parental')}</h3>
           <ParentalSection />
         </section>
 
         <section className="settings__group">
-          <h3>Backup</h3>
+          <h3>{t('settings.backup')}</h3>
           <BackupSection />
         </section>
 
@@ -563,10 +556,23 @@ export function Settings({ onAddSource }: Props): JSX.Element {
           </div>
 
           {/*
-            Checked on demand only. The installer's notice promises that
-            nothing leaves the machine except the requests the user makes, and
-            a call to GitHub on every launch would make that untrue.
+            Off until someone says otherwise. The installer's notice promises
+            that nothing leaves the machine except the requests the user makes,
+            which is a promise about the default, not a ban on the feature —
+            so this is opt-in and says exactly what it sends.
           */}
+          <div className="settings__row">
+            <div>
+              <strong>{t('settings.autoUpdate')}</strong>
+              <span>{t('settings.autoUpdateBody')}</span>
+            </div>
+            <input
+              type="checkbox"
+              checked={settings.autoCheckUpdates === true}
+              onChange={(event) => void updateSettings({ autoCheckUpdates: event.target.checked })}
+            />
+          </div>
+
           <div className="settings__row">
             <div>
               <strong>{t('settings.updates')}</strong>
@@ -678,6 +684,7 @@ function SourceSettings({
   const [minutes, setMinutes] = useState(offset)
   const [agent, setAgent] = useState(userAgent)
   const [refer, setRefer] = useState(referrer)
+  const t = useT()
 
   return (
     <div
@@ -685,19 +692,19 @@ function SourceSettings({
       style={{ flexDirection: 'column', alignItems: 'stretch', gap: 12, borderTop: 'none', marginBottom: 8 }}
     >
       <div className="field">
-        <label className="field__label">XMLTV URL</label>
+        <label className="field__label">{t('settings.xmltvUrl')}</label>
         <input
           className="input"
-          placeholder={isXtream ? "Leave empty to use the provider's own guide" : 'http://example.com/xmltv.xml.gz'}
+          placeholder={isXtream ? t('settings.xmltvUrlHint') : 'http://example.com/xmltv.xml.gz'}
           value={url}
           onChange={(event) => setUrl(event.target.value)}
           spellCheck={false}
         />
-        <span className="field__hint">Plain XML or gzip. Overrides the provider guide when set.</span>
+        <span className="field__hint">{t('settings.xmltvBody')}</span>
       </div>
 
       <div className="field">
-        <label className="field__label">Time offset (minutes)</label>
+        <label className="field__label">{t('settings.epgOffset')}</label>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <input
             className="input"
@@ -708,13 +715,13 @@ function SourceSettings({
             onChange={(event) => setMinutes(Number(event.target.value) || 0)}
           />
           <span className="field__hint" style={{ flex: 1 }}>
-            Shifts every programme. Use −60 or +60 when the guide is out by exactly an hour.
+            {t('settings.epgOffsetBody')}
           </span>
         </div>
       </div>
 
       <div className="field">
-        <label className="field__label">User-Agent</label>
+        <label className="field__label">{t('settings.userAgent')}</label>
         <input
           className="input"
           placeholder="VLC/3.0.20 LibVLC/3.0.20 (default)"
@@ -722,18 +729,15 @@ function SourceSettings({
           onChange={(event) => setAgent(event.target.value)}
           spellCheck={false}
         />
-        <span className="field__hint">
-          Sent with every request to this provider. Leave empty unless streams fail while the same
-          links work in another player.
-        </span>
+        <span className="field__hint">{t('settings.userAgentBody')}</span>
       </div>
 
       <div className="field">
-        <label className="field__label">Referrer</label>
+        <label className="field__label">{t('settings.referrer')}</label>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <input
             className="input"
-            placeholder="Only needed if your provider asks for one"
+            placeholder={t('settings.referrerHint')}
             value={refer}
             onChange={(event) => setRefer(event.target.value)}
             spellCheck={false}
@@ -745,7 +749,7 @@ function SourceSettings({
             }
             disabled={busy}
           >
-            Save
+            {t('common.save')}
           </button>
         </div>
       </div>
@@ -759,8 +763,11 @@ function SourceSettings({
  * The point is to make a silent background job auditable: if it has been
  * failing for a week, this is where that becomes visible.
  */
-function describeRefresh(report: AutoRefreshReport | null): string {
-  if (!report) return 'Has not run yet.'
+function describeRefresh(
+  report: AutoRefreshReport | null,
+  t: (key: TranslationKey, vars?: Record<string, string | number>) => string
+): string {
+  if (!report) return t('settings.refreshNeverRan')
 
   const failed = report.sources.filter((source) => source.error !== null)
   const added = report.sources.reduce((sum, source) => sum + (source.added ?? 0), 0)
@@ -769,14 +776,20 @@ function describeRefresh(report: AutoRefreshReport | null): string {
   const when = formatRelative(report.at)
 
   if (failed.length === report.sources.length && failed.length > 0) {
-    return `${when} — failed: ${failed[0]!.error}`
+    return t('settings.refreshFailed', { when, error: failed[0]!.error ?? '' })
   }
 
   const parts = [`${when}`]
-  parts.push(added === 0 && removed === 0 ? 'nothing changed' : `${added} added, ${removed} removed`)
-  if (report.programmes !== null) parts.push(`${report.programmes.toLocaleString()} programmes`)
-  if (report.epgError) parts.push(`guide failed: ${report.epgError}`)
-  if (failed.length > 0) parts.push(`${failed.length} source(s) failed`)
+  parts.push(
+    added === 0 && removed === 0
+      ? t('settings.refreshNoChange')
+      : t('settings.refreshChanged', { added, removed })
+  )
+  if (report.programmes !== null) {
+    parts.push(t('settings.refreshProgrammes', { count: report.programmes.toLocaleString() }))
+  }
+  if (report.epgError) parts.push(t('settings.refreshGuideFailed', { error: report.epgError }))
+  if (failed.length > 0) parts.push(t('settings.refreshSourcesFailed', { count: failed.length }))
 
   return parts.join(' · ')
 }

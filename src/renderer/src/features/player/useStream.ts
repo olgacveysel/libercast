@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ExternalSubtitle, MediaTracks, StreamSource, VideoInfo } from '@shared/types'
 import { invoke, messageOf } from '@renderer/lib/api'
 import { parseCueBlocks, streamSubtitles } from './subtitles'
+import { createStallWatch } from './stall'
 import { disableOthers, ensureShowing } from './textTracks'
 
 export interface StreamState {
@@ -33,6 +34,12 @@ export interface StreamState {
    * for a control the user just operated.
    */
   subtitleProblem: string | null
+  /**
+   * Set when this picture is coming from a different provider than the one
+   * asked for. The switch itself is silent; this is how it gets reported
+   * afterwards.
+   */
+  switched: { channelName: string; from: string; to: string } | null
 }
 
 const NO_TRACKS: MediaTracks = { audio: [], subtitle: [] }
@@ -54,6 +61,14 @@ interface Options {
 }
 
 const MAX_RETRIES = 2
+
+/**
+ * How often the element's clock is checked.
+ *
+ * A second is far more often than a stall needs to be caught, and costs
+ * nothing: reading `currentTime` is a property access, not work.
+ */
+const STALL_POLL_MS = 1000
 
 /**
  * Owns a playback session end to end.
@@ -79,6 +94,8 @@ export function useStream({
   const videoRef = useRef<HTMLVideoElement>(null)
   const sessionRef = useRef<string | null>(null)
   const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  /** Set by the effect, so a successful open can restart the stall countdown. */
+  const resetStall = useRef<(() => void) | null>(null)
   const subtitleAbort = useRef<AbortController | null>(null)
 
   /**
@@ -110,6 +127,7 @@ export function useStream({
     subtitleTrack: null,
     subtitlesBurnedIn: false,
     absoluteTimeline: false,
+    switched: null,
     subtitleProblem: null
   })
   const [nonce, setNonce] = useState(0)
@@ -133,6 +151,7 @@ export function useStream({
         subtitleTrack: null,
         subtitlesBurnedIn: false,
         absoluteTimeline: false,
+        switched: null,
         subtitleProblem: null
       })
       return
@@ -140,6 +159,17 @@ export function useStream({
 
     let cancelled = false
     let attempt = 0
+
+    /**
+     * Channels this attempt has already watched fail.
+     *
+     * A stream that opens cleanly and then stops is a failure the main process
+     * never sees — it handed over a working session and moved on. Telling it
+     * what died is what makes the retry come back from a different provider
+     * instead of walking into the same dead stream again.
+     */
+    const dead: number[] = []
+    let playing: number | null = null
 
     const closeSession = (): void => {
       if (sessionRef.current) {
@@ -158,7 +188,8 @@ export function useStream({
           seekSecs,
           audioTrack,
           subtitleTrack,
-          owner: ownerRef.current
+          owner: ownerRef.current,
+          exclude: dead
         })
         if (cancelled) {
           void invoke('stream:close', session.id)
@@ -167,6 +198,7 @@ export function useStream({
 
         sessionRef.current = session.id
         warningRef.current = session.warning
+        playing = session.playingChannelId
         element.src = session.url
 
         subtitleAbort.current?.abort()
@@ -192,8 +224,12 @@ export function useStream({
           subtitleTrack: session.subtitleTrack,
           subtitlesBurnedIn: session.subtitlesBurnedIn,
           absoluteTimeline: session.absoluteTimeline,
+          switched: session.switched,
           subtitleProblem: null
         })
+        // The new stream gets the full grace period: the clock is about to
+        // jump to a different place, and that is not movement to judge it by.
+        resetStall.current?.()
         onOpened?.()
       } catch (error) {
         if (cancelled) return
@@ -211,16 +247,23 @@ export function useStream({
     }
 
     /**
-     * The element reports a decode or network failure after the session opened
-     * cleanly, which is what a stream ffmpeg could not remux looks like from
-     * here. Reopening gives the main process the chance to come back
-     * re-encoding, so the retry is worth making automatically.
+     * Playback that was working has stopped — reported by the element, or
+     * caught by the stall watch when nothing is reported at all.
+     *
+     * Reopening is worth doing automatically: a stream ffmpeg could not remux
+     * usually comes back fine when the main process returns re-encoding, and a
+     * provider that dropped the connection will often hand over another one.
      */
-    const onElementError = (): void => {
+    const recover = (): void => {
       if (cancelled) return
 
       if (autoRetry && attempt < MAX_RETRIES) {
         attempt += 1
+        // The first retry reopens the same source: a remux failure comes back
+        // fine re-encoded, and giving up a working provider for that would be
+        // wrong. A second failure is the source itself, so it is struck off
+        // and the next attempt comes from somewhere else.
+        if (attempt > 1 && playing !== null && !dead.includes(playing)) dead.push(playing)
         retryTimer.current = setTimeout(() => void open(), 900 * attempt)
         setState((prev) => ({ ...prev, status: 'loading', attempt }))
         return
@@ -240,14 +283,45 @@ export function useStream({
       )
     }
 
-    element.addEventListener('error', onElementError)
+    /**
+     * A provider dropping a live stream reports nothing at all: the socket
+     * stays open, ffmpeg keeps running with nothing to read, and the picture
+     * freezes on its last frame forever. The element's own clock is the only
+     * thing that gives it away, so it is polled.
+     *
+     * The watch is reset on every successful open, so the grace period starts
+     * from the new stream rather than from whenever the last frame arrived.
+     */
+    const stall = createStallWatch(Date.now())
+    resetStall.current = () => stall.reset(Date.now())
+
+    const poll = setInterval(() => {
+      if (cancelled || element.readyState === 0) return
+
+      const stalled = stall.observe({
+        currentTime: element.currentTime,
+        paused: element.paused,
+        ended: element.ended,
+        seeking: element.seeking,
+        at: Date.now()
+      })
+
+      if (stalled) {
+        stall.reset(Date.now())
+        recover()
+      }
+    }, STALL_POLL_MS)
+
+    element.addEventListener('error', recover)
     void open()
 
     return () => {
       cancelled = true
+      clearInterval(poll)
+      resetStall.current = null
       if (retryTimer.current) clearTimeout(retryTimer.current)
       subtitleAbort.current?.abort()
-      element.removeEventListener('error', onElementError)
+      element.removeEventListener('error', recover)
       element.removeAttribute('src')
       element.load()
       closeSession()

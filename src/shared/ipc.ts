@@ -194,6 +194,18 @@ export interface IpcContract {
   /** Checks every favourite in turn and reports which no longer play. */
   'health:scanFavorites': { req: number; res: ChannelHealth[] }
   'health:cancel': { req: void; res: void }
+
+  /**
+   * Pulls one multi-view tile out into a window of its own, and puts it back.
+   *
+   * The tile index travels with the channel because that is what the window
+   * returns to, and because the grid has to stop playing exactly that tile —
+   * two windows on one channel would cost a second provider connection.
+   */
+  'multiview:detach': { req: { channelId: number; tile: number }; res: void }
+  'multiview:attach': { req: number; res: void }
+  /** Which tiles are in their own window, for a renderer that just reloaded. */
+  'multiview:detached': { req: void; res: number[] }
 }
 
 export type IpcChannel = keyof IpcContract
@@ -212,6 +224,22 @@ export interface IpcEvents {
   'sources:refreshed': AutoRefreshReport
   /** How far through a favourites scan we are. */
   'health:progress': { done: number; total: number; current: string }
+  /**
+   * A newer release was found by the once-a-day launch check.
+   *
+   * Pushed rather than polled because the check finishes a second or two after
+   * the window opens, and a renderer that asked once at startup would always
+   * ask too early.
+   */
+  'updates:available': AvailableUpdate
+
+  /**
+   * The tiles now in their own window.
+   *
+   * Pushed rather than polled because a detached window can be closed from the
+   * window manager or the taskbar, where the grid would never hear about it.
+   */
+  'multiview:detachedChanged': number[]
 }
 
 export type IpcEventName = keyof IpcEvents
@@ -293,7 +321,10 @@ export const IPC_CHANNELS: IpcChannel[] = [
   'app:showLogs',
   'app:checkUpdate',
   'health:scanFavorites',
-  'health:cancel'
+  'health:cancel',
+  'multiview:detach',
+  'multiview:attach',
+  'multiview:detached'
 ]
 
 export const IPC_EVENTS: IpcEventName[] = [
@@ -303,7 +334,9 @@ export const IPC_EVENTS: IpcEventName[] = [
   'downloads:changed',
   'reminders:tune',
   'sources:refreshed',
-  'health:progress'
+  'health:progress',
+  'multiview:detachedChanged',
+  'updates:available'
 ]
 
 // Re-exported so the renderer can import everything from one module.

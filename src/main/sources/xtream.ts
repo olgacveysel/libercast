@@ -48,6 +48,7 @@ interface RawLiveStream {
   category_id?: string | number | null
   num?: string | number
   tv_archive?: string | number
+  tv_archive_duration?: string | number
 }
 
 interface RawVodStream {
@@ -162,7 +163,8 @@ export class XtreamClient {
           epgChannelId: stream.epg_channel_id || null,
           streamUrl: this.liveStreamUrl(id),
           containerExtension: 'ts',
-          isAdult: false
+          isAdult: false,
+          catchupDays: catchupDays(stream)
         }
       ]
     })
@@ -309,6 +311,37 @@ export class XtreamClient {
     }
   }
 
+  /**
+   * The archive URL for a window of a live channel.
+   *
+   * Panels take the start as local wall-clock in their own timezone, in a
+   * format of their own invention, and the length in whole minutes — not an
+   * end time, and not seconds. Both are the provider's conventions rather than
+   * ours, which is why building the string lives here with the rest of them.
+   */
+  timeshiftUrl(streamId: string, start: string, durationMinutes: number): string {
+    const { baseUrl, username, password } = this.credentials
+    return (
+      `${baseUrl}/streaming/timeshift.php?username=${encode(username)}&password=${encode(password)}` +
+      `&stream=${encode(streamId)}&start=${encode(start)}&duration=${durationMinutes}`
+    )
+  }
+
+  /**
+   * The path form of the same thing.
+   *
+   * Panels are split roughly evenly between the two and neither is documented;
+   * a panel that does not recognise one answers with an error page, so both
+   * are offered and the first that serves video wins.
+   */
+  timeshiftPathUrl(streamId: string, start: string, durationMinutes: number): string {
+    const { baseUrl, username, password } = this.credentials
+    return (
+      `${baseUrl}/timeshift/${encode(username)}/${encode(password)}/` +
+      `${durationMinutes}/${encode(start)}/${streamId}.ts`
+    )
+  }
+
   liveStreamUrl(streamId: string, extension = 'ts'): string {
     const { baseUrl, username, password } = this.credentials
     return `${baseUrl}/live/${encode(username)}/${encode(password)}/${streamId}.${extension}`
@@ -358,6 +391,24 @@ function toInt(value: string | number | null | undefined): number | null {
 
 function encode(value: string): string {
   return encodeURIComponent(value)
+}
+
+/**
+ * How many days of this channel the panel keeps.
+ *
+ * `tv_archive` is the flag and `tv_archive_duration` the length, but panels
+ * are inconsistent about both: some send the duration with the flag at zero,
+ * some send the flag with no duration at all. A duration on its own is taken
+ * as the answer; a flag on its own is taken as a day, which is the shortest
+ * window worth offering and errs towards asking the provider rather than
+ * hiding a feature the account has paid for.
+ */
+function catchupDays(stream: RawLiveStream): number {
+  const duration = toInt(stream.tv_archive_duration) ?? 0
+  if (duration > 0) return duration
+
+  const flag = toInt(stream.tv_archive) ?? 0
+  return flag > 0 ? 1 : 0
 }
 
 function text(value: unknown): string | null {

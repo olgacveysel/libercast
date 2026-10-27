@@ -7,23 +7,9 @@ you connect your own provider.
 
 ---
 
-## Download
-
-Windows 10/11, 64-bit. Grab the installer or the portable build from
-[Releases](../../releases).
-
-This is a **beta**. The build is not code-signed, so Windows SmartScreen will
-say the publisher is unknown and hide the Run button behind *More info → Run
-anyway*. That warning is accurate — only get past it if you trust where you got
-the file. [`docs/BETA-TESTING.md`](./docs/BETA-TESTING.md) covers what to expect
-and how to send a useful bug report.
-
-You also need your own IPTV source: an Xtream Codes login, or an M3U playlist
-URL or file.
-
 ## Status
 
-Beta — `0.9.0-beta.1`. Milestones 1–4 are implemented and building.
+Milestones 1–4 are implemented and building.
 
 **Sources & live TV** — Xtream Codes and M3U/M3U8, connection testing before you
 save, SQLite catalog that handles 50k+ channel playlists, category browsing,
@@ -49,8 +35,54 @@ languages once in Settings and they are chosen automatically from then on.
 External `.srt`, `.ass` and `.vtt` files can be opened for any title, with a
 timing nudge for files that run out of sync.
 
+**Favourites health** — check every favourite in one pass and keep the result:
+a channel that did not answer is marked in the list until it plays again or the
+verdict goes stale, so you are not hunting for the dead ones each time.
+
 **Multi-view** — two to nine channels at once in a configurable grid, with one
-tile carrying the audio. The layout is remembered between sessions.
+tile carrying the audio. Double-click a tile (or press its ⤢ button) to give it
+the top of the grid and the sound in one gesture, with the rest in a strip
+underneath; double-click again for an even grid. F puts the grid itself
+fullscreen, so the window chrome goes away and every pixel is picture. Any tile
+can also be detached (⧉) into a window of its own — it opens on your second
+monitor when you have one, and the grid keeps playing the rest. The layout is
+remembered between sessions.
+
+A detached tile stops playing in the grid while its window is open. That is
+deliberate: every tile is a separate provider connection and most accounts
+allow only a few, so the same channel is never connected twice.
+
+**Catch-up** — where the provider keeps an archive, a programme that has
+already finished can be replayed from the channel's schedule. Only offered
+where there is something to replay: the archive length is read per channel on
+sync, and the start time is built in the panel's own timezone rather than
+yours, which is the difference between a replay starting in the right place and
+an hour of the wrong programme.
+
+**Stall recovery** — a provider that stops sending data reports nothing at
+all: no error, no end of stream, just a frozen frame. The player watches the
+media element's own clock and reopens the stream when it stops moving, falling
+over to another source if the second attempt fails too.
+
+**Update checks, opt-in** — LiberCast asks on first launch whether it may check
+GitHub for new versions. Say no and it never makes a request you did not ask
+for; say yes and it asks once a day for the latest version number — and nothing
+else — showing a dismissible strip when there is one. There is a manual *Check
+now* button in Settings either way.
+
+**One list from every source** — with more than one provider connected, "All
+sources" in the sidebar shows them as a single list with duplicates merged, and
+marks the channels more than one of them carries. Grouping is by the normalised
+name, so "beIN Sports 2 HD" and "BEIN SPORTS 2" are one row while beIN 2 and
+beIN 4 stay two. A list prefix like "TR |" is deliberately *not* stripped:
+removing it would also merge "UK Sky Sports 2" with "DE Sky Sports 2", which are
+different channels.
+
+**Source failover** — with more than one provider added, a live channel that
+will not start, or that dies partway through, is looked for on your other
+sources and played from there. The switch is silent; a brief note afterwards
+names the source that took over, so a provider that keeps failing is visible
+rather than mysterious. Can be turned off in Settings.
 
 **Stream info** — resolution, measured frame rate, dropped frames, codec and
 bitrate over the picture while windowed. Press I to toggle.
@@ -79,18 +111,11 @@ left there is marked post-1.0.
 ## Quick start
 
 ```bash
-npm ci
+npm install
 npm run dev
 ```
 
 Then add a source from the sidebar and hit **Sync**.
-
-Packaging has to happen on Windows: the build contains `better-sqlite3`, a
-native module that must be compiled for the platform it will run on.
-
-Do not build inside a OneDrive-synced folder. The sync client holds the output
-files open while it uploads them, which makes electron-builder fail to replace
-them and quietly produce a package containing the previous build.
 
 ## Scripts
 
@@ -101,8 +126,6 @@ them and quietly produce a package containing the previous build.
 | `npm test` | Runs the test suite under Electron's node runtime |
 | `npm run build` | Type-checks and builds all three bundles |
 | `npm run pack:win` | Builds an NSIS installer and a portable .exe into `release/` |
-| `npm run pack:win:dir` | Packages without building the installer — quicker when you only want to check the app starts |
-| `npm run verify:player` | Drives a real Electron window and asserts subtitles are *displayed*, not merely delivered. Needs a display (`xvfb-run` on Linux) |
 
 ## Architecture
 
@@ -225,6 +248,13 @@ constraint rather than an implementation detail: most Xtream accounts allow one
 or two connections, so tiles past that limit will not start. The UI says so
 before the failures happen instead of leaving the user guessing.
 
+**Failover spends another account's connection, so it needs a clear refusal.**
+An error status or a web page where video should be is a refusal; a panel that
+is merely busy, or a stream ffprobe cannot read, is not — those are played
+through as they always were, because they usually work. Matching is by name
+with the channel-number rule from the guide matcher, so beIN 2 never falls back
+to beIN 4.
+
 **Changing a track reopens the stream.** ffmpeg is mapping one audio and one
 subtitle stream, so a different selection needs a different ffmpeg. That reuses
 the seek machinery: the session reopens at the current position and playback
@@ -300,23 +330,10 @@ the source is synced.
 ## Third-party binaries
 
 ffmpeg and ffprobe are fetched at install time by `ffmpeg-static` and
-`ffprobe-static`, and are **invoked as separate executables** — LiberCast
-spawns them and reads their output. Nothing from ffmpeg is linked into this
-application.
-
-The wrapper packages are MIT. The binaries they download are not:
-`ffmpeg-static` declares **GPL-3.0-or-later**, and that is what the shipped
-installer carries. Distributing it therefore means distributing a GPL-3 binary,
-which is allowed and does not change LiberCast's own licence, but it does carry
-two obligations — the licence text has to travel with it, and the corresponding
-source has to be obtainable. Both are handled: the installer puts the GPL text,
-the exact build's manifest, `LICENSE` and the notices beside `LiberCast.exe`
-rather than burying them in the archive.
-
-[`THIRD-PARTY-NOTICES.md`](./THIRD-PARTY-NOTICES.md) has the detail, including
-how to produce a build with no GPL component at all — LiberCast already prefers
-an `ffmpeg` on `PATH` over its bundled copy, so dropping those two packages
-leaves a working application for anyone who installs ffmpeg themselves.
+`ffprobe-static` and are invoked as separate executables — they are not linked
+into this application. They carry their own licenses (LGPL or GPL depending on
+the build). If you redistribute a packaged build, check which one you are
+shipping and comply accordingly.
 
 ## Legal
 
@@ -327,18 +344,4 @@ configure.
 
 ## License
 
-**LiberCast's own source code is MIT** — see [LICENSE](./LICENSE). Use it, fork
-it, ship it closed-source if you like.
-
-The packaged installer is a different question, because it also contains
-ffmpeg, which is GPL-3. Those two licences sit side by side rather than
-conflicting: LiberCast runs ffmpeg as a separate program rather than linking
-its libraries, so the GPL covers the ffmpeg binary and not the application that
-calls it. If you ever change that — linking `libavcodec` instead of spawning
-`ffmpeg.exe` — the analysis changes and the whole thing would likely have to be
-GPL.
-
-The GPL text under `resources/licenses/` is ffmpeg's, not LiberCast's. It is in
-this repository so the installer can place it next to the binary it applies to.
-
-None of the above is legal advice.
+MIT — see [LICENSE](./LICENSE).

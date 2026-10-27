@@ -1,7 +1,7 @@
 {
   "name": "libercast",
-  "version": "0.9.0-beta.2",
-  "description": "LiberCast \u2014 a free, open-source IPTV player for Windows. Xtream Codes, M3U and XMLTV EPG.",
+  "version": "0.9.0-beta.3",
+  "description": "LiberCast — a free, open-source IPTV player for Windows. Xtream Codes, M3U and XMLTV EPG.",
   "license": "MIT",
   "author": "Veysel Olgac",
   "main": "./out/main/index.js",
@@ -17,9 +17,17 @@
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json",
     "test": "node test/run.mjs",
     "postinstall": "electron-builder install-app-deps",
-    "pack:win": "npm run build && electron-builder --win --publish never",
-    "pack:win:dir": "npm run build && electron-builder --win --dir --publish never",
-    "verify:player": "esbuild src/main/media/streamServer.ts --bundle --platform=node --format=cjs --outfile=node_modules/.cache/verify-player/streamServer.cjs --alias:@main=./src/main --alias:@shared=./src/shared --alias:electron=./test/electron-stub.cjs --external:better-sqlite3 --external:ffmpeg-static --external:ffprobe-static --log-level=error && esbuild src/renderer/src/features/player/subtitleStyle.ts --bundle --platform=node --format=cjs --outfile=node_modules/.cache/verify-player/subtitleStyle.cjs --alias:@shared=./src/shared --log-level=error && electron test/browser/verify-player.cjs"
+    "pack:win": "npm run build && npm run eula && electron-builder --win --publish never",
+    "pack:win:dir": "npm run build && npm run eula && electron-builder --win --dir --publish never",
+    "verify:detached": "npm run build && node -e \"const{cpSync,mkdirSync,rmSync}=require('fs');const d='node_modules/.cache/verify-detached';rmSync(d,{recursive:true,force:true});mkdirSync(d+'/main',{recursive:true});cpSync('out/preload',d+'/preload',{recursive:true});cpSync('out/renderer',d+'/renderer',{recursive:true})\" && esbuild src/main/windows/detached.ts --bundle --platform=node --format=cjs --outfile=node_modules/.cache/verify-detached/main/detached.cjs --alias:@main/window=./test/browser/window-stub.cjs --alias:@main=./src/main --alias:@shared=./src/shared --external:electron --log-level=error && electron test/browser/verify-detached.cjs",
+    "verify:multiview": "esbuild src/renderer/src/features/multiview/layout.ts --bundle --platform=node --format=cjs --outfile=node_modules/.cache/verify-multiview/layout.cjs --log-level=error && electron test/browser/verify-multiview.cjs",
+    "verify:player": "esbuild src/main/media/streamServer.ts --bundle --platform=node --format=cjs --outfile=node_modules/.cache/verify-player/streamServer.cjs --alias:@main=./src/main --alias:@shared=./src/shared --alias:electron=./test/electron-stub.cjs --external:better-sqlite3 --external:ffmpeg-static --external:ffprobe-static --log-level=error && esbuild src/renderer/src/features/player/subtitleStyle.ts --bundle --platform=node --format=cjs --outfile=node_modules/.cache/verify-player/subtitleStyle.cjs --alias:@shared=./src/shared --log-level=error && electron test/browser/verify-player.cjs",
+    "verify:stall": "esbuild src/renderer/src/features/player/stall.ts --bundle --platform=node --format=cjs --outfile=node_modules/.cache/verify-stall/stall.cjs --log-level=error && electron test/browser/verify-stall.cjs",
+    "verify:i18n": "npm run build && electron test/browser/verify-i18n.cjs",
+    "verify:merged": "npm run build && electron test/browser/verify-merged.cjs",
+    "verify:updates": "npm run build && electron test/browser/verify-updates.cjs",
+    "verify:nextup": "npm run build && electron test/browser/verify-nextup.cjs",
+    "eula": "node tools/make-eula.mjs"
   },
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.1",

@@ -77,6 +77,17 @@ export interface OpenedSession {
    * a generic "the stream stopped".
    */
   warning: string | null
+  /**
+   * The provider gave a clear refusal — an error status, or a web page where
+   * video should be — and this session was opened anyway.
+   *
+   * Playing through it is still right when there is nothing else to try:
+   * ffmpeg is more tolerant than ffprobe and some panels answer the probe
+   * badly but stream fine. But it is also the signal that the same channel on
+   * another provider is worth a connection, which is a decision the caller
+   * makes, not this server.
+   */
+  refused: boolean
 }
 
 interface Session extends SessionSpec {
@@ -236,7 +247,8 @@ export class StreamServer {
           : null,
       subtitlesBurnedIn: burnIn,
       absoluteTimeline,
-      warning: resolved.warning
+      warning: resolved.warning,
+      refused: resolved.refused
     }
   }
 
@@ -256,7 +268,13 @@ export class StreamServer {
    */
   private async resolveUrl(
     spec: SessionSpec
-  ): Promise<{ url: string; probe: ProbeResult; corrected: boolean; warning: string | null }> {
+  ): Promise<{
+    url: string
+    probe: ProbeResult
+    corrected: boolean
+    warning: string | null
+    refused: boolean
+  }> {
     const options = { userAgent: spec.userAgent, referrer: spec.referrer }
     const key = streamKey(spec.url)
 
@@ -264,7 +282,7 @@ export class StreamServer {
     const remembered = this.corrected.get(key)
     if (remembered) {
       const probe = await probeStream(remembered, options)
-      if (probe.ok) return { url: remembered, probe, corrected: true, warning: null }
+      if (probe.ok) return { url: remembered, probe, corrected: true, warning: null, refused: false }
       this.corrected.delete(key)
     }
 
@@ -274,18 +292,18 @@ export class StreamServer {
     // re-encoding, which is the same recovery an unexpected codec already gets.
     if (spec.frugal && spec.isLive) {
       log.info(`${spec.label}: playing without identifying it first, to spend one connection`)
-      return { url: spec.url, probe: assumedLiveCodecs(), corrected: false, warning: null }
+      return { url: spec.url, probe: assumedLiveCodecs(), corrected: false, warning: null, refused: false }
     }
 
     const probe = await probeStream(spec.url, options)
-    if (probe.ok) return { url: spec.url, probe, corrected: false, warning: null }
+    if (probe.ok) return { url: spec.url, probe, corrected: false, warning: null, refused: false }
 
     // A local recording or download has no provider to interrogate, and ffprobe
     // failing on one is not a reason to refuse to play it — ffmpeg copes with
     // partial files that ffprobe rejects, and a still-recording file is exactly
     // that.
     if (!/^https?:/i.test(spec.url)) {
-      return { url: spec.url, probe, corrected: false, warning: null }
+      return { url: spec.url, probe, corrected: false, warning: null, refused: false }
     }
 
     // ffprobe failed. Find out what the provider is actually sending, because
@@ -299,7 +317,7 @@ export class StreamServer {
       log.warn(
         `probe failed for ${spec.label} but the URL serves ${check.container ?? 'media'}; playing anyway`
       )
-      return { url: spec.url, probe, corrected: false, warning: null }
+      return { url: spec.url, probe, corrected: false, warning: null, refused: false }
     }
 
     log.warn(`${spec.label}: ${check.reason ?? 'the provider did not return a stream'}`)
@@ -318,7 +336,7 @@ export class StreamServer {
           `${spec.label}: the provider serves ${alternate.container ?? 'media'} here, not what it listed`
         )
         this.corrected.set(key, candidate)
-        return { url: candidate, probe: alternateProbe, corrected: true, warning: null }
+        return { url: candidate, probe: alternateProbe, corrected: true, warning: null, refused: false }
       }
     }
 
@@ -327,7 +345,11 @@ export class StreamServer {
       url: spec.url,
       probe,
       corrected: false,
-      warning: check.reason ?? probe.error ?? null
+      warning: check.reason ?? probe.error ?? null,
+      // A clear refusal, rather than a busy panel or an unreadable but valid
+      // stream. This is the one shape worth spending another account's
+      // connection on.
+      refused: check.definitive
     }
   }
 

@@ -6,7 +6,13 @@ import {
   sleepDeadline
 } from '@renderer/features/player/sleepTimer'
 import { compareVersions, isNewer, parseVersion } from '@shared/version'
-import { onPrereleaseLine, pickUpdate, type ReleaseSummary } from '@shared/releases'
+import {
+  bannerUpdate,
+  onPrereleaseLine,
+  pickUpdate,
+  shouldCheckNow,
+  type ReleaseSummary
+} from '@shared/releases'
 
 let failures = 0
 function check(label: string, condition: boolean, detail?: unknown): void {
@@ -118,6 +124,66 @@ check(
 
 check('a beta build is on the prerelease line', onPrereleaseLine('0.9.0-beta.1'))
 check('a release build is not', !onPrereleaseLine('0.9.0'))
+
+
+console.log('\nWhen to ask GitHub')
+
+const DAY = 24 * 60 * 60 * 1000
+const now = 1_700_000_000_000
+
+// `null` means nobody has been asked yet. It has to behave exactly like a no,
+// or the installer's promise that nothing leaves the machine unasked is false
+// for every user between installing and answering the prompt.
+check('an unanswered prompt checks nothing',
+  !shouldCheckNow({ autoCheckUpdates: null, lastUpdateCheck: null }, now))
+check('and a declined one checks nothing either',
+  !shouldCheckNow({ autoCheckUpdates: false, lastUpdateCheck: null }, now))
+check('and neither becomes stale enough to start',
+  !shouldCheckNow({ autoCheckUpdates: null, lastUpdateCheck: now - 10 * DAY }, now))
+
+check('having opted in, the first launch checks',
+  shouldCheckNow({ autoCheckUpdates: true, lastUpdateCheck: null }, now))
+check('a check an hour ago is recent enough to skip',
+  !shouldCheckNow({ autoCheckUpdates: true, lastUpdateCheck: now - 3_600_000 }, now))
+check('a day later it checks again',
+  shouldCheckNow({ autoCheckUpdates: true, lastUpdateCheck: now - DAY }, now))
+check('just under a day it does not',
+  !shouldCheckNow({ autoCheckUpdates: true, lastUpdateCheck: now - DAY + 1000 }, now))
+// A clock that has gone backwards — a correction, a timezone change, a
+// restored backup — must not lock checking out until it catches up.
+check('a timestamp from the future does not lock it out',
+  shouldCheckNow({ autoCheckUpdates: true, lastUpdateCheck: now + 5 * DAY }, now))
+check('a corrupt timestamp is treated as never',
+  shouldCheckNow({ autoCheckUpdates: true, lastUpdateCheck: Number.NaN }, now))
+
+console.log('\nWhat to put on screen')
+
+const remembered = {
+  knownUpdateVersion: '0.9.0-beta.3',
+  knownUpdateUrl: 'https://github.com/olgacveysel/libercast/releases/tag/v0.9.0-beta.3',
+  dismissedUpdate: null
+}
+
+check('a newer remembered version is announced',
+  bannerUpdate(remembered, '0.9.0-beta.2')?.version === '0.9.0-beta.3')
+check('and carries its link', bannerUpdate(remembered, '0.9.0-beta.2')?.url.includes('github.com') === true)
+// After updating, the note has to clear itself rather than waiting a day for
+// the next check to notice.
+check('the same version is not announced to itself', bannerUpdate(remembered, '0.9.0-beta.3') === null)
+check('nor is an older one', bannerUpdate(remembered, '1.0.0') === null)
+check('a version the user waved away stays away',
+  bannerUpdate({ ...remembered, dismissedUpdate: '0.9.0-beta.3' }, '0.9.0-beta.2') === null)
+check('but the next one is announced again',
+  bannerUpdate({ ...remembered, knownUpdateVersion: '0.9.0-beta.4',
+                 dismissedUpdate: '0.9.0-beta.3' }, '0.9.0-beta.2')?.version === '0.9.0-beta.4')
+check('nothing remembered means nothing shown',
+  bannerUpdate({ knownUpdateVersion: null, knownUpdateUrl: null, dismissedUpdate: null }, '0.9.0') === null)
+check('a version with no link is not shown',
+  bannerUpdate({ ...remembered, knownUpdateUrl: null }, '0.9.0-beta.2') === null)
+// The remembered url came from GitHub's own JSON, which is third-party data
+// that reached the database. It is checked again on the way out.
+check('a link that is not on github is refused',
+  bannerUpdate({ ...remembered, knownUpdateUrl: 'https://elsewhere.example/x' }, '0.9.0-beta.2') === null)
 
 console.log(failures === 0 ? '\nsleeptimer: all passed' : `\nsleeptimer: ${failures} failed`)
 if (failures > 0) process.exitCode = 1

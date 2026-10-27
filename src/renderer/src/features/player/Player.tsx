@@ -23,6 +23,7 @@ import { SleepMenu } from './SleepMenu'
 import { nextFit, videoFitStyle } from './videoFit'
 import { useT } from '@renderer/i18n'
 import { StreamStats } from './StreamStats'
+import { SwitchedNotice } from './SwitchedNotice'
 import { useHotkeys } from './useHotkeys'
 import { stepVolume } from '@renderer/features/player/volume'
 
@@ -78,8 +79,24 @@ export function Player({
     }
   }
 
+  /**
+   * A finished programme being replayed from the provider's archive.
+   *
+   * Held here rather than inside the schedule dialog because it replaces what
+   * the player is playing: the dialog is only where it was chosen.
+   */
+  const [replay, setReplay] = useState<{ startsAt: number; endsAt: number; title: string } | null>(null)
+
+  // Changing channel must drop any replay with it, or the archive window of
+  // the previous channel would be asked of the new one.
+  useEffect(() => setReplay(null), [channel?.id])
+
   const { videoRef, state, reload } = useStream({
-    source: channel ? { type: 'channel', id: channel.id } : null,
+    source: channel
+      ? replay
+        ? { type: 'catchup', id: channel.id, startsAt: replay.startsAt, endsAt: replay.endsAt }
+        : { type: 'channel', id: channel.id }
+      : null,
     audioTrack,
     subtitleTrack,
     externalSubtitle,
@@ -172,6 +189,14 @@ export function Player({
           channel={channel}
           onClose={() => setShowSchedule(false)}
           canRecord={capabilities?.ffmpeg !== false}
+          onReplay={(programme) => {
+            setReplay({
+              startsAt: programme.startsAt,
+              endsAt: programme.endsAt,
+              title: programme.title
+            })
+            setShowSchedule(false)
+          }}
         />
       )}
 
@@ -185,6 +210,17 @@ export function Player({
           onDoubleClick={toggleFullscreen}
         />
 
+        {replay && (
+          <div className="replaybar">
+            <span>{t('catchup.replaying', { title: replay.title })}</span>
+            <button className="btn btn--ghost" onClick={() => setReplay(null)}>
+              {t('catchup.backToLive')}
+            </button>
+          </div>
+        )}
+
+        <SwitchedNotice switched={state.switched} />
+
         <StreamStats
           videoRef={videoRef}
           declared={state.video}
@@ -196,28 +232,27 @@ export function Player({
           <div className="player__overlay">
             {ffmpegMissing ? (
               <div className="player__error" style={{ color: 'var(--text-muted)' }}>
-                <p style={{ margin: '0 0 12px', lineHeight: 1.6 }}>
-                  Playback needs ffmpeg, and no working copy was found. Most provider channels are MPEG-TS,
-                  which the browser engine cannot decode on its own.
-                </p>
+                <p style={{ margin: '0 0 12px', lineHeight: 1.6 }}>{t('player.needsFfmpeg')}</p>
                 <button className="btn btn--primary" onClick={onOpenSettings}>
-                  Open settings
+                  {t('player.openSettings')}
                 </button>
               </div>
             ) : state.status === 'idle' ? (
-              <p style={{ margin: 0, fontSize: 14 }}>Select a channel to start watching</p>
+              <p style={{ margin: 0, fontSize: 14 }}>{t('player.selectChannel')}</p>
             ) : state.status === 'loading' ? (
               <div style={{ display: 'grid', gap: 10, justifyItems: 'center' }}>
                 <span className="spinner" style={{ width: 22, height: 22 }} />
                 <p style={{ margin: 0 }}>
-                  {state.attempt > 0 ? `Reconnecting (attempt ${state.attempt})…` : 'Connecting…'}
+                  {state.attempt > 0
+                    ? t('player.reconnecting', { attempt: state.attempt })
+                    : t('player.connecting')}
                 </p>
               </div>
             ) : (
               <div className="player__error">
                 <p style={{ margin: '0 0 12px', lineHeight: 1.55 }}>{state.error}</p>
                 <button className="btn" onClick={reload}>
-                  Try again
+                  {t('common.retry')}
                 </button>
               </div>
             )}
@@ -259,7 +294,7 @@ export function Player({
               className={`chanrow__fav ${channel.favorite ? 'chanrow__fav--on' : ''}`}
               style={{ opacity: 1 }}
               onClick={() => onToggleFavorite(channel)}
-              aria-label={channel.favorite ? 'Remove from favorites' : 'Add to favorites'}
+              aria-label={t(channel.favorite ? 'live.removeFavorite' : 'live.addFavorite')}
             >
               <IconStar size={17} filled={channel.favorite} />
             </button>
@@ -285,7 +320,11 @@ export function Player({
                   </div>
                 </>
               ) : (
-                <span>{state.pipeline ? `Stream: ${state.pipeline}` : t('player.noGuideData')}</span>
+                <span>
+                  {state.pipeline
+                    ? t('player.streamLine', { pipeline: state.pipeline })
+                    : t('player.noGuideData')}
+                </span>
               )}
             </button>
 
@@ -297,7 +336,7 @@ export function Player({
               tracks={state.tracks.audio}
               selected={state.audioTrack}
               onSelect={(index) => index !== null && setAudioTrack(index)}
-              note="Switching audio reconnects to the channel."
+              note={t('player.audioNote')}
             />
 
             <TrackMenu
@@ -312,7 +351,7 @@ export function Player({
               onClearExternal={() => setExternalSubtitle(null)}
               offsetSecs={subtitleOffset}
               onOffsetChange={setSubtitleOffset}
-              note="Switching subtitles reconnects to the channel."
+              note={t('player.subtitlesNote')}
             />
 
             <SleepMenu />
@@ -321,10 +360,10 @@ export function Player({
               className={`btn ${recordingId !== null ? 'btn--rec' : 'btn--ghost'}`}
               onClick={() => void toggleRecording()}
               disabled={ffmpegMissing}
-              title={ffmpegMissing ? 'Recording needs ffmpeg' : undefined}
+              title={ffmpegMissing ? t('guide.needsFfmpeg') : undefined}
             >
               <IconRecord size={15} filled={recordingId !== null} />
-              {recordingId !== null ? 'Stop' : 'Record'}
+              {t(recordingId !== null ? 'library.stop' : 'player.record')}
             </button>
 
             <div className="volume">
@@ -332,7 +371,7 @@ export function Player({
                 className="btn btn--ghost"
                 style={{ padding: 4 }}
                 onClick={() => void updateSettings({ muted: !settings.muted })}
-                aria-label={settings.muted ? 'Unmute' : 'Mute'}
+                aria-label={t(settings.muted ? 'player.unmute' : 'player.mute')}
               >
                 <IconVolume size={17} muted={settings.muted} />
               </button>
@@ -343,7 +382,7 @@ export function Player({
                 step={0.01}
                 value={settings.muted ? 0 : settings.volume}
                 onChange={(event) => void updateSettings({ volume: Number(event.target.value), muted: false })}
-                aria-label="Volume"
+                aria-label={t('player.volume')}
               />
             </div>
 

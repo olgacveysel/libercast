@@ -2,13 +2,17 @@ import { useEffect, useState, type JSX } from 'react'
 import type { ChannelWithState, EpgProgram } from '@shared/types'
 import { invoke } from '@renderer/lib/api'
 import { formatTime, programProgress } from '@renderer/lib/format'
-import { IconBell, IconClose, IconRecord } from '@renderer/ui/Icon'
+import { IconBell, IconClose, IconPlay, IconRecord } from '@renderer/ui/Icon'
+import { canReplay } from '@shared/catchup'
+import { useT } from '@renderer/i18n'
 
 interface Props {
   channel: ChannelWithState
   onClose: () => void
   /** Offered per programme, so the guide is not the only place to record. */
   canRecord: boolean
+  /** Replays a finished programme from the provider's archive. */
+  onReplay: (programme: EpgProgram) => void
 }
 
 /** A day either side: enough to answer "what's on later" and "what did I miss". */
@@ -21,10 +25,11 @@ const WINDOW_MS = 24 * 3600_000
  * the question people actually ask while watching one: what is on after this.
  * Answering it here also means not losing the stream to go and look.
  */
-export function ChannelSchedule({ channel, onClose, canRecord }: Props): JSX.Element {
+export function ChannelSchedule({ channel, onClose, canRecord, onReplay }: Props): JSX.Element {
   const [programmes, setProgrammes] = useState<EpgProgram[] | null>(null)
   const [note, setNote] = useState<string | null>(null)
   const [reminded, setReminded] = useState<Set<number>>(new Set())
+  const t = useT()
 
   const epgId = channel.epgChannelId
 
@@ -51,20 +56,20 @@ export function ChannelSchedule({ channel, onClose, canRecord }: Props): JSX.Ele
       <div className="dialog" role="dialog" aria-modal="true">
         <div className="dialog__head">
           <h2>{channel.name}</h2>
-          <p>What is on today. Times come from the guide, so they are as accurate as it is.</p>
-          <button className="btn btn--ghost sheet__close" onClick={onClose} aria-label="Close">
+          <p>{t('schedule.body')}</p>
+          <button className="btn btn--ghost sheet__close" onClick={onClose} aria-label={t('common.close')}>
             <IconClose size={16} />
           </button>
         </div>
 
         <div className="dialog__body" style={{ maxHeight: 420, overflowY: 'auto' }}>
-          {programmes === null && <p style={{ color: 'var(--text-dim)', fontSize: 12.5 }}>Loading…</p>}
+          {programmes === null && (
+            <p style={{ color: 'var(--text-dim)', fontSize: 12.5 }}>{t('common.loading')}</p>
+          )}
 
           {programmes?.length === 0 && (
             <p style={{ color: 'var(--text-dim)', fontSize: 12.5, margin: 0, lineHeight: 1.6 }}>
-              {epgId
-                ? 'The guide has nothing for this channel. Guide matching in the Guide screen can point it at the right feed.'
-                : 'The provider gave this channel no guide id, so nothing can be matched to it. The Guide screen can set one by hand.'}
+              {epgId ? t('schedule.nothingForChannel') : t('schedule.noGuideId')}
             </p>
           )}
 
@@ -89,11 +94,27 @@ export function ChannelSchedule({ channel, onClose, canRecord }: Props): JSX.Ele
                   )}
                 </span>
 
+                {/*
+                  Only offered where there is actually something to replay. A
+                  channel with no archive, or a programme older than the window
+                  the provider keeps, would cost a connection to be told no.
+                */}
+                {canReplay(programme, channel.catchupDays, now) && (
+                  <button
+                    className="btn btn--ghost"
+                    title={t('catchup.replay')}
+                    aria-label={t('catchup.replayOne', { title: programme.title })}
+                    onClick={() => onReplay(programme)}
+                  >
+                    <IconPlay size={14} />
+                  </button>
+                )}
+
                 {!past && (
                   <button
                     className={`btn btn--ghost ${reminded.has(programme.id) ? 'btn--on' : ''}`}
-                    title={reminded.has(programme.id) ? 'Reminder set' : 'Remind me before it starts'}
-                    aria-label={`Remind me about ${programme.title}`}
+                    title={reminded.has(programme.id) ? t('guide.reminderSet') : t('schedule.remindBefore')}
+                    aria-label={t('schedule.remindAbout', { title: programme.title })}
                     onClick={() => {
                       void invoke('reminders:add', {
                         channelId: channel.id,
@@ -104,9 +125,9 @@ export function ChannelSchedule({ channel, onClose, canRecord }: Props): JSX.Ele
                       })
                         .then(() => {
                           setReminded((current) => new Set(current).add(programme.id))
-                          setNote(`You will be reminded before ${programme.title} starts.`)
+                          setNote(t('schedule.reminded', { title: programme.title }))
                         })
-                        .catch(() => setNote('That reminder could not be set.'))
+                        .catch(() => setNote(t('schedule.reminderFailed')))
                     }}
                   >
                     <IconBell size={14} filled={reminded.has(programme.id)} />
@@ -116,8 +137,8 @@ export function ChannelSchedule({ channel, onClose, canRecord }: Props): JSX.Ele
                 {!past && canRecord && (
                   <button
                     className="btn btn--ghost"
-                    title="Record this programme"
-                    aria-label={`Record ${programme.title}`}
+                    title={t('schedule.recordThis')}
+                    aria-label={t('schedule.recordTitle', { title: programme.title })}
                     onClick={() => {
                       void invoke('recordings:schedule', {
                         channelId: channel.id,
@@ -129,8 +150,8 @@ export function ChannelSchedule({ channel, onClose, canRecord }: Props): JSX.Ele
                         padBeforeMinutes: 2,
                         padAfterMinutes: 5
                       })
-                        .then(() => setNote(`${programme.title} will be recorded. It appears in Library.`))
-                        .catch(() => setNote('That recording could not be scheduled.'))
+                        .then(() => setNote(t('schedule.recordScheduled', { title: programme.title })))
+                        .catch(() => setNote(t('schedule.recordFailed')))
                     }}
                   >
                     <IconRecord size={14} />
@@ -146,7 +167,7 @@ export function ChannelSchedule({ channel, onClose, canRecord }: Props): JSX.Ele
         <div className="dialog__foot">
           <div className="spacer" />
           <button className="btn" onClick={onClose}>
-            Close
+            {t('common.close')}
           </button>
         </div>
       </div>

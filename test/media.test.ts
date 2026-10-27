@@ -295,6 +295,15 @@ async function main(): Promise<void> {
   // true to existsSync in a real packaged application. Only one of them can be
   // executed without Electron copying 80 MB to a temp directory first, so the
   // order these are checked in is the whole point.
+  //
+  // The fixture stands an ordinary directory named `app.asar` in for the real
+  // archive, which means Electron's asar shim has to be out of the way: given
+  // a path through a would-be archive it tries to open it as one, and on
+  // Windows a directory there fails with ENOTDIR before any of this is
+  // reached. `unpacked()` is path manipulation over existsSync, so switching
+  // the shim off tests exactly what it does, on every platform.
+  const hadAsar = process.noAsar
+  process.noAsar = true
   const root = mkdtempSync(join(tmpdir(), 'libercast-asar-'))
   const packed = join(root, 'resources', 'app.asar', 'node_modules', 'ffmpeg-static')
   const loose = join(root, 'resources', 'app.asar.unpacked', 'node_modules', 'ffmpeg-static')
@@ -327,6 +336,8 @@ async function main(): Promise<void> {
 
   check('a missing binary is null', unpacked(join(root, 'nope', 'ffmpeg')) === null)
   check('no path at all is null', unpacked(null) === null && unpacked(undefined) === null)
+
+  process.noAsar = hadAsar
 
   server.closeAll()
 }

@@ -1,6 +1,7 @@
 import type { Playlist, PlaylistDraft, SyncProgress, SyncResult, XtreamAccountInfo } from '@shared/types'
 import { importCatalog } from '@main/db/repo/import'
-import { getPlaylist, markSynced } from '@main/db/repo/playlists'
+import { getPlaylist, markSynced, setServerTimezone } from '@main/db/repo/playlists'
+import { pruneHealth } from '@main/db/repo/health'
 import { pruneProbes } from '@main/db/repo/probeCache'
 import { getPassword } from '@main/secure/credentials'
 import { createLogger, errorMessage } from '@main/util/logger'
@@ -108,7 +109,11 @@ export async function syncPlaylist(playlistId: number, onProgress: ProgressSink)
     } else if (playlist.kind === 'xtream') {
       emit('connecting', 'Authenticating…', 0.05)
       const client = xtreamClientFor(playlist)
-      await client.authenticate()
+      const account = await client.authenticate()
+
+      // The panel's clock, kept for catch-up URLs. It comes free with the
+      // authentication this sync already had to do.
+      setServerTimezone(playlistId, account.timezone)
 
       emit('live', 'Loading live channels…', 0.2)
       const live = await client.liveCatalog()
@@ -142,8 +147,10 @@ export async function syncPlaylist(playlistId: number, onProgress: ProgressSink)
     markSynced(playlistId)
 
     // Stored identifications for streams that have expired: the table would
-    // otherwise keep a row for every channel the provider ever offered.
+    // otherwise keep a row for every channel the provider ever offered. Scan
+    // verdicts too old to mean anything go the same way.
     pruneProbes()
+    pruneHealth()
     result.durationMs = Date.now() - started
     emit('done', `Done in ${(result.durationMs / 1000).toFixed(1)}s`, 1)
     return result

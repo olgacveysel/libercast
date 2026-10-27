@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type JSX } from 'react'
 import type { Playlist, XtreamAccountInfo } from '@shared/types'
 import { invoke, messageOf } from '@renderer/lib/api'
 import { useAppStore } from '@renderer/store/useAppStore'
+import { useT } from '@renderer/i18n'
 import { connectionPlan } from './connectionPlan'
 
 interface Props {
@@ -26,6 +27,7 @@ const EXPIRY_WARNING_DAYS = 14
 export function AccountPanel({ playlist }: Props): JSX.Element | null {
   const settings = useAppStore((s) => s.settings)
   const updateSettings = useAppStore((s) => s.updateSettings)
+  const t = useT()
 
   const [account, setAccount] = useState<XtreamAccountInfo | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -66,8 +68,11 @@ export function AccountPanel({ playlist }: Props): JSX.Element | null {
     void updateSettings(plan)
     setApplied(
       plan.singleConnection
-        ? 'Set to spend as few connections as possible, and one download at a time.'
-        : `Set to ${plan.maxConcurrentDownloads} download${plan.maxConcurrentDownloads === 1 ? '' : 's'} at a time, leaving one for playback.`
+        ? t('account.appliedSingle')
+        : t(
+            plan.maxConcurrentDownloads === 1 ? 'account.appliedOne' : 'account.appliedMany',
+            { count: plan.maxConcurrentDownloads }
+          )
     )
   }
 
@@ -84,15 +89,12 @@ export function AccountPanel({ playlist }: Props): JSX.Element | null {
       {!account && !error && (
         <div className="settings__row" style={{ border: 0, padding: 0 }}>
           <div>
-            <strong>Account</strong>
-            <span>
-              How many streams this account may have open at once, and when it expires. Asking is a
-              request to your provider, so it is not done automatically.
-            </span>
+            <strong>{t('settings.account')}</strong>
+            <span>{t('account.body')}</span>
           </div>
           <button className="btn" onClick={() => void load()} disabled={loading}>
             {loading ? <span className="spinner" /> : null}
-            {loading ? 'Checking…' : 'Check account'}
+            {t(loading ? 'settings.checking' : 'settings.checkAccount')}
           </button>
         </div>
       )}
@@ -103,11 +105,14 @@ export function AccountPanel({ playlist }: Props): JSX.Element | null {
         <>
           <div className="acctgrid">
             <Stat
-              label="Connections"
+              label={t('settings.connectionsLabel')}
               value={
                 account.maxConnections > 0
-                  ? `${account.activeConnections} of ${account.maxConnections}`
-                  : 'Not stated'
+                  ? t('account.connectionsValue', {
+                      active: account.activeConnections,
+                      max: account.maxConnections
+                    })
+                  : t('account.notStated')
               }
               tone={
                 account.maxConnections > 0 && account.activeConnections >= account.maxConnections
@@ -118,57 +123,50 @@ export function AccountPanel({ playlist }: Props): JSX.Element | null {
               }
             />
             <Stat
-              label="Status"
+              label={t('settings.status')}
               value={account.status}
               tone={account.status.toLowerCase() === 'active' ? 'ok' : 'bad'}
             />
             <Stat
-              label="Expires"
+              label={t('settings.expires')}
               value={
                 account.expiresAt === null
-                  ? 'Never'
+                  ? t('common.never')
                   : new Date(account.expiresAt).toLocaleDateString()
               }
               tone={
                 daysLeft === null ? 'ok' : daysLeft < 0 ? 'bad' : daysLeft <= EXPIRY_WARNING_DAYS ? 'warn' : 'ok'
               }
             />
-            <Stat label="Username" value={account.username} tone="ok" />
+            <Stat label={t('settings.username')} value={account.username} tone="ok" />
           </div>
 
           {daysLeft !== null && daysLeft < 0 && (
-            <div className="notice notice--error">
-              This subscription expired. Every channel will fail until it is renewed — which looks
-              like a broken app rather than an expired account.
-            </div>
+            <div className="notice notice--error">{t('account.expired')}</div>
           )}
 
           {daysLeft !== null && daysLeft >= 0 && daysLeft <= EXPIRY_WARNING_DAYS && (
             <div className="notice">
-              Expires in {daysLeft} day{daysLeft === 1 ? '' : 's'}.
+              {t(daysLeft === 1 ? 'account.expiresInOne' : 'account.expiresInMany', {
+                days: daysLeft
+              })}
             </div>
           )}
 
-          {account.isTrial && <div className="notice">This is a trial account.</div>}
+          {account.isTrial && <div className="notice">{t('account.trial')}</div>}
 
           {tight && (
-            <div className="notice">
-              This account allows a single stream at a time. Anything else using it — another device,
-              a download, a recording — will stop playback here.
-            </div>
+            <div className="notice">{t('account.singleStream')}</div>
           )}
 
           {limit > 0 && (
             <div className="settings__row" style={{ border: 0, padding: 0 }}>
               <div>
-                <strong>Match the app to this limit</strong>
-                <span>
-                  Sets how many downloads run at once and whether to play live channels without
-                  identifying them first, from the number your provider just reported.
-                </span>
+                <strong>{t('account.matchLimit')}</strong>
+                <span>{t('account.matchLimitBody')}</span>
               </div>
               <button className="btn btn--primary" onClick={applyLimit}>
-                Apply
+                {t('common.apply')}
               </button>
             </div>
           )}
@@ -182,7 +180,7 @@ export function AccountPanel({ playlist }: Props): JSX.Element | null {
             </span>
             <button className="btn btn--ghost" onClick={() => void load()} disabled={loading}>
               {loading ? <span className="spinner" /> : null}
-              Refresh
+              {t('common.refresh')}
             </button>
           </div>
         </>
@@ -192,7 +190,7 @@ export function AccountPanel({ playlist }: Props): JSX.Element | null {
           what the setting above the panel is for. */}
       {settings.singleConnection && (
         <span style={{ fontSize: 11.5, color: 'var(--text-dim)' }}>
-          The app is currently set to spend as few connections as possible.
+          {t('account.singleConnectionNote')}
         </span>
       )}
     </div>

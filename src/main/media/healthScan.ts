@@ -1,5 +1,6 @@
 import type { ChannelHealth } from '@shared/types'
 import { queryChannels } from '@main/db/repo/catalog'
+import { recordHealth } from '@main/db/repo/health'
 import { resolveProviderStream } from '@main/media/resolve'
 import { inspectStream } from '@main/media/httpCheck'
 import { createLogger, errorMessage } from '@main/util/logger'
@@ -57,6 +58,12 @@ export async function scanFavorites(
   }
 
   onProgress({ done: results.length, total: favorites.length, current: '' })
+
+  // Kept, so the list can mark the dead ones tomorrow morning. A scan is one
+  // connection per channel with a pause between each: throwing the answer away
+  // when the panel closes means paying for it again every single time.
+  recordHealth(results)
+
   log.info(`scan finished: ${results.filter((r) => !r.ok).length} of ${results.length} failed`)
   return results
 }

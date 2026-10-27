@@ -48,10 +48,14 @@ export function TitleBar({ onOpenSearch }: Props): JSX.Element {
 
       <div className="titlebar__spacer" />
 
-      <button className="titlebar__search" onClick={onOpenSearch} title="Search everything (Ctrl+K)">
+      <button
+        className="titlebar__search"
+        onClick={onOpenSearch}
+        title={`${t('nav.searchEverything')} (Ctrl+K)`}
+      >
         <IconSearch size={13} />
-        <span>Search</span>
-        <kbd>Ctrl K</kbd>
+        <span>{t('nav.search')}</span>
+        <kbd>{t('titlebar.searchKey')}</kbd>
       </button>
 
       <div className="titlebar__spacer" />
@@ -64,20 +68,20 @@ export function TitleBar({ onOpenSearch }: Props): JSX.Element {
       )}
 
       <div className="titlebar__controls">
-        <button className="titlebar__button" onClick={() => void invoke('window:minimize')} aria-label="Minimize">
+        <button className="titlebar__button" onClick={() => void invoke('window:minimize')} aria-label={t('titlebar.minimize')}>
           <IconMinimize size={15} />
         </button>
         <button
           className="titlebar__button"
           onClick={() => void invoke('window:toggleMaximize').then(setMaximized)}
-          aria-label={maximized ? 'Restore' : 'Maximize'}
+          aria-label={maximized ? t('titlebar.restore') : t('titlebar.maximize')}
         >
           <IconMaximize size={13} restore={maximized} />
         </button>
         <button
           className="titlebar__button titlebar__button--close"
           onClick={() => void invoke('window:close')}
-          aria-label="Close"
+          aria-label={t('common.close')}
         >
           <IconClose size={15} />
         </button>
