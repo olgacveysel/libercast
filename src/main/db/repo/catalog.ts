@@ -150,6 +150,26 @@ const ORDER_BY: Record<NonNullable<ChannelQuery['sort']>, string> = {
 const GROUP_KEY = "CASE WHEN ch.match_key = '' THEN 'id:' || ch.id ELSE ch.match_key END"
 
 /**
+ * The key with a short leading word removed, or null when there is not one.
+ *
+ * Providers organise their lists with a country or language code in front of
+ * every name — "TR | Alto Sports 2". The prefix is how that provider sorts its
+ * own list, not part of what the channel is, so a list that uses one would
+ * otherwise merge with nothing.
+ *
+ * Three or fewer letters and no digit: long enough to catch tr, uk, de, ger,
+ * and short enough to leave real first words alone. A digit disqualifies it
+ * because a number at the front identifies the channel.
+ */
+const PREFIXLESS = (key: string): string =>
+  `CASE WHEN instr(${key}, ' ') BETWEEN 2 AND 4
+         AND substr(${key}, 1, instr(${key}, ' ') - 1) NOT GLOB '*[0-9]*'
+        THEN substr(${key}, instr(${key}, ' ') + 1) END`
+
+/** The leading word itself, for telling two differently-prefixed feeds apart. */
+const PREFIX = (key: string): string => `substr(${key}, 1, instr(${key}, ' ') - 1)`
+
+/**
  * One row per channel across every source.
  *
  * The copy that represents a group is a favourite first, then whichever source
@@ -162,7 +182,14 @@ const GROUP_KEY = "CASE WHEN ch.match_key = '' THEN 'id:' || ch.id ELSE ch.match
  * counting rows instead would say "3 sources" for a provider that simply lists
  * the same channel three times. So the sources are counted in their own pass.
  */
-function mergedQuery(where: string, order: string): string {
+/**
+ * The common table expressions behind every merged read.
+ *
+ * Shared by the list and its count on purpose: when they were written twice,
+ * the count kept counting raw keys after the list started collapsing prefixed
+ * ones, and the header promised eight channels over a list of seven.
+ */
+function mergedCtes(where: string): string {
   return `WITH visible AS (
             SELECT ch.id,
                    ${GROUP_KEY} AS gkey,
@@ -174,9 +201,39 @@ function mergedQuery(where: string, order: string): string {
             LEFT JOIN favorites f ON f.channel_id = ch.id
             WHERE ${where}
           ),
+          keys AS (SELECT DISTINCT gkey FROM visible),
+          /*
+            Which prefixed keys may collapse onto their unprefixed form.
+
+            Two conditions, and the second is the one that matters: the
+            unprefixed name has to exist on its own, AND it must be claimed by
+            only one prefix. "UK harbour sports 2" and "DE harbour sports 2"
+            both reduce to "harbour sports 2" — two prefixes, so all three stay
+            apart, because those are different feeds and merging them is the
+            same mistake as merging channel 2 with channel 4.
+          */
+          usable AS (
+            SELECT ${PREFIXLESS('k.gkey')} AS base
+            FROM keys k
+            WHERE ${PREFIXLESS('k.gkey')} IS NOT NULL
+              AND ${PREFIXLESS('k.gkey')} IN (SELECT gkey FROM keys)
+            GROUP BY base
+            HAVING COUNT(DISTINCT ${PREFIX('k.gkey')}) = 1
+          ),
+          canonical AS (
+            SELECT v.id,
+                   COALESCE(
+                     (SELECT u.base FROM usable u WHERE u.base = ${PREFIXLESS('v.gkey')}),
+                     v.gkey
+                   ) AS gkey,
+                   v.playlist_id,
+                   v.sort_order,
+                   v.unstarred
+            FROM visible v
+          ),
           groups AS (
             SELECT gkey, COUNT(DISTINCT playlist_id) AS source_count
-            FROM visible GROUP BY gkey
+            FROM canonical GROUP BY gkey
           ),
           chosen AS (
             SELECT gkey, id FROM (
@@ -184,9 +241,14 @@ function mergedQuery(where: string, order: string): string {
                      ROW_NUMBER() OVER (
                        PARTITION BY gkey ORDER BY unstarred, sort_order, id
                      ) AS rn
-              FROM visible
+              FROM canonical
             ) WHERE rn = 1
           )
+`
+}
+
+function mergedQuery(where: string, order: string): string {
+  return `${mergedCtes(where)}
           SELECT ch.*,
                  ${EFFECTIVE_EPG_ID} AS effective_epg_id,
                  CASE WHEN f.channel_id IS NULL THEN 0 ELSE 1 END AS favorite,
@@ -201,6 +263,12 @@ function mergedQuery(where: string, order: string): string {
           ${HEALTH_JOIN}
           ORDER BY ${order}
           LIMIT ? OFFSET ?`
+}
+
+/** How many rows a merged list will show, counted the same way it groups. */
+function mergedCount(where: string): string {
+  return `${mergedCtes(where)}
+          SELECT COUNT(*) AS n FROM (SELECT DISTINCT gkey FROM canonical)`
 }
 
 function plainQuery(where: string, order: string): string {
@@ -245,10 +313,7 @@ export function countChannels(query: ChannelQuery): number {
   // A merged list counts groups, not rows — otherwise the header promises
   // eight thousand channels and the list shows five thousand.
   const count = query.merge
-    ? `SELECT COUNT(DISTINCT ${GROUP_KEY}) AS n
-       FROM channels ch
-       LEFT JOIN favorites f ON f.channel_id = ch.id
-       WHERE ${sql}`
+    ? mergedCount(sql)
     : `SELECT COUNT(*) AS n
        FROM channels ch
        LEFT JOIN favorites f ON f.channel_id = ch.id

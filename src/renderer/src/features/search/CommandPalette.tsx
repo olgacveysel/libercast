@@ -101,16 +101,26 @@ export function CommandPalette({ onClose }: Props): JSX.Element {
       return
     }
 
+    // The palette is the one place that should never care which source is
+    // selected: someone reaching for Ctrl+K is looking for a channel, not for
+    // a channel on provider B. With more than one connected it searches them
+    // all and collapses the duplicates, the way the list does.
+    const everywhere = playlists.length > 1
+
     setLoading(true)
     const timer = setTimeout(() => {
-      void invoke('search:global', { playlistId: activePlaylistId, query: needle, limit: 6 })
+      void invoke('search:global', {
+        ...(everywhere ? { merge: true } : { playlistId: activePlaylistId }),
+        query: needle,
+        limit: 6
+      })
         .then(setResults)
         .catch((e) => setError(messageOf(e)))
         .finally(() => setLoading(false))
     }, 180)
 
     return () => clearTimeout(timer)
-  }, [query, activePlaylistId])
+  }, [query, activePlaylistId, playlists.length])
 
   const rows: Row[] = useMemo(() => {
     const contentRows = (channels: ChannelWithState[], hint: string): Row[] =>

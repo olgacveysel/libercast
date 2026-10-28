@@ -37,12 +37,19 @@ importCatalog(main.id, 'live', [], [
   ch('a2', 'Alto Sports 4 HD'),
   ch('a3', 'Civic One'),
   ch('a4', 'Only On Main'),
-  ch('a5', '4K')
+  ch('a5', '4K'),
+  // The guard for prefix collapsing: a plain name with TWO differently
+  // prefixed variants across the providers. Those are different feeds.
+  ch('a6', 'Harbour Sports 2'),
+  ch('a7', 'UK Harbour Sports 2'),
+  // A prefix with nothing to collapse onto.
+  ch('a8', 'FR Lumen Channel')
 ])
 importCatalog(backup.id, 'live', [], [
   ch('b1', 'ALTO SPORTS 2'),
   ch('b2', 'TR | Alto Sports 2 (Hat 1)'),
   ch('b3', 'Civic One HD'),
+  ch('b6', 'DE Harbour Sports 2'),
   ch('b4', 'Only On Backup'),
   ch('b5', '|||')
 ])
@@ -60,13 +67,25 @@ const alto2 = all.filter((c) => /alto/i.test(c.name) && c.name.includes('2') && 
 check('the same channel appears once', alto2.length === 1, names)
 check('and reports both providers', alto2[0]?.sources === 2, alto2[0])
 
-// Deliberately NOT merged, and worth pinning so nobody "fixes" it later: a
-// list prefix like "TR |" is indistinguishable, from here, from a feed
-// marker. Stripping it would merge "UK Harbour Sports 2" with "DE Harbour Sports 2",
-// which are different channels — the same class of mistake as merging Alto 2
-// with Alto 4, and the one this whole feature is built to avoid.
-check('a channel carrying a list prefix stays separate',
-  names.some((n) => n.startsWith('TR |')), names)
+// A list prefix like "TR |" is how a provider sorts its own list, not part of
+// what the channel is — so it collapses onto the unprefixed name when that
+// name exists and nothing else claims it.
+check('a list prefix collapses onto the plain name',
+  !names.some((n) => n.startsWith('TR |')), names)
+
+// The guard, and the reason this took two attempts: when two different
+// prefixes point at the same plain name, they are different feeds. All three
+// stay apart — merging them would be the same mistake as merging channel 2
+// with channel 4.
+const harbour = all.filter((c) => /harbour/i.test(c.name))
+check('two different prefixes are never merged together', harbour.length === 3,
+  harbour.map((c) => c.name))
+check('and none of them is credited with a second source',
+  harbour.every((c) => c.sources === 1), harbour.map((c) => `${c.name}:${c.sources}`))
+
+// Nothing to collapse onto, so it keeps its prefix rather than losing it.
+check('a prefix with no plain counterpart is left alone',
+  names.some((n) => n === 'FR Lumen Channel'), names)
 
 // The rule that matters most. Falling back onto the wrong match of the same
 // competition is worse than showing no picture at all.
@@ -93,7 +112,7 @@ check('the count matches what the list returns',
 console.log('\nWithout merging, nothing changes')
 
 const single = catalog.queryChannels({ playlistId: main.id, kind: 'live', limit: 100 })
-check('a single-source list is untouched', single.length === 5, single.length)
+check('a single-source list is untouched', single.length === 8, single.length)
 check('and every row reports one source', single.every((c) => c.sources === 1))
 
 console.log('\nWhich copy represents the group')
@@ -122,7 +141,7 @@ catalog.toggleFavorite(backupBein2.id)
 console.log('\nSearching across the merge')
 
 const found = catalog.queryChannels({ merge: true, kind: 'live', search: 'alto', limit: 50 })
-check('a search spans both providers', found.length === 3, found.map((c) => c.name))
+check('a search spans both providers', found.length === 2, found.map((c) => c.name))
 check('and still collapses the duplicates',
   found.filter((c) => c.name === 'Alto Sports 2 HD').length === 1, found.map((c) => c.name))
 check('searching finds the copy that was merged away',
@@ -187,6 +206,41 @@ const opened = catalog.getChannel(merged().find((c) => /alto/i.test(c.name) && c
 check('it knows it has a fallback', opened?.sources === 2, opened?.sources)
 check('a channel with no counterpart knows that too',
   catalog.getChannel(merged().find((c) => c.name === 'Only On Main')!.id)?.sources === 1)
+
+
+console.log('\nA catalogue the size of a real one')
+
+// The merged query now does real work per group — reducing prefixes, deciding
+// which of them may collapse — on the query behind every keystroke in the
+// search box. A rule that is correct and unusably slow is not a rule anyone
+// gets to keep, so the cost is measured rather than assumed.
+const big = createPlaylist({ name: 'Big A', kind: 'm3u', url: 'http://big-a' })
+const big2 = createPlaylist({ name: 'Big B', kind: 'm3u', url: 'http://big-b' })
+
+const bulk = (prefix: string, count: number) =>
+  Array.from({ length: count }, (_, i) => ch(`${prefix}${i}`, `${prefix} Channel ${i}`))
+
+importCatalog(big.id, 'live', [], bulk('x', 4000))
+importCatalog(big2.id, 'live', [], bulk('y', 4000))
+
+const started = Date.now()
+const bigList = catalog.queryChannels({ merge: true, kind: 'live', limit: 500, sort: 'name' })
+const listMs = Date.now() - started
+
+const countStarted = Date.now()
+const bigCount = catalog.countChannels({ merge: true, kind: 'live' })
+const countMs = Date.now() - countStarted
+
+check('eight thousand channels still merge', bigList.length === 500, bigList.length)
+check('and the count agrees it is a big list', bigCount > 8000, bigCount)
+// Generous on purpose: this is a floor against a collapse, not a benchmark.
+check(`the list comes back quickly (${listMs}ms)`, listMs < 2000, listMs)
+check(`and so does the count (${countMs}ms)`, countMs < 2000, countMs)
+
+const searchStarted = Date.now()
+catalog.queryChannels({ merge: true, kind: 'live', search: 'channel 123', limit: 100 })
+const searchMs = Date.now() - searchStarted
+check(`a search over all of it is quick too (${searchMs}ms)`, searchMs < 2000, searchMs)
 
 console.log(failures === 0 ? '\nmerged: all passed' : `\nmerged: ${failures} failed`)
 process.exit(failures === 0 ? 0 : 1)

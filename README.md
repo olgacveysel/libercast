@@ -74,9 +74,11 @@ now* button in Settings either way.
 sources" in the sidebar shows them as a single list with duplicates merged, and
 marks the channels more than one of them carries. Grouping is by the normalised
 name, so "Alto Sports 2 HD" and "ALTO SPORTS 2" are one row while Alto 2 and
-Alto 4 stay two. A list prefix like "TR |" is deliberately *not* stripped:
-removing it would also merge "UK Harbour Sports 2" with "DE Harbour Sports 2", which are
-different channels.
+Alto 4 stay two. A list prefix like "TR |" collapses onto the plain name when
+that name exists and only one prefix claims it — but "UK Harbour Sports 2" and
+"DE Harbour Sports 2" stay apart from each other and from "Harbour Sports 2",
+because two competing prefixes mean two different feeds. Ctrl+K searches every
+source the same way.
 
 **Source failover** — with more than one provider added, a live channel that
 will not start, or that dies partway through, is looked for on your other

@@ -1,5 +1,8 @@
 import { fold, getDb } from '@main/db/index'
+import { createLogger } from '@main/util/logger'
 import { normalizeName, similarity } from './epgMatch'
+
+const log = createLogger('failover')
 
 /**
  * The same channel, as another of the user's providers carries it.
@@ -42,22 +45,53 @@ export const MIN_SCORE = 0.86
  * scores zero against "Alto Sports 4", so a failover can never land on the
  * wrong match of the same competition — which would be worse than no picture.
  */
-export function rankAlternates(
+/**
+ * How close a candidate has to get before it is worth reporting as a near miss.
+ *
+ * `MIN_SCORE` cannot be tuned from a desk: whether 0.86 is right depends
+ * entirely on how two particular providers spell things, and the only evidence
+ * is what it is turning away on a real pair of lists. Anything in this band
+ * was recognisably the same channel to the matcher and still refused, which is
+ * exactly the list someone needs in order to say "that threshold is too high".
+ */
+export const NEAR_MISS_SCORE = 0.7
+
+export interface RankResult {
+  accepted: Alternate[]
+  /** Scored well, but not well enough to play. Reported, never used. */
+  nearMisses: Alternate[]
+}
+
+export function rankAlternatesDetailed(
   name: string,
   candidates: readonly AlternateCandidate[],
   exclude: readonly number[] = []
-): Alternate[] {
+): RankResult {
   const skip = new Set(exclude)
 
-  return candidates
+  const scored = candidates
     .filter((candidate) => !skip.has(candidate.channelId))
     .map((candidate) => ({ ...candidate, score: similarity(name, candidate.name) }))
-    .filter((candidate) => candidate.score >= MIN_SCORE)
     .sort((a, b) =>
       // Score first; then a stable order, so the same provider is tried first
       // every time rather than shuffling between attempts.
       b.score - a.score || a.playlistId - b.playlistId || a.channelId - b.channelId
     )
+
+  return {
+    accepted: scored.filter((candidate) => candidate.score >= MIN_SCORE),
+    nearMisses: scored.filter(
+      (candidate) => candidate.score >= NEAR_MISS_SCORE && candidate.score < MIN_SCORE
+    )
+  }
+}
+
+export function rankAlternates(
+  name: string,
+  candidates: readonly AlternateCandidate[],
+  exclude: readonly number[] = []
+): Alternate[] {
+  return rankAlternatesDetailed(name, candidates, exclude).accepted
 }
 
 /**
@@ -125,7 +159,7 @@ export function findAlternates(channelId: number, exclude: readonly number[] = [
     )
     .all(...params, SCAN_LIMIT) as Row[]
 
-  return rankAlternates(
+  const { accepted, nearMisses } = rankAlternatesDetailed(
     self.name,
     rows.map((row) => ({
       channelId: row.id,
@@ -135,4 +169,19 @@ export function findAlternates(channelId: number, exclude: readonly number[] = [
     })),
     exclude
   )
+
+  // Logged, not used. The threshold is a judgement about someone else's naming
+  // conventions, and this is the only way to find out whether it is the right
+  // one for a particular pair of lists without guessing.
+  if (accepted.length === 0 && nearMisses.length > 0) {
+    const listed = nearMisses
+      .slice(0, 3)
+      .map((candidate) => `"${candidate.name}" (${candidate.score.toFixed(2)}, ${candidate.playlistName})`)
+      .join(', ')
+    log.info(
+      `no alternate for "${self.name}" cleared ${MIN_SCORE}; closest was ${listed}`
+    )
+  }
+
+  return accepted
 }

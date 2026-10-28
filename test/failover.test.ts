@@ -13,7 +13,14 @@ import { setSettings } from '@main/db/repo/settings'
 import { binaries, resetBinaryCache } from '@main/media/binaries'
 import { openStream } from '@main/media/openStream'
 import { streamServer } from '@main/media/streamServer'
-import { findAlternates, narrowingTerm, rankAlternates } from '@main/sources/failover'
+import {
+  findAlternates,
+  MIN_SCORE,
+  narrowingTerm,
+  NEAR_MISS_SCORE,
+  rankAlternates,
+  rankAlternatesDetailed
+} from '@main/sources/failover'
 
 const run = promisify(execFile)
 
@@ -83,6 +90,29 @@ async function main(): Promise<void> {
     rankAlternates('Alto Sports 2 HD', candidates, [10])[0]?.channelId === 12)
   check('excluding everything leaves nothing',
     rankAlternates('Alto Sports 2 HD', candidates, [10, 12]).length === 0)
+
+  console.log('\nWhat the threshold is turning away')
+
+  // The threshold is a judgement about someone else's naming conventions, and
+  // 0.86 was picked without ever seeing two real provider lists side by side.
+  // These are the pairs a user would need to see before saying it is wrong.
+  const detailed = rankAlternatesDetailed('Alto Sports 2 HD', [
+    { channelId: 20, playlistId: 2, playlistName: 'Backup', name: 'ALTO SPORTS 2' },
+    { channelId: 21, playlistId: 2, playlistName: 'Backup', name: 'Alto Spor 2' },
+    { channelId: 22, playlistId: 2, playlistName: 'Backup', name: 'Lumen Channel' }
+  ])
+
+  check('a clear match is accepted', detailed.accepted.some((a) => a.channelId === 20), detailed.accepted)
+  check('a close spelling is reported rather than played',
+    detailed.nearMisses.some((a) => a.channelId === 21), detailed.nearMisses)
+  check('and is never among the accepted',
+    !detailed.accepted.some((a) => a.channelId === 21), detailed.accepted)
+  // Reporting everything would be the same as reporting nothing.
+  check('something unrelated is not reported either',
+    !detailed.nearMisses.some((a) => a.channelId === 22), detailed.nearMisses)
+  check('a near miss carries its score, which is the point',
+    detailed.nearMisses.every((a) => a.score >= NEAR_MISS_SCORE && a.score < MIN_SCORE),
+    detailed.nearMisses)
 
   console.log('\nAgainst two real providers, one of them broken')
 

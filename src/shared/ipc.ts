@@ -134,7 +134,17 @@ export interface IpcContract {
   }
 
   /** One query across live, movies and series, for the command palette. */
-  'search:global': { req: { playlistId: number; query: string; limit?: number }; res: SearchResults }
+  /**
+   * Everything matching a query, across one source or all of them.
+   *
+   * `merge` collapses the same channel on different providers, exactly as the
+   * channel list does — without it, searching with two providers connected
+   * returns each channel twice.
+   */
+  'search:global': {
+    req: { playlistId?: number; merge?: boolean; query: string; limit?: number }
+    res: SearchResults
+  }
 
   'parental:status': { req: void; res: ParentalStatus }
   'parental:setPin': { req: { currentPin: string | null; newPin: string }; res: ParentalStatus }

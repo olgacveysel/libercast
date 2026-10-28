@@ -237,9 +237,9 @@ export function registerIpcHandlers(): void {
 
   /* ---------------- global search ---------------- */
 
-  handle('search:global', ({ playlistId, query, limit }) => {
+  handle('search:global', ({ playlistId, merge, query, limit }) => {
     const perSection = Math.min(limit ?? 8, 30)
-    const base = { playlistId, search: query, sort: 'name' as const }
+    const base = { playlistId, merge, search: query, sort: 'name' as const }
 
     // Three narrow queries rather than one union: each kind has its own index,
     // and a union would lose the per-kind cap that keeps the palette readable.
