@@ -33,16 +33,16 @@ const main = createPlaylist({ name: 'Main', kind: 'm3u', url: 'http://a' })
 const backup = createPlaylist({ name: 'Backup', kind: 'm3u', url: 'http://b' })
 
 importCatalog(main.id, 'live', [], [
-  ch('a1', 'beIN Sports 2 HD'),
-  ch('a2', 'beIN Sports 4 HD'),
-  ch('a3', 'BBC One'),
+  ch('a1', 'Alto Sports 2 HD'),
+  ch('a2', 'Alto Sports 4 HD'),
+  ch('a3', 'Civic One'),
   ch('a4', 'Only On Main'),
   ch('a5', '4K')
 ])
 importCatalog(backup.id, 'live', [], [
-  ch('b1', 'BEIN SPORTS 2'),
-  ch('b2', 'TR | beIN Sports 2 (Hat 1)'),
-  ch('b3', 'BBC One HD'),
+  ch('b1', 'ALTO SPORTS 2'),
+  ch('b2', 'TR | Alto Sports 2 (Hat 1)'),
+  ch('b3', 'Civic One HD'),
   ch('b4', 'Only On Backup'),
   ch('b5', '|||')
 ])
@@ -55,27 +55,27 @@ console.log('\nOne list out of two providers')
 const all = merged()
 const names = all.map((c) => c.name)
 
-// Two spellings of beIN 2 across two providers collapse to one row.
-const bein2 = all.filter((c) => /bein/i.test(c.name) && c.name.includes('2') && !c.name.startsWith('TR'))
-check('the same channel appears once', bein2.length === 1, names)
-check('and reports both providers', bein2[0]?.sources === 2, bein2[0])
+// Two spellings of Alto 2 across two providers collapse to one row.
+const alto2 = all.filter((c) => /alto/i.test(c.name) && c.name.includes('2') && !c.name.startsWith('TR'))
+check('the same channel appears once', alto2.length === 1, names)
+check('and reports both providers', alto2[0]?.sources === 2, alto2[0])
 
 // Deliberately NOT merged, and worth pinning so nobody "fixes" it later: a
 // list prefix like "TR |" is indistinguishable, from here, from a feed
-// marker. Stripping it would merge "UK Sky Sports 2" with "DE Sky Sports 2",
-// which are different channels — the same class of mistake as merging beIN 2
-// with beIN 4, and the one this whole feature is built to avoid.
+// marker. Stripping it would merge "UK Harbour Sports 2" with "DE Harbour Sports 2",
+// which are different channels — the same class of mistake as merging Alto 2
+// with Alto 4, and the one this whole feature is built to avoid.
 check('a channel carrying a list prefix stays separate',
   names.some((n) => n.startsWith('TR |')), names)
 
 // The rule that matters most. Falling back onto the wrong match of the same
 // competition is worse than showing no picture at all.
-const bein4 = all.filter((c) => /bein/i.test(c.name) && c.name.includes('4'))
-check('a different channel number stays its own row', bein4.length === 1, names)
-check('and is not credited with a second source', bein4[0]?.sources === 1, bein4[0])
+const alto4 = all.filter((c) => /alto/i.test(c.name) && c.name.includes('4'))
+check('a different channel number stays its own row', alto4.length === 1, names)
+check('and is not credited with a second source', alto4[0]?.sources === 1, alto4[0])
 
 check('a quality suffix does not split a channel',
-  all.filter((c) => /bbc/i.test(c.name)).length === 1, names)
+  all.filter((c) => /civic/i.test(c.name)).length === 1, names)
 check('a channel only one provider has is still listed',
   names.some((n) => n === 'Only On Main') && names.some((n) => n === 'Only On Backup'), names)
 check('and reports one provider',
@@ -106,10 +106,10 @@ check('by default the higher-ordered source wins', chosen.playlistId === main.id
 // broken.
 const backupBein2 = catalog
   .queryChannels({ playlistId: backup.id, kind: 'live', limit: 50 })
-  .find((c) => c.name === 'BEIN SPORTS 2')!
+  .find((c) => c.name === 'ALTO SPORTS 2')!
 catalog.toggleFavorite(backupBein2.id)
 
-const afterStar = merged().find((c) => c.name.includes('2') && /bein/i.test(c.name))!
+const afterStar = merged().find((c) => c.name.includes('2') && /alto/i.test(c.name))!
 check('a favourited copy becomes the one shown', afterStar.id === backupBein2.id, afterStar)
 check('and the row reads as a favourite', afterStar.favorite === true, afterStar)
 check('it still reports both providers', afterStar.sources === 2, afterStar)
@@ -121,27 +121,27 @@ catalog.toggleFavorite(backupBein2.id)
 
 console.log('\nSearching across the merge')
 
-const found = catalog.queryChannels({ merge: true, kind: 'live', search: 'bein', limit: 50 })
+const found = catalog.queryChannels({ merge: true, kind: 'live', search: 'alto', limit: 50 })
 check('a search spans both providers', found.length === 3, found.map((c) => c.name))
 check('and still collapses the duplicates',
-  found.filter((c) => c.name === 'beIN Sports 2 HD').length === 1, found.map((c) => c.name))
+  found.filter((c) => c.name === 'Alto Sports 2 HD').length === 1, found.map((c) => c.name))
 check('searching finds the copy that was merged away',
-  found.find((c) => c.name === 'beIN Sports 2 HD')?.sources === 2, found)
+  found.find((c) => c.name === 'Alto Sports 2 HD')?.sources === 2, found)
 
 console.log('\nWhat must never leak through')
 
 const mainBbc = catalog
   .queryChannels({ playlistId: main.id, kind: 'live', limit: 50 })
-  .find((c) => c.name === 'BBC One')!
+  .find((c) => c.name === 'Civic One')!
 catalog.setHidden(mainBbc.id, true)
 
 const hidden = merged()
 check('a hidden copy is not shown', !hidden.some((c) => c.id === mainBbc.id), hidden.map((c) => c.name))
 // The other provider still carries it, so the channel stays — with one source.
 check('but the channel survives through the other provider',
-  hidden.some((c) => c.name === 'BBC One HD'), hidden.map((c) => c.name))
+  hidden.some((c) => c.name === 'Civic One HD'), hidden.map((c) => c.name))
 check('and the source count drops to one',
-  hidden.find((c) => c.name === 'BBC One HD')?.sources === 1)
+  hidden.find((c) => c.name === 'Civic One HD')?.sources === 1)
 catalog.setHidden(mainBbc.id, false)
 
 // Parental filtering is applied in the query precisely so that no screen can
@@ -150,14 +150,14 @@ parental.setPin(null, '1234')
 parental.setRules({
   lockAdult: false,
   autoLockMinutes: 0,
-  keywords: ['bein'],
+  keywords: ['alto'],
   lockedCategoryIds: []
 })
 parental.lock()
 
 const locked = merged()
 check('a blocked word is filtered out of the merged list',
-  !locked.some((c) => /bein/i.test(c.name)), locked.map((c) => c.name))
+  !locked.some((c) => /alto/i.test(c.name)), locked.map((c) => c.name))
 check('and the merged count agrees',
   catalog.countChannels({ merge: true, kind: 'live' }) === locked.length)
 
@@ -183,7 +183,7 @@ setEnabled(backup.id, true)
 
 console.log('\nOpening a channel from the merged list')
 
-const opened = catalog.getChannel(merged().find((c) => /bein/i.test(c.name) && c.name.includes('2'))!.id)
+const opened = catalog.getChannel(merged().find((c) => /alto/i.test(c.name) && c.name.includes('2'))!.id)
 check('it knows it has a fallback', opened?.sources === 2, opened?.sources)
 check('a channel with no counterpart knows that too',
   catalog.getChannel(merged().find((c) => c.name === 'Only On Main')!.id)?.sources === 1)

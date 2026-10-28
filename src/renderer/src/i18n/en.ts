@@ -297,7 +297,7 @@ export const en = {
   'settings.frugalBody': 'Playing a channel normally takes two connections in quick succession — one to identify the stream, one to play it. If your account allows only one, the second is refused and the channel opens only sometimes. Turn this on and a live channel that has not been played before is started on assumption instead.',
   'settings.frugalNote': 'Either way, what a stream turned out to be is remembered, so playing anything a second time costs a single connection. The audio and subtitle menus for a live channel stay empty until it has been played once.',
   'settings.failover': 'Play from another source when one fails',
-  'settings.failoverBody': 'With more than one source added, a live channel that will not start — or that stops partway through — is looked for on your other providers and played from there instead. Channel numbers are respected, so beIN 2 never falls back to beIN 4. A brief note says which source took over. Turn this off to spend connections only on the source you chose.',
+  'settings.failoverBody': 'With more than one source added, a live channel that will not start — or that stops partway through — is looked for on your other providers and played from there instead. Channel numbers are respected, so a channel numbered 2 is never replaced by the one numbered 4. A brief note says which source took over. Turn this off to spend connections only on the source you chose.',
   'settings.refreshEvery': 'Refresh sources every',
   'settings.refreshEveryBody': 'Off by default. A refresh talks to your provider, and it is skipped while something is playing so it can never take the connection a stream is using.',
   'settings.everyWeek': 'Week',

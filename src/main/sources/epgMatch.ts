@@ -21,8 +21,8 @@ export interface MatchResult {
 }
 
 /**
- * Words that describe the feed rather than the channel. "Sky Sports HD" and
- * "Sky Sports FHD" are the same channel, so these are dropped before comparing.
+ * Words that describe the feed rather than the channel. "Harbour Sports HD" and
+ * "Harbour Sports FHD" are the same channel, so these are dropped before comparing.
  */
 const NOISE = new Set([
   'hd',
@@ -58,7 +58,7 @@ const NOISE = new Set([
 
 /**
  * Words that introduce a *feed* number rather than a channel number. Providers
- * label duplicate streams "beIN Sports 2 (Hat 1)" — Turkish for line 1 — and
+ * label duplicate streams "Alto Sports 2 (Hat 1)" — Turkish for line 1 — and
  * the 1 there says nothing about which channel it is. Both the word and the
  * number that follows it are dropped, otherwise the digit rule below reads that
  * 1 as part of the channel's identity and refuses every correct match.
@@ -79,13 +79,13 @@ const FEED_QUALIFIERS = new Set([
   'mirror'
 ])
 
-/** Bracketed or piped qualifiers: "beIN Sports 2 (Hat 1)", "TR | beIN 2". */
+/** Bracketed or piped qualifiers: "Alto Sports 2 (Hat 1)", "TR | Alto 2". */
 const SEPARATORS = /[|/\\[\](){}:;,_]+/g
 
 /**
  * Reduces a channel name to the tokens that identify it.
  *
- * Digits are kept and matter: "beIN Sports 2" and "beIN Sports 4" differ by one
+ * Digits are kept and matter: "Alto Sports 2" and "Alto Sports 4" differ by one
  * character and must never be treated as the same channel.
  */
 export function normalizeName(value: string): string[] {
@@ -143,7 +143,7 @@ export function diceCoefficient(a: string, b: string): number {
  *
  * The digit rule comes first and overrides everything: if both names contain
  * numbers and those numbers differ, they are different channels no matter how
- * similar the words are. Without it "beIN Sports 2" happily matches "beIN
+ * similar the words are. Without it "Alto Sports 2" happily matches "Alto
  * Sports 4", which is worse than no guide at all.
  */
 export function similarity(a: string, b: string): number {
@@ -166,7 +166,7 @@ export function similarity(a: string, b: string): number {
   for (const token of leftSet) if (rightSet.has(token)) shared += 1
 
   // One name being a complete subset of the other is a strong signal:
-  // "beIN Sports 2" inside "beIN Sports 2 Turkey".
+  // "Alto Sports 2" inside "Alto Sports 2 Turkey".
   const smaller = Math.min(leftSet.size, rightSet.size)
   if (shared === smaller && smaller > 0) {
     const coverage = shared / Math.max(leftSet.size, rightSet.size)

@@ -73,9 +73,9 @@ now* button in Settings either way.
 **One list from every source** — with more than one provider connected, "All
 sources" in the sidebar shows them as a single list with duplicates merged, and
 marks the channels more than one of them carries. Grouping is by the normalised
-name, so "beIN Sports 2 HD" and "BEIN SPORTS 2" are one row while beIN 2 and
-beIN 4 stay two. A list prefix like "TR |" is deliberately *not* stripped:
-removing it would also merge "UK Sky Sports 2" with "DE Sky Sports 2", which are
+name, so "Alto Sports 2 HD" and "ALTO SPORTS 2" are one row while Alto 2 and
+Alto 4 stay two. A list prefix like "TR |" is deliberately *not* stripped:
+removing it would also merge "UK Harbour Sports 2" with "DE Harbour Sports 2", which are
 different channels.
 
 **Source failover** — with more than one provider added, a live channel that
@@ -212,9 +212,9 @@ feed's own channel declarations and matches the unmatched channels by name.
 
 Two rules keep that from doing harm. Numbers identify a channel, so if two names
 carry different numbers they never match however similar the words are —
-otherwise "beIN Sports 2" cheerfully matches "beIN Sports 4", which is worse
+otherwise "Alto Sports 2" cheerfully matches "Alto Sports 4", which is worse
 than an empty guide because it looks like it works. But a number introduced by
-a feed qualifier is not a channel number: "beIN Sports 2 (Hat 1)" is line 1 of
+a feed qualifier is not a channel number: "Alto Sports 2 (Hat 1)" is line 1 of
 channel 2, so those are stripped before the rule applies. And a best candidate
 must beat the runner-up by a clear margin, because two names scoring 0.84 and
 0.83 means the answer is a guess.
@@ -252,8 +252,8 @@ before the failures happen instead of leaving the user guessing.
 An error status or a web page where video should be is a refusal; a panel that
 is merely busy, or a stream ffprobe cannot read, is not — those are played
 through as they always were, because they usually work. Matching is by name
-with the channel-number rule from the guide matcher, so beIN 2 never falls back
-to beIN 4.
+with the channel-number rule from the guide matcher, so Alto 2 never falls back
+to Alto 4.
 
 **Changing a track reopens the stream.** ffmpeg is mapping one audio and one
 subtitle stream, so a different selection needs a different ffmpeg. That reuses

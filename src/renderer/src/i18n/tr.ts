@@ -286,7 +286,7 @@ export const tr: Record<TranslationKey, string> = {
   'settings.frugalBody': 'Bir kanalı açmak normalde arka arkaya iki bağlantı ister: biri yayının ne olduğunu anlamak, diğeri onu oynatmak için. Hesabın yalnızca tek bağlantıya izin veriyorsa ikincisi reddedilir ve kanal ancak arada bir açılır. Bunu açarsan, daha önce hiç oynatılmamış bir canlı kanal tahmine dayanarak başlatılır.',
   'settings.frugalNote': 'Her iki durumda da bir yayının ne olduğu bir kez öğrenilip saklanır; aynı şeyi ikinci kez açmak tek bağlantıya mal olur. Canlı bir kanalın ses ve altyazı menüleri, o kanal bir kez oynatılana kadar boş kalır.',
   'settings.failover': 'Bir kaynak açılmazsa başka kaynaktan oynat',
-  'settings.failoverBody': 'Birden fazla kaynak eklediysen, başlamayan ya da ortasında kesilen bir canlı kanal diğer sağlayıcılarında aranır ve oradan oynatılır. Kanal numaraları korunur; beIN 2 hiçbir zaman beIN 4’e düşmez. Kısa bir not hangi kaynağın devraldığını söyler. Bunu kapatırsan bağlantılar yalnızca senin seçtiğin kaynağa harcanır.',
+  'settings.failoverBody': 'Birden fazla kaynak eklediysen, başlamayan ya da ortasında kesilen bir canlı kanal diğer sağlayıcılarında aranır ve oradan oynatılır. Kanal numaraları korunur; 2 numaralı bir kanal hiçbir zaman 4 numaralı olanla değiştirilmez. Kısa bir not hangi kaynağın devraldığını söyler. Bunu kapatırsan bağlantılar yalnızca senin seçtiğin kaynağa harcanır.',
   'settings.refreshEvery': 'Kaynakları yenileme sıklığı',
   'settings.refreshEveryBody': 'Varsayılan olarak kapalıdır. Yenileme sağlayıcına bağlanır ve bir şey oynarken atlanır; böylece yayının kullandığı bağlantıyı asla almaz.',
   'settings.everyWeek': 'Hafta',

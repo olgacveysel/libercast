@@ -226,8 +226,8 @@ export interface ChannelQuery {
   /**
    * Collapse the same channel on different providers into one row.
    *
-   * Grouping is by the normalised name stored at import, so "beIN Sports 2 HD"
-   * and "BEIN SPORTS 2" are one row while beIN 2 and beIN 4 stay two.
+   * Grouping is by the normalised name stored at import, so "Alto Sports 2 HD"
+   * and "ALTO SPORTS 2" are one row while Alto 2 and Alto 4 stay two.
    */
   merge?: boolean
   /** Defaults to 'live'. Movies and series live in the same table. */

@@ -35,7 +35,7 @@ async function main(): Promise<void> {
     mk('1', 'Cartoon Time', 'kids', false),
     mk('2', 'Kids Movies', 'kids', false),
     mk('3', 'Late Night XXX', 'adult', true),
-    mk('4', 'BBC News', 'news', false),
+    mk('4', 'Civic News', 'news', false),
     mk('5', 'Poker Central', 'news', false)
   ]
 
@@ -132,7 +132,7 @@ async function main(): Promise<void> {
   console.log('\nFiltering reaches every screen, not just the list')
   const newsChannel = catalog
     .queryChannels({ playlistId: playlist.id, limit: 50 })
-    .find((c) => c.name === 'BBC News')!
+    .find((c) => c.name === 'Civic News')!
   catalog.markWatched(newsChannel.id)
 
   parental.unlock('1234')

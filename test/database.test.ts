@@ -30,7 +30,7 @@ const categories = [
 ]
 const channels = Array.from({ length: 5000 }, (_, i) => ({
   externalId: String(i),
-  name: i % 2 === 0 ? `Sky Sports ${i}` : `BBC News ${i}`,
+  name: i % 2 === 0 ? `Harbour Sports ${i}` : `Civic News ${i}`,
   categoryExternalId: i % 2 === 0 ? 'sports' : 'news',
   number: i,
   logoUrl: null,
@@ -53,15 +53,15 @@ check('category counts channels', sports.channelCount === 2500, sports.channelCo
 console.log('\nQueries')
 const all = catalog.queryChannels({ playlistId: playlist.id, limit: 10 })
 check('query returns a page', all.length === 10)
-check('sorted A-Z by folded name', all[0]!.name.startsWith('BBC'), all[0]!.name)
+check('sorted A-Z by folded name', all[0]!.name.startsWith('Civic'), all[0]!.name)
 
-const search = catalog.queryChannels({ playlistId: playlist.id, search: 'sky sports', limit: 5000 })
+const search = catalog.queryChannels({ playlistId: playlist.id, search: 'harbour sports', limit: 5000 })
 check('multi-token search matches', search.length === 2500, search.length)
 
 const numbered = catalog.queryChannels({ playlistId: playlist.id, sort: 'number', limit: 3 })
 check('numeric sort works', numbered[0]!.number === 0 && numbered[1]!.number === 1)
 
-check('count matches filter', catalog.countChannels({ playlistId: playlist.id, search: 'bbc' }) === 2500)
+check('count matches filter', catalog.countChannels({ playlistId: playlist.id, search: 'civic' }) === 2500)
 
 console.log('\nFavorites, history, hiding')
 const target = all[0]!

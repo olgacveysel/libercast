@@ -33,13 +33,13 @@ check('unwraps CDATA', decodeEntities('<![CDATA[Hello]]>') === 'Hello')
 
 console.log('\nProgramme blocks')
 const block =
-  ' start="20260906123000 +0000" stop="20260906133000 +0000" channel="bbc.one">' +
+  ' start="20260906123000 +0000" stop="20260906133000 +0000" channel="civic.one">' +
   '<title lang="en">The News &amp; Weather</title>' +
   '<desc lang="en">Headlines.</desc>' +
   '<category lang="en">News</category>'
 
 const programme = parseProgrammeBlock(block)
-check('extracts the channel id', programme?.channelId === 'bbc.one')
+check('extracts the channel id', programme?.channelId === 'civic.one')
 check('extracts and decodes the title', programme?.title === 'The News & Weather', programme?.title)
 check('extracts the description', programme?.description === 'Headlines.')
 check('extracts the category', programme?.category === 'News')

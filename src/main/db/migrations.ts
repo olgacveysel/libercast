@@ -368,13 +368,13 @@ export const MIGRATIONS: Migration[] = [
     up: `
       -- The identifying words of a channel name, normalised.
       --
-      -- Two providers almost never spell a channel the same way — "beIN
-      -- Sports 2 HD", "BEIN SPORTS 2", "TR | beIN Sports 2 (Hat 1)" — so
+      -- Two providers almost never spell a channel the same way — "Alto
+      -- Sports 2 HD", "ALTO SPORTS 2", "TR | Alto Sports 2 (Hat 1)" — so
       -- showing them as one list means grouping on something other than the
       -- name. Scoring every pair in JavaScript would mean thousands of
       -- comparisons on every keystroke, so the normalised form is computed
       -- once at import and grouped on here. Digits survive normalisation,
-      -- which is what keeps beIN 2 and beIN 4 apart.
+      -- which is what keeps Alto 2 and Alto 4 apart.
       ALTER TABLE channels ADD COLUMN match_key TEXT NOT NULL DEFAULT '';
 
       CREATE INDEX idx_channels_match ON channels(kind, match_key);

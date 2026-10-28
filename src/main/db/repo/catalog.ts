@@ -124,7 +124,7 @@ function buildWhere(query: ChannelQuery): { sql: string; params: unknown[] } {
 
   const search = query.search?.trim()
   if (search) {
-    // Every token must appear, so "sky sport" matches "Sky Sports UK".
+    // Every token must appear, so "harbour sport" matches "Harbour Sports UK".
     for (const token of fold(search).split(' ').filter(Boolean)) {
       clauses.push('ch.name_folded LIKE ?')
       params.push(`%${token}%`)

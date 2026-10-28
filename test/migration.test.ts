@@ -46,7 +46,7 @@ const insertChannel = db.prepare(
    VALUES (1, ?, ?, ?, ?, ?, ?, ?)`
 )
 const now = Date.now()
-insertChannel.run(1, '900', 'Sky Sports', 'sky sports', 'http://ex.com/live/1.ts', now, now)
+insertChannel.run(1, '900', 'Harbour Sports', 'harbour sports', 'http://ex.com/live/1.ts', now, now)
 insertChannel.run(2, 'vod:12', 'Some Film', 'some film', 'http://ex.com/movie/12.mp4', now, now)
 // An orphan: its category was already pruned, so only the id prefix identifies it.
 insertChannel.run(null, 'series:7', 'Some Show', 'some show', '', now, now)

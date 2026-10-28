@@ -38,8 +38,8 @@ export const MIN_SCORE = 0.86
 /**
  * Ranks candidates from other providers against the channel being played.
  *
- * The digit rule inside `similarity` does the heavy lifting: "beIN Sports 2"
- * scores zero against "beIN Sports 4", so a failover can never land on the
+ * The digit rule inside `similarity` does the heavy lifting: "Alto Sports 2"
+ * scores zero against "Alto Sports 4", so a failover can never land on the
  * wrong match of the same competition — which would be worse than no picture.
  */
 export function rankAlternates(

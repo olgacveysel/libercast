@@ -3,7 +3,7 @@ import { XtreamClient } from '@main/sources/xtream'
 import { fold } from '@main/db/index'
 
 const SAMPLE = `#EXTM3U x-tvg-url="http://ex.com/xmltv.php"
-#EXTINF:-1 tvg-id="sky.sports.uk" tvg-name="Sky Sports Main Event" tvg-logo="http://l/1.png" tvg-chno="401" group-title="UK | SPORTS",Sky Sports Main Event FHD
+#EXTINF:-1 tvg-id="harbour.sports.uk" tvg-name="Harbour Sports Main Event" tvg-logo="http://l/1.png" tvg-chno="401" group-title="UK | SPORTS",Harbour Sports Main Event FHD
 http://ex.com:8080/live/user/pass/1001.m3u8
 #EXTINF:-1 tvg-id="" tvg-logo="" group-title="UK | SPORTS",BT Sport 1
 http://ex.com:8080/live/user/pass/1002.ts
@@ -29,8 +29,8 @@ function check(label: string, condition: boolean, detail?: unknown): void {
 console.log('\nM3U parser')
 const catalog = parseM3u(SAMPLE)
 check('parses all 5 entries', catalog.channels.length === 5, catalog.channels.length)
-check('extracts tvg-id', catalog.channels[0]!.epgChannelId === 'sky.sports.uk')
-check('prefers tvg-name over display title', catalog.channels[0]!.name === 'Sky Sports Main Event')
+check('extracts tvg-id', catalog.channels[0]!.epgChannelId === 'harbour.sports.uk')
+check('prefers tvg-name over display title', catalog.channels[0]!.name === 'Harbour Sports Main Event')
 check('parses tvg-chno as number', catalog.channels[0]!.number === 401)
 check('detects m3u8 extension', catalog.channels[0]!.containerExtension === 'm3u8')
 check('empty tvg-id becomes null', catalog.channels[1]!.epgChannelId === null)
@@ -67,7 +67,7 @@ check('vod uses container extension', client.vodStreamUrl('7', 'mkv').endsWith('
 
 console.log('\nSearch folding')
 check('strips accents', fold('Télé Événement') === 'tele evenement', fold('Télé Événement'))
-check('collapses punctuation', fold('SKY-SPORTS | HD') === 'sky sports hd', fold('SKY-SPORTS | HD'))
+check('collapses punctuation', fold('HARBOUR-SPORTS | HD') === 'harbour sports hd', fold('HARBOUR-SPORTS | HD'))
 
 console.log(failures === 0 ? '\nAll checks passed.\n' : `\n${failures} check(s) failed.\n`)
 process.exit(failures === 0 ? 0 : 1)

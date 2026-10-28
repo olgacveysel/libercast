@@ -56,20 +56,20 @@ async function main(): Promise<void> {
 
   // Scoring every channel of every other provider would read tens of thousands
   // of rows per failover, so the longest identifying word narrows it first.
-  check('the longest real word is used', narrowingTerm('beIN Sports 2 HD') === 'sports')
-  check('numbers are never the narrowing term', narrowingTerm('TRT 1') === null)
+  check('the longest real word is used', narrowingTerm('Alto Sports 2 HD') === 'sports')
+  check('numbers are never the narrowing term', narrowingTerm('KTV 1') === null)
   check('short words are not worth narrowing on', narrowingTerm('TV 5') === null)
-  check('quality markers are not used', narrowingTerm('BBC One HD') !== 'hd', narrowingTerm('BBC One HD'))
+  check('quality markers are not used', narrowingTerm('Civic One HD') !== 'hd', narrowingTerm('Civic One HD'))
 
   console.log('\nRanking what the other providers carry')
 
   const candidates = [
-    { channelId: 10, playlistId: 2, playlistName: 'Backup', name: 'BEIN SPORTS 2' },
-    { channelId: 11, playlistId: 2, playlistName: 'Backup', name: 'beIN Sports 4 HD' },
-    { channelId: 12, playlistId: 3, playlistName: 'Third', name: 'TR | beIN Sports 2 (Hat 1)' },
-    { channelId: 13, playlistId: 2, playlistName: 'Backup', name: 'Discovery Channel' }
+    { channelId: 10, playlistId: 2, playlistName: 'Backup', name: 'ALTO SPORTS 2' },
+    { channelId: 11, playlistId: 2, playlistName: 'Backup', name: 'Alto Sports 4 HD' },
+    { channelId: 12, playlistId: 3, playlistName: 'Third', name: 'TR | Alto Sports 2 (Hat 1)' },
+    { channelId: 13, playlistId: 2, playlistName: 'Backup', name: 'Lumen Channel' }
   ]
-  const ranked = rankAlternates('beIN Sports 2 HD', candidates)
+  const ranked = rankAlternates('Alto Sports 2 HD', candidates)
 
   check('the same channel elsewhere is found', ranked.length === 2, ranked)
   // The single most important rule here: failing over onto the wrong match of
@@ -80,9 +80,9 @@ async function main(): Promise<void> {
     ranked.every((r) => r.channelId !== 13), ranked)
   check('the closest name comes first', ranked[0]?.channelId === 10, ranked)
   check('a channel already known dead is skipped',
-    rankAlternates('beIN Sports 2 HD', candidates, [10])[0]?.channelId === 12)
+    rankAlternates('Alto Sports 2 HD', candidates, [10])[0]?.channelId === 12)
   check('excluding everything leaves nothing',
-    rankAlternates('beIN Sports 2 HD', candidates, [10, 12]).length === 0)
+    rankAlternates('Alto Sports 2 HD', candidates, [10, 12]).length === 0)
 
   console.log('\nAgainst two real providers, one of them broken')
 
@@ -127,35 +127,35 @@ async function main(): Promise<void> {
   })
 
   importCatalog(main1.id, 'live', [], [
-    channel('a-bein2', 'beIN Sports 2 HD', deadPort),
-    channel('a-bein4', 'beIN Sports 4 HD', deadPort),
+    channel('a-alto2', 'Alto Sports 2 HD', deadPort),
+    channel('a-alto4', 'Alto Sports 4 HD', deadPort),
     channel('a-only', 'Channel Nobody Else Has', deadPort)
   ])
   importCatalog(backup.id, 'live', [], [
-    channel('b-bein2', 'BEIN SPORTS 2', goodPort),
-    // Deliberately no beIN 2 counterpart for the 4: the digit rule has to stop
+    channel('b-alto2', 'ALTO SPORTS 2', goodPort),
+    // Deliberately no Alto 2 counterpart for the 4: the digit rule has to stop
     // a fallback onto a different match.
-    channel('b-other', 'Discovery Channel', goodPort)
+    channel('b-other', 'Lumen Channel', goodPort)
   ])
 
   const all = catalog.queryChannels({ playlistId: main1.id, kind: 'live', limit: 50 })
-  const bein2 = all.find((c) => c.name === 'beIN Sports 2 HD')!
-  const bein4 = all.find((c) => c.name === 'beIN Sports 4 HD')!
+  const alto2 = all.find((c) => c.name === 'Alto Sports 2 HD')!
+  const alto4 = all.find((c) => c.name === 'Alto Sports 4 HD')!
   const lonely = all.find((c) => c.name === 'Channel Nobody Else Has')!
 
-  const found = findAlternates(bein2.id)
+  const found = findAlternates(alto2.id)
   check('the backup copy is found through the database', found.length === 1, found)
   check('and it names the provider it came from', found[0]?.playlistName === 'Backup provider', found)
   check('a channel with no counterpart finds none', findAlternates(lonely.id).length === 0)
   check('and neither does one whose number only exists here',
-    findAlternates(bein4.id).length === 0, findAlternates(bein4.id))
+    findAlternates(alto4.id).length === 0, findAlternates(alto4.id))
 
   console.log('\nOpening through a dead source')
 
-  const outcome = await openStream({ source: { type: 'channel', id: bein2.id }, owner: 'test' })
+  const outcome = await openStream({ source: { type: 'channel', id: alto2.id }, owner: 'test' })
   check('it played', outcome.session.url.startsWith('http://127.0.0.1'), outcome.session.url)
   check('from the backup, not the source that refused',
-    outcome.playingChannelId !== bein2.id, outcome.playingChannelId)
+    outcome.playingChannelId !== alto2.id, outcome.playingChannelId)
   check('the switch is reported', outcome.switched !== null, outcome.switched)
   check('it names the source that failed', outcome.switched?.from === 'Main provider', outcome.switched)
   check('and the one that took over', outcome.switched?.to === 'Backup provider', outcome.switched)
@@ -167,12 +167,12 @@ async function main(): Promise<void> {
 
   const before = asked.dead.length
   const second = await openStream({
-    source: { type: 'channel', id: bein2.id },
+    source: { type: 'channel', id: alto2.id },
     owner: 'test',
-    exclude: [bein2.id]
+    exclude: [alto2.id]
   })
   check('a channel already known dead is skipped entirely', asked.dead.length === before, asked.dead.length)
-  check('and it still plays', second.playingChannelId !== bein2.id, second.playingChannelId)
+  check('and it still plays', second.playingChannelId !== alto2.id, second.playingChannelId)
   check('the switch is still reported', second.switched !== null, second.switched)
   streamServer.close(second.session.id)
 
@@ -194,7 +194,7 @@ async function main(): Promise<void> {
 
   setSettings({ sourceFailover: false })
   const askedBefore = asked.good.length
-  const off = await openStream({ source: { type: 'channel', id: bein2.id }, owner: 'test' })
+  const off = await openStream({ source: { type: 'channel', id: alto2.id }, owner: 'test' })
   check('the other provider is never contacted', asked.good.length === askedBefore, asked.good.length)
   check('the dead source is played through, as it was before failover existed',
     off.switched === null && off.session.warning !== null, off)

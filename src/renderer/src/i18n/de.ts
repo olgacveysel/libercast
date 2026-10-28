@@ -290,7 +290,7 @@ export const de: Record<TranslationKey, string> = {
     'So oder so wird gemerkt, was ein Stream ist. Beim zweiten Mal kostet alles nur noch eine Verbindung. Die Menüs für Ton und Untertitel bleiben bei einem Live-Sender leer, bis er einmal lief.',
   'settings.failover': 'Bei Ausfall von einer anderen Quelle spielen',
   'settings.failoverBody':
-    'Mit mehr als einer Quelle wird ein Live-Sender, der nicht startet — oder mittendrin abbricht — bei deinen anderen Anbietern gesucht und von dort gespielt. Sendernummern werden beachtet, beIN 2 landet also nie bei beIN 4. Ein kurzer Hinweis nennt die Quelle, die übernommen hat. Aus, wenn nur die gewählte Quelle Verbindungen kosten soll.',
+    'Mit mehr als einer Quelle wird ein Live-Sender, der nicht startet — oder mittendrin abbricht — bei deinen anderen Anbietern gesucht und von dort gespielt. Sendernummern werden beachtet, ein Sender mit der 2 landet also nie bei der 4. Ein kurzer Hinweis nennt die Quelle, die übernommen hat. Aus, wenn nur die gewählte Quelle Verbindungen kosten soll.',
   'settings.refreshEvery': 'Quellen aktualisieren alle',
   'settings.refreshEveryBody':
     'Standardmäßig aus. Eine Aktualisierung spricht mit deinem Anbieter und wird übersprungen, solange etwas läuft — sie kann einem Stream also nie die Verbindung wegnehmen.',
