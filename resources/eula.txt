@@ -1,6 +1,6 @@
 LiberCast -- beta software notice
 
-Version 0.9.0-beta.3
+Version 0.9.0-beta.4
 
 Please read this before installing. Installing LiberCast means you accept it.
 
