@@ -307,31 +307,60 @@ export class StalkerClient {
    * cached: every play asks again. That is one small request against a
    * subscription that is about to open a stream anyway.
    */
-  async streamUrl(cmd: string): Promise<string> {
+  async streamUrl(cmd: string, channelId?: string): Promise<string> {
     await this.authenticate()
     const endpoint = await this.resolveEndpoint()
 
-    const raw = await this.call<Record<string, unknown>>(endpoint, {
-      type: 'itv',
-      action: 'create_link',
-      cmd,
-      series: '',
-      forced_storage: 'undefined',
-      disable_ad: '0',
-      download: '0',
-      force_ch_link_check: '0'
-    })
+    const attempts = linkAttempts(cmd, channelId)
+    const refusals: string[] = []
 
-    const answer = text(raw?.['cmd']) ?? text(raw?.['id'])
-    if (!answer) {
-      throw new Error('The portal did not return a link for this channel')
+    for (const attempt of attempts) {
+      const raw = await this.call<Record<string, unknown>>(endpoint, {
+        type: 'itv',
+        action: 'create_link',
+        cmd: attempt.cmd,
+        series: '',
+        forced_storage: 'undefined',
+        disable_ad: '0',
+        download: '0',
+        force_ch_link_check: '0'
+      })
+
+      const answer = text(raw?.['cmd']) ?? text(raw?.['id'])
+      if (!answer) {
+        refusals.push(`${attempt.name}: no link in the answer`)
+        continue
+      }
+
+      const url = stripLinkPrefix(answer)
+      if (!/^https?:\/\//i.test(url)) {
+        refusals.push(`${attempt.name}: not a URL (${url.slice(0, 60)})`)
+        continue
+      }
+
+      // The failure this exists for. A portal that does not recognise the cmd
+      // does not say so: it builds its play URL anyway, with the channel id
+      // left blank, and answers 200. Handed on, that URL reaches ffmpeg, comes
+      // back 4xx, and reads as a dead channel — so the portal looks broken and
+      // the real cause, that we asked in a form it does not use, is invisible.
+      if (hasBlankStreamId(url)) {
+        refusals.push(`${attempt.name}: answered with an empty stream id`)
+        continue
+      }
+
+      if (attempt.name !== 'stored') {
+        log.info(`portal accepted the "${attempt.name}" cmd form for channel ${channelId ?? '?'}`)
+      }
+      return url
     }
 
-    const url = answer.replace(LINK_PREFIX, '').trim()
-    if (!/^https?:\/\//i.test(url)) {
-      throw new Error(`The portal returned something that is not a URL: ${url.slice(0, 80)}`)
-    }
-    return url
+    // Everything here is what the next person needs and cannot get any other
+    // way: the forms tried, what the portal said to each, and the cmd as the
+    // catalogue stored it.
+    throw new Error(
+      `The portal would not turn this channel into a link. Tried ${attempts.length} ` +
+        `form(s): ${refusals.join('; ')}. The stored command was "${cmd.slice(0, 80)}".`
+    )
   }
 
   /**
@@ -552,6 +581,57 @@ export function serialFor(mac: string): string {
   return hex.slice(-13).padStart(13, '0')
 }
 
+/**
+ * The ways a portal might want to be asked for a link, best guess first.
+ *
+ * `create_link` matches the `cmd` against what it has stored, and portals
+ * disagree about what that is. Most want it exactly as the channel list gave
+ * it. Some strip the player hint before storing and will not match a cmd that
+ * still carries one. Some only ever match the canonical form built from the
+ * channel id, whatever they put in the list.
+ *
+ * There is no way to tell which from the outside, and getting it wrong does
+ * not look like an error — see `hasBlankStreamId`. So the forms are tried in
+ * turn, at one small request each, and only on failure.
+ */
+export function linkAttempts(
+  cmd: string,
+  channelId?: string
+): { name: string; cmd: string }[] {
+  const attempts = [{ name: 'stored', cmd }]
+
+  const bare = stripLinkPrefix(cmd)
+  if (bare !== cmd && bare !== '') attempts.push({ name: 'without the player hint', cmd: bare })
+
+  if (channelId) {
+    const canonical = `ffrt http://localhost/ch/${channelId}`
+    if (!attempts.some((attempt) => attempt.cmd === canonical)) {
+      attempts.push({ name: 'rebuilt from the channel id', cmd: canonical })
+    }
+  }
+
+  return attempts
+}
+
+/**
+ * Whether a play URL names no channel.
+ *
+ * `…/play/live.php?mac=…&stream=&extension=ts` is what a portal answers when
+ * it did not recognise the cmd. It is a 200, it looks like a URL, and it is
+ * worthless — the only sign is the empty parameter.
+ */
+export function hasBlankStreamId(url: string): boolean {
+  try {
+    const params = new URL(url).searchParams
+    for (const key of ['stream', 'ch_id', 'channel_id', 'id']) {
+      if (params.has(key) && params.get(key)!.trim() === '') return true
+    }
+    return false
+  } catch {
+    return false
+  }
+}
+
 /** Strips the player hint a portal puts in front of the URL it returns. */
 export function stripLinkPrefix(value: string): string {
   return value.replace(LINK_PREFIX, '').trim()
@@ -719,12 +799,35 @@ function refusalIn(js: unknown): string | null {
   if (!record) return null
 
   const blocked = text(record['block_msg'])
-  if (blocked) return blocked
+  if (blocked) return plainText(blocked)
 
   const error = text(record['error'])
   if (!error) return null
   if (/^(none|0|null|false|ok)$/i.test(error)) return null
-  return error
+  return plainText(error)
+}
+
+/**
+ * A portal message, fit to show someone.
+ *
+ * These are written for the set-top box's own browser, so they arrive as
+ * fragments of HTML — a real one read "Validation error occured.<br />Call
+ * Provider.+972 74 703 3333", and the tag went straight into the dialog. The
+ * message itself is worth showing: it is the provider telling the user what to
+ * do about it.
+ */
+export function plainText(value: string): string {
+  return value
+    .replace(/<br\s*\/?>/gi, ' ')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 /** Names a call in an error, without repeating the whole query string. */

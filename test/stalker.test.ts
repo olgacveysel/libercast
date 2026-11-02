@@ -1,6 +1,9 @@
 import {
   StalkerClient,
   candidateEndpoints,
+  hasBlankStreamId,
+  linkAttempts,
+  plainText,
   isMacAddress,
   listOf,
   normalizeMac,
@@ -133,8 +136,9 @@ async function main(): Promise<void> {
   check('a channel carries its genre', catalogue.channels[0]?.categoryExternalId !== null)
   check('the adult flag survives', catalogue.channels.some((c) => c.isAdult === true))
 
-  const link = await client(portal).streamUrl('ffrt http://localhost/ch/3')
-  check('a link comes back without the player hint', link === 'http://localhost/play/3?token=xyz', link)
+  const link = await client(portal).streamUrl('ffrt http://localhost/ch/3', '3')
+  check('a link comes back without the player hint', !link.startsWith('ffmpeg'), link)
+  check('and it names the channel', link.includes('stream=3'), link)
 
   const epg = await client(portal).shortEpg('1')
   check('the portal guide is read', epg.length === 2, epg)
@@ -208,6 +212,56 @@ async function main(): Promise<void> {
       expiredMessage.toLowerCase().includes('html'), expiredMessage)
   expiring.close()
 
+  console.log('\nWhen a portal will not recognise the command it gave us')
+
+  // Taken from a real portal. Every link it returned had an empty stream id —
+  // a 200, a plausible URL, and nothing playable at the end of it. ffmpeg then
+  // reported a 4xx, which reads as a dead channel rather than as a client
+  // asking in a form the portal does not use.
+  check('a blank id is recognised',
+    hasBlankStreamId('http://h/play/live.php?mac=x&stream=&extension=ts'))
+  check('a real one is not',
+    !hasBlankStreamId('http://h/play/live.php?mac=x&stream=42&extension=ts'))
+  check('a URL with no id parameter at all is not blank',
+    !hasBlankStreamId('http://h/live/42.ts'))
+  check('nor is something unparseable', !hasBlankStreamId('not a url'))
+
+  const forms = linkAttempts('ffrt http://localhost/ch/9', '9')
+  check('the stored form is tried first', forms[0]?.name === 'stored', forms)
+  check('then the same without the player hint',
+    forms[1]?.cmd === 'http://localhost/ch/9', forms)
+  check('a form is never tried twice',
+    new Set(forms.map((f) => f.cmd)).size === forms.length, forms)
+  check('with no channel id there is nothing to rebuild from',
+    linkAttempts('http://localhost/ch/9').length === 1, linkAttempts('http://localhost/ch/9'))
+
+  const bareOnly = await startPortal({ acceptsCmd: 'bare' })
+  const bareLink = await client(bareOnly).streamUrl('ffrt http://localhost/ch/4', '4')
+  check('a portal that wants the bare command is accommodated',
+    bareLink.includes('stream=4'), bareLink)
+  bareOnly.close()
+
+  const canonicalOnly = await startPortal({ acceptsCmd: 'canonical' })
+  const rebuilt = await client(canonicalOnly).streamUrl('http://cdn.example/stream/4.ts', '4')
+  check('and so is one that only matches a command rebuilt from the id',
+    rebuilt.includes('stream=4'), rebuilt)
+  canonicalOnly.close()
+
+  const hopeless = await startPortal({ acceptsCmd: 'canonical' })
+  let linkError = ''
+  try {
+    await client(hopeless).streamUrl('http://cdn.example/stream/4.ts')
+  } catch (error) {
+    linkError = error instanceof Error ? error.message : String(error)
+  }
+  hopeless.close()
+  check('when no form works it fails rather than returning a dead URL',
+    linkError !== '', linkError)
+  check('saying what the portal did with each form',
+    linkError.includes('empty stream id'), linkError)
+  check('and quoting the command the catalogue stored',
+    linkError.includes('cdn.example'), linkError)
+
   console.log('\nWhen a portal names its fields differently')
 
   // The reason this section exists: this adapter cannot be checked against a
@@ -238,6 +292,19 @@ async function main(): Promise<void> {
     warnings.some((w) => w.includes('channel_id') && w.includes('stream_cmd')), warnings)
   check('and what a channel needs instead',
     warnings.some((w) => w.includes('id, a name and a cmd')), warnings)
+
+  console.log('\nShowing a portal\'s own words to the user')
+
+  // Verbatim from a real portal. The message is worth showing — it is the
+  // provider saying what to do — but it arrives as a fragment of HTML and went
+  // into the dialog with the tag still in it.
+  check('a tag becomes a space',
+    plainText('Validation error occured.<br />Call Provider.+972 74 703 3333') ===
+      'Validation error occured. Call Provider.+972 74 703 3333',
+    plainText('Validation error occured.<br />Call Provider.+972 74 703 3333'))
+  check('entities are decoded', plainText('Tom &amp; Jerry') === 'Tom & Jerry')
+  check('plain text is left alone', plainText('Account expired') === 'Account expired')
+  check('and runs of space are collapsed', plainText('a  \n  b') === 'a b')
 
   console.log('\nThe MAC never reaches the log')
 

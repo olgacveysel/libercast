@@ -120,7 +120,16 @@ export async function resolveProviderStream(source: StreamSource): Promise<Provi
   }
 
   const channel = getChannel(source.id)
-  if (!channel) throw new Error('Channel not found')
+  if (!channel) {
+    // Channel ids survive a re-sync — they are keyed on the provider's own id
+    // — so a missing one means the provider stopped listing it, or the source
+    // was removed. "Channel not found" is true and tells the user nothing they
+    // can act on.
+    throw new Error(
+      'That channel is no longer in this source. The provider may have dropped it, ' +
+        'or the source was removed — sync it again, or pick another channel.'
+    )
+  }
 
   const playlist = getPlaylist(channel.playlistId)
   if (!playlist) throw new Error('Playlist not found')
@@ -163,7 +172,10 @@ export async function resolveProviderStream(source: StreamSource): Promise<Provi
   // on some portals works exactly once.
   if (playlist.kind === 'stalker') {
     if (!url) throw new Error('This channel has no portal command saved. Re-sync the source.')
-    url = await stalkerClientFor(playlist).streamUrl(url)
+    // The external id goes with it: when a portal does not recognise the cmd
+    // from its own channel list, rebuilding one from the id is the form that
+    // tends to work, and only the catalogue knows that id.
+    url = await stalkerClientFor(playlist).streamUrl(url, channel.externalId)
 
     return {
       url,

@@ -41,6 +41,14 @@ export interface PortalOptions {
    * rows arrive, and none of them is a channel this client recognises.
    */
   oddFieldNames?: boolean
+  /**
+   * Which `cmd` form this portal will actually match.
+   *
+   * The real failure this models: a portal that does not recognise the cmd
+   * still answers 200 with a play URL — it just leaves the channel id out of
+   * it. Nothing about the response says anything went wrong.
+   */
+  acceptsCmd?: 'stored' | 'bare' | 'canonical'
 }
 
 export interface Portal {
@@ -69,6 +77,7 @@ export function startPortal(options: PortalOptions = {}): Promise<Portal> {
     linkPrefix: 'ffmpeg ',
     noAccountInfo: false,
     oddFieldNames: false,
+    acceptsCmd: 'stored' as const,
     mac: MAC,
     ...options
   }
@@ -209,8 +218,25 @@ export function startPortal(options: PortalOptions = {}): Promise<Portal> {
 
     if (action === 'create_link') {
       const cmd = params.get('cmd') ?? ''
-      const id = (cmd.match(/\/ch\/(\d+)/) ?? [])[1] ?? '0'
-      send({ id: 1, cmd: `${config.linkPrefix}http://localhost/play/${id}?token=xyz` })
+      const id = (cmd.match(/\/ch\/(\d+)/) ?? [])[1] ?? ''
+
+      const hinted = /^\s*(ffmpeg|ffrt\d*|auto)\s+/i.test(cmd)
+      const canonical = cmd.includes('localhost/ch/')
+      const matches =
+        config.acceptsCmd === 'stored'
+          ? true
+          : config.acceptsCmd === 'bare'
+            ? !hinted
+            : canonical && hinted
+
+      // Not an error, and that is the point: the id is simply missing from the
+      // URL, and everything else looks exactly like success.
+      const stream = matches ? id : ''
+      send({
+        id: 1,
+        cmd: `${config.linkPrefix}http://localhost/play/live.php?mac=${config.mac}` +
+          `&stream=${stream}&extension=ts&play_token=abc123`
+      })
       return
     }
 
