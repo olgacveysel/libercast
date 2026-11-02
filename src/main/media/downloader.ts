@@ -177,7 +177,7 @@ class Downloader {
     let startAt = 0
 
     try {
-      const provider = resolveProviderStream(
+      const provider = await resolveProviderStream(
         download.itemType === 'episode'
           ? { type: 'episode', id: download.itemId }
           : { type: 'channel', id: download.itemId }

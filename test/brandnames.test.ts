@@ -34,7 +34,12 @@ const FORBIDDEN: { name: string; pattern: RegExp }[] = [
   { name: 'beIN', pattern: /\bbein(?![a-z])/i },
   { name: 'BBC', pattern: /\bbbc/i },
   { name: 'Sky Sports', pattern: /\bsky[ -]?sports?\b/i },
-  { name: 'ITV', pattern: /\bitv\b/i },
+  // Case-sensitive, alone among these. Stalker portals use `itv` as a protocol
+  // literal — it stands for "internet TV" and is the required value of the
+  // `type` parameter on every live-channel call, so it appears throughout
+  // src/main/sources/stalker.ts and cannot be renamed. The broadcaster is
+  // written in capitals wherever anyone would mean the broadcaster.
+  { name: 'ITV', pattern: /\bITV\b/ },
   { name: 'Meridian (ITV region)', pattern: /\bmeridian\b/i },
   { name: 'Discovery Channel', pattern: /\bdiscovery channel\b/i },
   { name: 'CNN', pattern: /\bcnn\b/i },

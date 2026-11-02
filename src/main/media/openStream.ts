@@ -164,7 +164,7 @@ export async function openStream(request: StreamRequest): Promise<OpenResult> {
       candidate.channelId === -1 ? request.source : ({ type: 'channel', id: candidate.channelId } as const)
 
     try {
-      const provider = resolveProviderStream(source)
+      const provider = await resolveProviderStream(source)
       const session = await streamServer.open({
         url: provider.url,
         alternates: provider.alternates,

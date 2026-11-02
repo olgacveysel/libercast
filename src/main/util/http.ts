@@ -7,6 +7,14 @@ export interface FetchOptions {
   referrer?: string | null
   timeoutMs?: number
   signal?: AbortSignal
+  /**
+   * Extra headers, merged over the defaults.
+   *
+   * A Stalker portal authenticates with a `Cookie` carrying the MAC address
+   * and an `Authorization` bearer token, neither of which any other source
+   * needs — so they are passed in rather than built into the defaults.
+   */
+  headers?: Record<string, string>
 }
 
 const DEFAULT_UA =
@@ -18,7 +26,7 @@ export function buildHeaders(options: FetchOptions = {}): Record<string, string>
     Accept: '*/*'
   }
   if (options.referrer) headers['Referer'] = options.referrer
-  return headers
+  return { ...headers, ...(options.headers ?? {}) }
 }
 
 /**
@@ -88,5 +96,15 @@ export function redact(url: string): string {
       // The same panels also serve the playlist and the guide as
       // /get.php?username=…, and timeshift as /timeshift/<user>/<pass>/…
       .replace(/\/timeshift\/[^/\s]+\/[^/\s]+\//gi, '/timeshift/***/***/')
+      // On a Stalker portal the MAC address *is* the credential: it is the
+      // whole of the authentication, it is what the provider sells, and it
+      // arrives in a cookie, in a query string and in the play URL the portal
+      // hands back. Anyone holding it holds the subscription.
+      //
+      // Matched as a bare address anywhere in the line rather than only after
+      // `mac=`, because it also turns up in the cookie header and in error
+      // text quoting a request. The separator may be a colon, a dash or the
+      // URL-encoded `%3A` the portal's own cookie uses.
+      .replace(/\b(?:[0-9a-f]{2}(?::|-|%3a)){5}[0-9a-f]{2}\b/gi, '**:**:**:**:**:**')
   )
 }

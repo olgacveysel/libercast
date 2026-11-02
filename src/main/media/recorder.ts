@@ -142,7 +142,7 @@ class Recorder {
   private async spawn(recording: Recording): Promise<void> {
     if (recording.channelId === null) throw new Error('Recording has no channel')
 
-    const provider = resolveProviderStream({ type: 'channel', id: recording.channelId })
+    const provider = await resolveProviderStream({ type: 'channel', id: recording.channelId })
     const codecs = await probeStream(provider.url, {
       userAgent: provider.userAgent,
       referrer: provider.referrer

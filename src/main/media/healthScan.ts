@@ -69,11 +69,12 @@ export async function scanFavorites(
 }
 
 async function check(channelId: number, name: string): Promise<ChannelHealth> {
-  let stream: ReturnType<typeof resolveProviderStream>
+  let stream: Awaited<ReturnType<typeof resolveProviderStream>>
   try {
-    // Resolving can fail on its own — a channel whose playlist was removed, or
-    // an Xtream account that no longer authenticates.
-    stream = resolveProviderStream({ type: 'channel', id: channelId })
+    // Resolving can fail on its own — a channel whose playlist was removed, an
+    // Xtream account that no longer authenticates, or a portal that will not
+    // hand out a link for this channel.
+    stream = await resolveProviderStream({ type: 'channel', id: channelId })
   } catch (error) {
     return { channelId, name, ok: false, reason: errorMessage(error), checkedAt: Date.now() }
   }

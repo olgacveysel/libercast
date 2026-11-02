@@ -5,7 +5,7 @@ import { getPlaylist } from '@main/db/repo/playlists'
 import { getDownload } from '@main/db/repo/downloads'
 import { getRecording } from '@main/db/repo/recordings'
 import { getEpisode } from '@main/db/repo/vod'
-import { xtreamClientFor } from '@main/sources'
+import { stalkerClientFor, xtreamClientFor } from '@main/sources'
 
 export interface ProviderStream {
   url: string
@@ -52,9 +52,16 @@ function withOtherExtensions(url: string, extension: string): string[] {
  * Turns a UI-level reference into the real provider URL.
  *
  * This runs in the main process only, and its result is deliberately never sent
- * to the renderer: for Xtream sources the URL embeds the account password.
+ * to the renderer: for Xtream sources the URL embeds the account password, and
+ * for Stalker portals it is a signed link tied to the MAC.
+ *
+ * Asynchronous because of those portals. Every other source can build a URL
+ * from what is already in the database; a Stalker channel holds a `cmd` rather
+ * than an address, and the portal has to be asked to turn it into a link that
+ * works for the next few minutes. There is no version of that which is not a
+ * network round trip at the moment of pressing play.
  */
-export function resolveProviderStream(source: StreamSource): ProviderStream {
+export async function resolveProviderStream(source: StreamSource): Promise<ProviderStream> {
   if (source.type === 'recording') {
     const recording = getRecording(source.id)
     if (!recording?.filePath) throw new Error('Recording file is missing')
@@ -150,6 +157,24 @@ export function resolveProviderStream(source: StreamSource): ProviderStream {
   let url = channel.streamUrl
   let alternates: string[] = []
   const isLive = channel.kind === 'live'
+
+  // A portal channel stores the `cmd` the portal gave us, not an address. The
+  // link is fetched now, used now, and never stored: it expires in minutes and
+  // on some portals works exactly once.
+  if (playlist.kind === 'stalker') {
+    if (!url) throw new Error('This channel has no portal command saved. Re-sync the source.')
+    url = await stalkerClientFor(playlist).streamUrl(url)
+
+    return {
+      url,
+      userAgent: playlist.userAgent,
+      referrer: playlist.referrer,
+      label: channel.name,
+      durationSecs: null,
+      isLive,
+      alternates: []
+    }
+  }
 
   // Xtream URLs are rebuilt on demand rather than stored, so the password is
   // never written to the database and a password change needs no re-sync.

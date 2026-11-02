@@ -8,6 +8,7 @@ import { createLogger, errorMessage } from '@main/util/logger'
 import type { FetchOptions } from '@main/util/http'
 import { loadM3u } from './m3u'
 import { XtreamClient } from './xtream'
+import { StalkerClient, isMacAddress, normalizeMac } from './stalker'
 
 const log = createLogger('sync')
 
@@ -26,6 +27,44 @@ export function xtreamClientFor(playlist: Playlist): XtreamClient {
     { baseUrl: playlist.url, username: playlist.username, password },
     fetchOptions(playlist)
   )
+}
+
+/**
+ * The portal client for a source, kept between plays.
+ *
+ * Unlike the Xtream client, which is a URL builder and costs nothing to make,
+ * this one holds a session: a handshake token and the endpoint that answered.
+ * Rebuilding it per play would mean two extra round trips every time someone
+ * changes channel, so it is cached — and dropped the moment the credentials or
+ * the address change, because a cached session for the wrong account is worse
+ * than no cache at all.
+ */
+const portals = new Map<number, { key: string; client: StalkerClient }>()
+
+export function stalkerClientFor(playlist: Playlist): StalkerClient {
+  if (playlist.kind !== 'stalker') throw new Error('Playlist is not a Stalker portal')
+  if (!playlist.url) throw new Error('The portal address is missing')
+  if (!playlist.macAddress) throw new Error('This portal has no MAC address saved')
+
+  const key = `${playlist.url}|${playlist.macAddress}|${playlist.serverTimezone ?? ''}`
+  const cached = portals.get(playlist.id)
+  if (cached && cached.key === key) return cached.client
+
+  const client = new StalkerClient(
+    {
+      portalUrl: playlist.url,
+      macAddress: playlist.macAddress,
+      timezone: playlist.serverTimezone
+    },
+    fetchOptions(playlist)
+  )
+  portals.set(playlist.id, { key, client })
+  return client
+}
+
+/** Drops a cached portal session, for a source that was edited or removed. */
+export function forgetPortal(playlistId: number): void {
+  portals.delete(playlistId)
 }
 
 /**
@@ -69,6 +108,28 @@ export async function testSource(draft: PlaylistDraft): Promise<XtreamAccountInf
       { userAgent: draft.userAgent, referrer: draft.referrer, timeoutMs: 60_000 }
     )
     if (catalog.channels.length === 0) throw new Error('Playlist parsed but contained no channels')
+    return null
+  }
+
+  if (draft.kind === 'stalker') {
+    if (!draft.url) throw new Error('The portal address is required')
+    if (!draft.macAddress) throw new Error('The MAC address your provider gave you is required')
+    if (!isMacAddress(draft.macAddress)) {
+      throw new Error(
+        'That does not look like a MAC address. It should be twelve hexadecimal ' +
+          'digits, usually written like 00:1A:79:12:34:56.'
+      )
+    }
+
+    const client = new StalkerClient(
+      {
+        portalUrl: draft.url,
+        macAddress: normalizeMac(draft.macAddress),
+        timezone: null
+      },
+      { userAgent: draft.userAgent, referrer: draft.referrer, timeoutMs: 25_000 }
+    )
+    await client.authenticate()
     return null
   }
 
@@ -141,7 +202,36 @@ export async function syncPlaylist(playlistId: number, onProgress: ProgressSink)
         result.categories += counts.categories
       }
     } else {
-      throw new Error('Stalker portal sync is not implemented yet')
+      emit('connecting', 'Signing in to the portal…', 0.05)
+      const client = stalkerClientFor(playlist)
+      await client.authenticate()
+
+      emit('live', 'Loading channels…', 0.2)
+      const catalog = await client.liveCatalog((loaded, total) => {
+        const ratio = total && total > 0 ? Math.min(loaded / total, 1) : null
+        emit(
+          'live',
+          total ? `Loading channels… ${loaded} of ${total}` : `Loading channels… ${loaded}`,
+          ratio === null ? null : 0.2 + ratio * 0.6
+        )
+      })
+
+      // A portal that signs in and then lists nothing is not a working sync.
+      // It means the subscription is empty, expired, or bound to a different
+      // device — and reporting "0 channels, done" would send the user looking
+      // at this application instead of at their provider.
+      if (catalog.channels.length === 0) {
+        throw new Error(
+          'The portal signed in but offered no channels. The subscription may have ' +
+            'expired, or it may be registered to a different MAC address.'
+        )
+      }
+
+      emit('saving', `Saving ${catalog.channels.length} channels…`, 0.9)
+      const counts = importCatalog(playlistId, 'live', catalog.categories, catalog.channels)
+      result.categories = counts.categories
+      result.liveChannels = counts.channels
+      result.removed = counts.removed
     }
 
     markSynced(playlistId)

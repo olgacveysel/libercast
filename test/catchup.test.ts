@@ -160,7 +160,12 @@ check('and a channel without one keeps zero', plain.catchupDays === 0, plain.cat
 
 const started = Date.now() - 3 * 3_600_000
 const window = { startsAt: started, endsAt: started + 3_600_000 }
-const resolved = resolveProviderStream({ type: 'catchup', id: archived.id, ...window })
+
+// Resolving became asynchronous when Stalker portals arrived: a portal channel
+// has no address until the portal is asked for one. Nothing here needs the
+// network — these are Xtream URLs built locally — but the signature is shared.
+async function main(): Promise<void> {
+const resolved = await resolveProviderStream({ type: 'catchup', id: archived.id, ...window })
 
 check('it asks the timeshift endpoint', resolved.url.includes('timeshift.php'), resolved.url)
 check('with the stream id', resolved.url.includes('stream=501'), resolved.url)
@@ -182,27 +187,39 @@ check('the label says what it is', resolved.label.includes('catch-up'), resolved
 
 console.log('\nWhat it refuses')
 
-const refuses = (source: Parameters<typeof resolveProviderStream>[0]): string | null => {
+const refuses = async (
+  source: Parameters<typeof resolveProviderStream>[0]
+): Promise<string | null> => {
   try {
-    resolveProviderStream(source)
+    await resolveProviderStream(source)
     return null
   } catch (error) {
     return error instanceof Error ? error.message : String(error)
   }
 }
 
+const noArchive = await refuses({ type: 'catchup', id: plain.id, ...window })
 check('a channel with no archive is refused',
-  refuses({ type: 'catchup', id: plain.id, ...window })?.includes('no catch-up') === true,
-  refuses({ type: 'catchup', id: plain.id, ...window }))
+  noArchive?.includes('no catch-up') === true, noArchive)
 
 const tooOld = Date.now() - 9 * 24 * 3_600_000
+const stale = await refuses({
+  type: 'catchup', id: archived.id, startsAt: tooOld, endsAt: tooOld + 3_600_000
+})
 check('a programme older than the window is refused',
-  refuses({ type: 'catchup', id: archived.id, startsAt: tooOld, endsAt: tooOld + 3_600_000 })
-    ?.includes('outside the archive') === true)
+  stale?.includes('outside the archive') === true, stale)
 
 const future = Date.now() + 3_600_000
-check('a programme that has not finished is refused',
-  refuses({ type: 'catchup', id: archived.id, startsAt: future, endsAt: future + 3_600_000 }) !== null)
+const unfinished = await refuses({
+  type: 'catchup', id: archived.id, startsAt: future, endsAt: future + 3_600_000
+})
+check('a programme that has not finished is refused', unfinished !== null, unfinished)
 
 console.log(failures === 0 ? '\ncatchup: all passed' : `\ncatchup: ${failures} failed`)
 process.exit(failures === 0 ? 0 : 1)
+}
+
+void main().catch((error) => {
+  console.error('\nTest run threw:', error)
+  process.exit(1)
+})

@@ -32,6 +32,7 @@ export function AddSourceDialog({ onClose, onCreated }: Props): JSX.Element {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [filePath, setFilePath] = useState<string | null>(null)
+  const [macAddress, setMacAddress] = useState('')
   const [status, setStatus] = useState<Status>({ kind: 'idle' })
   const [saving, setSaving] = useState(false)
 
@@ -41,13 +42,16 @@ export function AddSourceDialog({ onClose, onCreated }: Props): JSX.Element {
     url: url.trim(),
     filePath,
     username: username.trim() || null,
-    password: password || null
+    password: password || null,
+    macAddress: macAddress.trim() || null
   })
 
   const canSubmit =
     kind === 'xtream'
       ? url.trim() !== '' && username.trim() !== '' && password !== ''
-      : url.trim() !== '' || filePath !== null
+      : kind === 'stalker'
+        ? url.trim() !== '' && looksLikeMac(macAddress)
+        : url.trim() !== '' || filePath !== null
 
   const test = async (): Promise<void> => {
     setStatus({ kind: 'testing' })
@@ -97,6 +101,9 @@ export function AddSourceDialog({ onClose, onCreated }: Props): JSX.Element {
             <button aria-pressed={kind === 'm3u'} onClick={() => setKind('m3u')}>
               {t('source.m3u')}
             </button>
+            <button aria-pressed={kind === 'stalker'} onClick={() => setKind('stalker')}>
+              {t('source.stalker')}
+            </button>
           </div>
 
           <div className="field">
@@ -106,7 +113,7 @@ export function AddSourceDialog({ onClose, onCreated }: Props): JSX.Element {
             <input
               id="src-name"
               className="input"
-              placeholder={kind === 'xtream' ? t('source.nameProvider') : t('source.namePlaylist')}
+              placeholder={kind === 'm3u' ? t('source.namePlaylist') : t('source.nameProvider')}
               value={name}
               onChange={(event) => setName(event.target.value)}
             />
@@ -176,6 +183,48 @@ export function AddSourceDialog({ onClose, onCreated }: Props): JSX.Element {
                   {t(credentialHintKey(storage) as TranslationKey)}
                 </span>
               )}
+            </>
+          ) : kind === 'stalker' ? (
+            <>
+              <div className="field">
+                <label className="field__label" htmlFor="src-portal">
+                  {t('source.portalUrl')}
+                </label>
+                <input
+                  id="src-portal"
+                  className="input"
+                  placeholder="http://example.com:8080/c/"
+                  value={url}
+                  onChange={(event) => setUrl(event.target.value)}
+                  spellCheck={false}
+                />
+                <span className="field__hint">{t('source.portalUrlHint')}</span>
+              </div>
+
+              <div className="field">
+                <label className="field__label" htmlFor="src-mac">
+                  {t('source.macAddress')}
+                </label>
+                <input
+                  id="src-mac"
+                  className="input"
+                  placeholder="00:1A:79:00:00:00"
+                  value={macAddress}
+                  onChange={(event) => setMacAddress(event.target.value)}
+                  spellCheck={false}
+                  autoComplete="off"
+                />
+                {/*
+                  The MAC is the entire authentication on a portal — there is
+                  no password — so this says plainly that it has to come from
+                  the provider. LiberCast will not invent one: a MAC that was
+                  not issued to you belongs to someone else's subscription.
+                */}
+                <span className="field__hint">{t('source.macAddressHint')}</span>
+                {macAddress.trim() !== '' && !looksLikeMac(macAddress) && (
+                  <span className="field__hint field__hint--warn">{t('source.macAddressBad')}</span>
+                )}
+              </div>
             </>
           ) : (
             <>
@@ -258,6 +307,16 @@ export function AddSourceDialog({ onClose, onCreated }: Props): JSX.Element {
       </div>
     </div>
   )
+}
+
+/**
+ * Twelve hexadecimal digits, however they were separated.
+ *
+ * Only a shape check. Whether the portal knows this MAC is the portal's
+ * business, and the Test button is what asks it.
+ */
+function looksLikeMac(value: string): boolean {
+  return /^[0-9a-f]{12}$/i.test(value.replace(/[^0-9a-f]/gi, ''))
 }
 
 function hostOf(value: string): string {
