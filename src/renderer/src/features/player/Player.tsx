@@ -23,6 +23,7 @@ import { SleepMenu } from './SleepMenu'
 import { nextFit, videoFitStyle } from './videoFit'
 import { useT } from '@renderer/i18n'
 import { StreamStats } from './StreamStats'
+import { AlternatePrompt } from './AlternatePrompt'
 import { SwitchedNotice } from './SwitchedNotice'
 import { useHotkeys } from './useHotkeys'
 import { stepVolume } from '@renderer/features/player/volume'
@@ -91,7 +92,7 @@ export function Player({
   // the previous channel would be asked of the new one.
   useEffect(() => setReplay(null), [channel?.id])
 
-  const { videoRef, state, reload } = useStream({
+  const { videoRef, state, reload, approveAlternate, rejectAlternates, dismissChoice } = useStream({
     source: channel
       ? replay
         ? { type: 'catchup', id: channel.id, startsAt: replay.startsAt, endsAt: replay.endsAt }
@@ -219,7 +220,24 @@ export function Player({
           </div>
         )}
 
-        <SwitchedNotice switched={state.switched} />
+        {state.choice && (
+          <AlternatePrompt
+            choice={state.choice}
+            onPlay={approveAlternate}
+            onDismiss={dismissChoice}
+            onNever={() => {
+              // Refusing the whole list is one answer, not several: the user
+              // has looked at these names and none of them is their channel.
+              rejectAlternates((state.choice?.offers ?? []).map((offer) => offer.channelId))
+              dismissChoice()
+            }}
+          />
+        )}
+
+        <SwitchedNotice
+          switched={state.switched}
+          onWrongChannel={(alternateChannelId) => rejectAlternates([alternateChannelId])}
+        />
 
         <StreamStats
           videoRef={videoRef}

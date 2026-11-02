@@ -25,7 +25,67 @@ const outputPath = join(root, 'resources', 'eula.txt')
 const { version } = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
 const template = readFileSync(templatePath, 'utf8')
 
-const notice = template.replaceAll('{{version}}', version)
+/**
+ * The paragraphs that are not true on every platform.
+ *
+ * Where passwords go, where the data folder is, and what the operating system
+ * says about an unsigned build all differ — and the notice is the one document
+ * someone reads before deciding to trust the thing, so getting it wrong there
+ * is worse than not saying it.
+ *
+ * The Linux wording is deliberately conditional: `safeStorage` falls back to a
+ * key compiled into Chromium when no keyring is present, which is not
+ * encryption, and the application now says so in its own interface too.
+ */
+const PLATFORMS = {
+  win32: {
+    passwords:
+      'Your provider passwords are encrypted with Windows DPAPI, tied to the Windows\n' +
+      'account you are signed in as, and kept in your own user profile:',
+    datafolder: '%APPDATA%\\LiberCast',
+    signing:
+      'Windows will warn you that the publisher is unknown, because this beta carries\n' +
+      'no code-signing certificate. Only install it if you obtained it directly from\n' +
+      'the author.'
+  },
+  linux: {
+    passwords:
+      'Your provider passwords are handed to your desktop keyring where there is one\n' +
+      '(GNOME Keyring or KWallet). Where there is not, they are stored unencrypted,\n' +
+      'readable by anything running as you, and the application says so when you add\n' +
+      'a source. Either way they stay in your own home directory:',
+    datafolder: '~/.config/LiberCast',
+    signing:
+      'This build is not signed. Nothing verifies that it came from the author, so\n' +
+      'only run it if you obtained it directly from them. The AppImage must also be\n' +
+      'made executable before it will run: chmod +x LiberCast-*.AppImage'
+  },
+  darwin: {
+    passwords:
+      'Your provider passwords are stored in the macOS Keychain, under the account\n' +
+      'you are signed in as. Everything else lives in your own library folder:',
+    datafolder: '~/Library/Application Support/LiberCast',
+    signing:
+      'This build is neither signed nor notarised, so macOS will refuse to open it\n' +
+      'normally. Only run it if you obtained it directly from the author.'
+  }
+}
+
+const target = process.argv[2] ?? 'win32'
+const platform = PLATFORMS[target]
+if (!platform) {
+  throw new Error(`No installer notice written for ${target}; known: ${Object.keys(PLATFORMS).join(', ')}`)
+}
+
+const notice = Object.entries({ version, ...platform }).reduce(
+  (text, [key, value]) => text.replaceAll(`{{${key}}}`, value),
+  template
+)
+
+const unfilled = notice.match(/\{\{[a-z]+\}\}/i)
+if (unfilled) {
+  throw new Error(`The installer notice still contains ${unfilled[0]} after filling it in.`)
+}
 
 const offending = [...notice].find((character) => character.charCodeAt(0) > 127)
 if (offending !== undefined) {
@@ -39,4 +99,4 @@ if (offending !== undefined) {
 // text control.
 writeFileSync(outputPath, notice.replace(/\r?\n/g, '\r\n'), 'ascii')
 
-console.log(`installer notice written for ${version}`)
+console.log(`installer notice written for ${version} on ${target}`)

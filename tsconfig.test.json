@@ -1,0 +1,23 @@
+{
+  // The tests were the one part of this repository TypeScript never looked at.
+  //
+  // `test/run.mjs` bundles them with esbuild, which strips types without
+  // checking them, so a test could access the wrong branch of a union and only
+  // say so at runtime — as a crash partway through a file, which takes every
+  // assertion after it down with it and reports as one failure with a stack
+  // trace. Checking them is how a mistake in the tests looks like a mistake in
+  // the tests.
+  "extends": "@electron-toolkit/tsconfig/tsconfig.node.json",
+  "include": ["test/**/*.ts"],
+  "compilerOptions": {
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "@shared/*": ["src/shared/*"],
+      "@main/*": ["src/main/*"],
+      "@renderer/*": ["src/renderer/src/*"]
+    }
+  }
+}

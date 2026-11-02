@@ -1,3 +1,4 @@
+import type { CredentialStorage } from '@shared/credentialStorage'
 import type { AvailableUpdate } from '@shared/releases'
 import type {
   AppSettings,
@@ -41,7 +42,7 @@ import type {
   SeriesEpisode,
   SeriesSeason,
   StreamRequest,
-  StreamSession,
+  StreamOpenResult,
   StreamSource,
   SyncProgress,
   SyncResult,
@@ -87,7 +88,9 @@ export interface IpcContract {
    * Opens a playback session. The renderer receives only a loopback URL — the
    * provider URL, which carries the Xtream password, stays in the main process.
    */
-  'stream:open': { req: StreamRequest; res: StreamSession }
+  'stream:open': { req: StreamRequest; res: StreamOpenResult }
+  /** Records that an offered alternate is not the channel the user asked for. */
+  'failover:reject': { req: { channelId: number; alternateId: number }; res: void }
   'stream:close': { req: string; res: void }
 
   'media:capabilities': { req: void; res: MediaCapabilities }
@@ -145,6 +148,9 @@ export interface IpcContract {
     req: { playlistId?: number; merge?: boolean; query: string; limit?: number }
     res: SearchResults
   }
+
+  /** What is protecting stored provider passwords on this machine. */
+  'app:credentialStorage': { req: void; res: CredentialStorage }
 
   'parental:status': { req: void; res: ParentalStatus }
   'parental:setPin': { req: { currentPin: string | null; newPin: string }; res: ParentalStatus }
@@ -275,6 +281,7 @@ export const IPC_CHANNELS: IpcChannel[] = [
   'vod:nextEpisode',
   'vod:previousEpisode',
   'stream:open',
+  'failover:reject',
   'stream:close',
   'media:capabilities',
   'downloads:list',
@@ -330,6 +337,7 @@ export const IPC_CHANNELS: IpcChannel[] = [
   'app:version',
   'app:showLogs',
   'app:checkUpdate',
+  'app:credentialStorage',
   'health:scanFavorites',
   'health:cancel',
   'multiview:detach',
@@ -390,7 +398,7 @@ export type {
   SeriesEpisode,
   SeriesSeason,
   StreamRequest,
-  StreamSession,
+  StreamOpenResult,
   StreamSource,
   SyncProgress,
   SyncResult,

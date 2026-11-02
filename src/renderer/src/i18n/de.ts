@@ -113,6 +113,13 @@ export const de: Record<TranslationKey, string> = {
   'catchup.replaying': '{title} wird erneut abgespielt',
   'catchup.backToLive': 'Zurück zu Live',
   'player.switchedSource': '{from} lief nicht — zu {to} gewechselt',
+  'player.alternateTitle': '{channel} lief nicht',
+  'player.alternateBody': 'Eine andere Quelle hat einen Kanal mit ähnlichem Namen. Die Namen sind nicht identisch — prüfe ihn vor dem Abspielen, denn ein Wort wie ein Land oder eine Region bedeutet meist einen anderen Feed.',
+  'player.alternatePlay': 'Diesen spielen',
+  'player.alternateOn': 'bei {source}',
+  'player.alternateNone': 'Keiner davon',
+  'player.alternateNever': 'Nie wieder anbieten',
+  'player.switchedWrong': 'Falscher Kanal',
   'player.audio': 'Ton',
   'player.subtitles': 'Untertitel',
   'player.speed': 'Tempo',
@@ -289,8 +296,13 @@ export const de: Record<TranslationKey, string> = {
   'settings.frugalNote':
     'So oder so wird gemerkt, was ein Stream ist. Beim zweiten Mal kostet alles nur noch eine Verbindung. Die Menüs für Ton und Untertitel bleiben bei einem Live-Sender leer, bis er einmal lief.',
   'settings.failover': 'Bei Ausfall von einer anderen Quelle spielen',
-  'settings.failoverBody':
-    'Mit mehr als einer Quelle wird ein Live-Sender, der nicht startet — oder mittendrin abbricht — bei deinen anderen Anbietern gesucht und von dort gespielt. Sendernummern werden beachtet, ein Sender mit der 2 landet also nie bei der 4. Ein kurzer Hinweis nennt die Quelle, die übernommen hat. Aus, wenn nur die gewählte Quelle Verbindungen kosten soll.',
+  'settings.failoverBody': 'Mit mehr als einer Quelle kann ein Live-Kanal, der nicht startet — oder mittendrin abbricht — stattdessen von einem deiner anderen Anbieter gespielt werden. Zwei Anbieter schreiben einen Kanal selten gleich, deshalb geht es in dieser Einstellung darum, wie sicher die Namen sein müssen, bevor etwas ungefragt gespielt wird.',
+  'settings.failoverAsk': 'Wechseln wenn sicher, sonst fragen',
+  'settings.failoverConfident': 'Nur wechseln wenn sicher',
+  'settings.failoverOff': 'Nie wechseln',
+  'settings.failoverAskNote': 'Ein identischer Name — HD, 4K und Ähnliches ausgenommen — wird sofort gespielt, und ein kurzer Hinweis nennt die Quelle, die übernommen hat. Ein nur ähnlicher Name wird dir zuerst gezeigt, denn "Alto Sports 2" und "Alto Sports 2 Turkey" unterscheiden sich um ein Wort und sind verschiedene Kanäle. Sag einmal, dass ein Name falsch ist, und er wird für diesen Kanal nie wieder angeboten.',
+  'settings.failoverConfidentNote': 'Gespielt wird nur ein Kanal mit identischem Namen — HD, 4K und Ähnliches ausgenommen. Nichts unterbricht dich, und ein Kanal, den dein anderer Anbieter anders schreibt, wird nicht gefunden.',
+  'settings.failoverOffNote': 'Verbindungen werden nur für die von dir gewählte Quelle verbraucht. Ein Kanal, der nicht startet, meldet stattdessen den Fehler.',
   'settings.refreshEvery': 'Quellen aktualisieren alle',
   'settings.refreshEveryBody':
     'Standardmäßig aus. Eine Aktualisierung spricht mit deinem Anbieter und wird übersprungen, solange etwas läuft — sie kann einem Stream also nie die Verbindung wegnehmen.',
@@ -405,8 +417,18 @@ export const de: Record<TranslationKey, string> = {
   'source.serverUrlHint':
     'Füge den Host ein, den dein Anbieter genannt hat. Ein angehängter Pfad wird automatisch entfernt.',
   'source.password': 'Passwort',
-  'source.passwordHint':
-    'Das Passwort wird mit Windows DPAPI verschlüsselt und verlässt diesen Rechner nie.',
+  'source.password.dpapi':
+    'Das Passwort wird mit Windows DPAPI verschlüsselt, an dein Windows-Konto gebunden, und verlässt diesen Rechner nie.',
+  'source.password.keychain':
+    'Das Passwort liegt im macOS-Schlüsselbund und verlässt diesen Rechner nie.',
+  'source.password.libsecret':
+    'Das Passwort liegt im Schlüsselbund deiner Desktop-Umgebung und verlässt diesen Rechner nie.',
+  'source.password.kwallet':
+    'Das Passwort liegt in KWallet und verlässt diesen Rechner nie.',
+  'source.password.plain':
+    'Auf diesem Desktop ist kein Schlüsselbund verfügbar, deshalb liegt das Passwort unverschlüsselt im Datenordner von LiberCast — lesbar für alles, was unter deinem Konto läuft. Es verlässt diesen Rechner trotzdem nie.',
+  'source.password.none':
+    'Dieses System bietet keine sichere Ablage, deshalb liegt das Passwort unverschlüsselt im Datenordner von LiberCast — lesbar für alles, was unter deinem Konto läuft. Es verlässt diesen Rechner trotzdem nie.',
   'source.playlistUrl': 'Listen-URL',
   'source.orLocalFile': '…oder eine lokale Datei',
   'source.browse': 'Durchsuchen…',

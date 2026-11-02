@@ -1,6 +1,6 @@
 <img src="resources/wordmark.png" alt="LiberCast" width="340">
 
-A free, open-source IPTV player for Windows. Built with Electron, React and TypeScript.
+A free, open-source IPTV player for Windows and Linux. Built with Electron, React and TypeScript.
 
 LiberCast is **player-only software**. It ships no channels, playlists or subscriptions —
 you connect your own provider.
@@ -105,7 +105,9 @@ single file. Provider passwords are opt-in and force encryption.
 
 **Shell** — frameless custom chrome, a Ctrl+K search across everything, a home
 screen built around resuming, dark/light themes, accent colors, interface
-scaling, and credentials encrypted with Windows DPAPI via `safeStorage`.
+scaling, and credentials handed to whatever the operating system offers via
+`safeStorage` — DPAPI, Keychain or a Linux keyring, with the dialog saying
+plainly when the machine offers none of them.
 
 Every milestone in [`FEATURES.md`](./FEATURES.md) is now implemented; what is
 left there is marked post-1.0.
@@ -156,12 +158,17 @@ channel with its request and response type. The preload bridge, the main-process
 router and the renderer client all derive from that single map, so a renamed
 channel is a compile error rather than a runtime `undefined`.
 
-**Credentials never reach the renderer.** Passwords are encrypted with
-`safeStorage` (DPAPI on Windows) and stored as ciphertext. Xtream stream URLs are
-assembled in the main process on demand, so a stored channel row never contains a
-password and changing your password does not require a re-sync. The renderer is
-handed a `http://127.0.0.1` session URL and never the provider URL — which
-matters, because for Xtream the password is a path segment in that URL.
+**Credentials never reach the renderer.** Passwords go to `safeStorage` — DPAPI
+on Windows, Keychain on macOS, libsecret or KWallet on Linux — and are stored as
+ciphertext. Where Linux offers no keyring, Chromium falls back to a key compiled
+into the binary, which protects nothing from anyone holding the file; the
+add-source dialog says so rather than repeating the word "encrypted", and the
+database and its write-ahead log are created owner-only so the file itself is
+the boundary. Xtream stream URLs are assembled in the main process on demand, so
+a stored channel row never contains a password and changing your password does
+not require a re-sync. The renderer is handed a `http://127.0.0.1` session URL
+and never the provider URL — which matters, because for Xtream the password is a
+path segment in that URL.
 
 **AAC out of MPEG-TS needs converting, not just copying.** AAC in a transport
 stream is ADTS-framed; MP4 wants raw AAC with its configuration in the sample

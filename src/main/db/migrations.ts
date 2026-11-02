@@ -379,6 +379,28 @@ export const MIGRATIONS: Migration[] = [
 
       CREATE INDEX idx_channels_match ON channels(kind, match_key);
     `
+  },
+  {
+    version: 11,
+    name: 'failover-rejects',
+    up: `
+      -- "That is not my channel."
+      --
+      -- Two providers spell things differently enough that failover has to
+      -- accept some difference, and no threshold tells a regional variant from
+      -- a spelling variant: only the person watching knows that their "Alto
+      -- Sports 2" is not the one with "Turkey" after it. Once they have said
+      -- so, it is never offered for that channel again.
+      --
+      -- Keyed both ways round and cascading, because either side of the pair
+      -- disappears on the next sync of either provider.
+      CREATE TABLE failover_rejects (
+        channel_id INTEGER NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+        alternate_id INTEGER NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+        rejected_at INTEGER NOT NULL,
+        PRIMARY KEY (channel_id, alternate_id)
+      );
+    `
   }
 ]
 

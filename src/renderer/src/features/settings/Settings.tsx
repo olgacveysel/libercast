@@ -1,5 +1,5 @@
 import { useEffect, useState, type JSX } from 'react'
-import type { AppSettings, AutoRefreshReport } from '@shared/types'
+import type { AppSettings, AutoRefreshReport, FailoverMode } from '@shared/types'
 import { invoke, messageOf } from '@renderer/lib/api'
 import { formatRelative } from '@renderer/lib/format'
 import { useAppStore } from '@renderer/store/useAppStore'
@@ -214,12 +214,29 @@ export function Settings({ onAddSource }: Props): JSX.Element {
               <strong>{t('settings.failover')}</strong>
               <span>{t('settings.failoverBody')}</span>
             </div>
-            <input
-              type="checkbox"
-              checked={settings.sourceFailover}
-              onChange={(event) => void updateSettings({ sourceFailover: event.target.checked })}
-            />
+            <select
+              className="input"
+              style={{ width: 230 }}
+              value={settings.sourceFailover}
+              onChange={(event) =>
+                void updateSettings({ sourceFailover: event.target.value as FailoverMode })
+              }
+            >
+              <option value="ask">{t('settings.failoverAsk')}</option>
+              <option value="confident">{t('settings.failoverConfident')}</option>
+              <option value="off">{t('settings.failoverOff')}</option>
+            </select>
           </div>
+
+          <p style={{ fontSize: 12, color: 'var(--text-dim)', margin: '2px 2px 0', lineHeight: 1.5 }}>
+            {t(
+              settings.sourceFailover === 'off'
+                ? 'settings.failoverOffNote'
+                : settings.sourceFailover === 'confident'
+                  ? 'settings.failoverConfidentNote'
+                  : 'settings.failoverAskNote'
+            )}
+          </p>
         </section>
 
         <section className="settings__group">

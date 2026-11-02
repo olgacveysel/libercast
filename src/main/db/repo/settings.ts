@@ -1,4 +1,4 @@
-import { DEFAULT_SETTINGS, type AppSettings } from '@shared/types'
+import { DEFAULT_SETTINGS, failoverMode, type AppSettings } from '@shared/types'
 import { getDb } from '../index'
 
 export function getSettings(): AppSettings {
@@ -13,7 +13,15 @@ export function getSettings(): AppSettings {
     }
   }
 
-  return { ...DEFAULT_SETTINGS, ...stored } as AppSettings
+  const merged = { ...DEFAULT_SETTINGS, ...stored } as AppSettings
+
+  // Stored settings are loose JSON merged over the defaults, so a value whose
+  // shape changed between releases arrives here in its old shape and no
+  // migration ever sees it. Anything that has changed shape is read through a
+  // coercion rather than trusted.
+  merged.sourceFailover = failoverMode(stored.sourceFailover)
+
+  return merged
 }
 
 export function setSettings(patch: Partial<AppSettings>): AppSettings {

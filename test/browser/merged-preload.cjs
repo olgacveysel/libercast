@@ -38,17 +38,17 @@ const channel = (id, playlistId, name, sources) => ({
   health: null, sources
 })
 
-// What the merged query returns for two providers: beIN 2 on both, the rest
+// What the merged query returns for two providers: Alto 2 on both, the rest
 // on one each.
 const MERGED = [
-  channel(1, 1, 'beIN Sports 2 HD', 2),
-  channel(2, 1, 'beIN Sports 4 HD', 1),
+  channel(1, 1, 'Alto Sports 2 HD', 2),
+  channel(2, 1, 'Alto Sports 4 HD', 1),
   channel(3, 2, 'Only On Backup', 1)
 ]
 // What a single-source query returns for provider one.
 const SINGLE = [
-  channel(1, 1, 'beIN Sports 2 HD', 1),
-  channel(2, 1, 'beIN Sports 4 HD', 1)
+  channel(1, 1, 'Alto Sports 2 HD', 1),
+  channel(2, 1, 'Alto Sports 4 HD', 1)
 ]
 
 const answers = {

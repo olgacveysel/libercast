@@ -5,8 +5,7 @@ import {
   nextAudioTile,
   parseDetached,
   pickDisplay,
-  type DisplayInfo,
-  type Rect
+  type DisplayInfo
 } from '@shared/detached'
 
 let failures = 0

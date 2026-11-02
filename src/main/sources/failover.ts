@@ -1,6 +1,7 @@
 import { fold, getDb } from '@main/db/index'
+import { rejectedAlternates } from '@main/db/repo/failoverRejects'
 import { createLogger } from '@main/util/logger'
-import { normalizeName, similarity } from './epgMatch'
+import { normalizeName, sameChannelName, similarity } from './epgMatch'
 
 const log = createLogger('failover')
 
@@ -11,6 +12,18 @@ const log = createLogger('failover')
  * common thing that goes wrong with IPTV, and the user very often already pays
  * for a second source that is carrying the same match.
  */
+/**
+ * How sure we are that an alternate is the same channel.
+ *
+ * `exact` means the identifying words are identical — only the feed
+ * description differs, so it can be played without interrupting anyone.
+ * `likely` means the name cleared the score threshold by looking similar, and
+ * "looking similar" is how you end up watching a different region's feed. The
+ * two are kept apart because they deserve different treatment, not because the
+ * score is unreliable.
+ */
+export type MatchConfidence = 'exact' | 'likely'
+
 export interface Alternate {
   channelId: number
   playlistId: number
@@ -18,6 +31,7 @@ export interface Alternate {
   name: string
   /** How confident the name match is, 0..1. */
   score: number
+  confidence: MatchConfidence
 }
 
 export interface AlternateCandidate {
@@ -71,11 +85,21 @@ export function rankAlternatesDetailed(
 
   const scored = candidates
     .filter((candidate) => !skip.has(candidate.channelId))
-    .map((candidate) => ({ ...candidate, score: similarity(name, candidate.name) }))
+    .map((candidate) => ({
+      ...candidate,
+      score: similarity(name, candidate.name),
+      confidence: (sameChannelName(name, candidate.name) ? 'exact' : 'likely') as MatchConfidence
+    }))
     .sort((a, b) =>
-      // Score first; then a stable order, so the same provider is tried first
+      // Certainty before score: an exact match that scores 1.00 and a regional
+      // variant that scores 0.95 are not two points on one scale, and the
+      // caller plays the first thing in this list that it is allowed to play.
+      rank(a) - rank(b) ||
+      // Then score; then a stable order, so the same provider is tried first
       // every time rather than shuffling between attempts.
-      b.score - a.score || a.playlistId - b.playlistId || a.channelId - b.channelId
+      b.score - a.score ||
+      a.playlistId - b.playlistId ||
+      a.channelId - b.channelId
     )
 
   return {
@@ -111,6 +135,11 @@ export function narrowingTerm(name: string): string | null {
   return words[0] ?? null
 }
 
+/** Exact matches first; within a confidence, the usual ordering. */
+function rank(candidate: { confidence: MatchConfidence }): number {
+  return candidate.confidence === 'exact' ? 0 : 1
+}
+
 interface Row {
   id: number
   playlist_id: number
@@ -134,6 +163,11 @@ export function findAlternates(channelId: number, exclude: readonly number[] = [
     .prepare('SELECT id, playlist_id, name, kind FROM channels WHERE id = ?')
     .get(channelId) as { id: number; playlist_id: number; name: string; kind: string } | undefined
   if (!self) return []
+
+  // A channel the user has already said is not this one is not a candidate,
+  // however well it scores — the whole point of having been asked.
+  const refused = rejectedAlternates(channelId)
+  const skip = refused.length > 0 ? [...exclude, ...refused] : exclude
 
   const term = narrowingTerm(self.name)
   const clauses = [
@@ -167,7 +201,7 @@ export function findAlternates(channelId: number, exclude: readonly number[] = [
       playlistName: row.playlist_name,
       name: row.name
     })),
-    exclude
+    skip
   )
 
   // Logged, not used. The threshold is a judgement about someone else's naming

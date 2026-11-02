@@ -39,8 +39,12 @@ Nothing leaves your computer except the requests you ask for. LiberCast has no
 analytics, no telemetry and no account of its own. It talks to the provider you
 configure, to the guide URL you configure, and to nothing else.
 
-Your provider passwords are stored encrypted, using the Windows account you are
-signed in as, in your own user profile:
+The one exception is one you are asked about: on first launch LiberCast offers
+to check GitHub once a day for a newer version. It asks for a version number
+and sends nothing about you. Say no and it never makes that request.
+
+Your provider passwords are encrypted with Windows DPAPI, tied to the Windows
+account you are signed in as, and kept in your own user profile:
 
     %APPDATA%\LiberCast
 

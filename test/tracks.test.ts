@@ -6,7 +6,7 @@ import { promisify } from 'node:util'
 import { buildStreamArgs, escapeFilterPath, planRemux } from '@main/media/args'
 import { binaries, resetBinaryCache, setFfmpegOverride } from '@main/media/binaries'
 import { languageName, normalizeLanguage, sameLanguage } from '@main/media/languages'
-import { clearProbeCache, parseProbeOutput, probeStream } from '@main/media/probe'
+import { clearProbeCache, probeStream } from '@main/media/probe'
 import { StreamServer, chooseAudio, chooseSubtitle } from '@main/media/streamServer'
 import { parseCueBlocks, parseTimestamp } from '../src/renderer/src/features/player/subtitles'
 
@@ -210,17 +210,17 @@ async function main(): Promise<void> {
   )
   check(
     'labels are human readable',
-    probe.tracks.audio[1]?.label.startsWith('German'),
+    probe.tracks.audio[1]?.label.startsWith('German') === true,
     probe.tracks.audio.map((t) => t.label)
   )
   check(
     'the channel layout is noted in the label',
-    probe.tracks.audio[1]?.label.includes('Mono'),
+    probe.tracks.audio[1]?.label.includes('Mono') === true,
     probe.tracks.audio[1]?.label
   )
   check(
     'a track title is folded into the label',
-    probe.tracks.audio[0]?.label.includes('Original'),
+    probe.tracks.audio[0]?.label.includes('Original') === true,
     probe.tracks.audio[0]?.label
   )
   check('the default flag survives', probe.tracks.audio[0]?.isDefault === true)

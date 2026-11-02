@@ -73,6 +73,10 @@ extraFiles:
     to: LICENSE.txt
   - from: THIRD-PARTY-NOTICES.md
     to: THIRD-PARTY-NOTICES.md
+  # The notice NSIS shows on its agreement page. A Linux package has no such
+  # page, so there it ships as a file people can actually find.
+  - from: resources/eula.txt
+    to: NOTICE.txt
   # The GPL text is committed rather than copied out of node_modules. The
   # licence itself never varies, and ffmpeg-static names its copy after the
   # binary — ffmpeg.LICENSE on Linux but ffmpeg.exe.LICENSE on Windows — so a
@@ -81,7 +85,13 @@ extraFiles:
   # The committed file is named for the component it covers. LiberCast's own
   # code is MIT; a bare GPL-3.0.txt sitting in the repository invites the
   # reasonable but wrong conclusion that the project is GPL.
-  - from: resources/licenses/ffmpeg-GPL-3.0.txt
+  #
+  # The source keeps the licence's own name and the destination says what it
+  # covers. Naming the source `ffmpeg-GPL-3.0.txt` was the intent, but the file
+  # was never renamed, so this entry quietly copied nothing for several
+  # releases — harmless only because the pattern-matched entry below shipped
+  # ffmpeg's own copy of the same text anyway.
+  - from: resources/licenses/GPL-3.0.txt
     to: licenses/ffmpeg-GPL-3.0.txt
   # The build manifest does vary: it names the exact ffmpeg version and the
   # libraries compiled into it, which is the part that has to describe the
@@ -124,6 +134,64 @@ nsis:
   license: resources/eula.txt
 portable:
   artifactName: ${productName}-${version}-portable.${ext}
+
+linux:
+  icon: resources/icon.png
+  # Required by the deb target. The GitHub noreply address rather than a
+  # personal or work one: this string is embedded in a package that anyone can
+  # download and read.
+  maintainer: Veysel Olgac <olgacveysel@users.noreply.github.com>
+  # electron-builder writes this straight into the desktop entry's Categories,
+  # and it overwrites anything the `desktop` map below says, so the full list
+  # belongs here rather than there. AudioVideo is the required main category;
+  # the rest are what a desktop's menu editor sorts on.
+  category: AudioVideo;Video;Player;TV
+  # Shown in the application menu under the name people will look for.
+  #
+  # `Comment` is deliberately absent: electron-builder fills it from
+  # package.json's `description` and overwrites anything stated here, so a line
+  # in this map would look like the source of truth while having no effect.
+  # That description is what the menu shows, which is why it no longer names a
+  # single platform — it used to say "for Windows", on a Linux desktop.
+  desktop:
+    Name: LiberCast
+    GenericName: IPTV Player
+    Keywords: iptv;m3u;xtream;tv;stream;
+  files:
+    # Same reasoning as the Windows build: ffprobe-static ships a binary for
+    # every platform it supports and a Linux x64 build needs one of them.
+    - '!node_modules/ffprobe-static/bin/{darwin,win32}/**'
+    - '!node_modules/ffprobe-static/bin/linux/ia32/**'
+  target:
+    - target: AppImage
+      arch: [x64]
+    - target: deb
+      arch: [x64]
+  artifactName: ${productName}-${version}-${arch}.${ext}
+deb:
+  # ffmpeg is bundled, so the only dependencies are what Electron itself needs
+  # on a desktop that might not have them.
+  depends:
+    - libgtk-3-0
+    - libnotify4
+    - libnss3
+    - libxss1
+    - libxtst6
+    - xdg-utils
+    - libatspi2.0-0
+    - libsecret-1-0
+# Squashfs inside an AppImage defaults to a light compression, which left the
+# Linux build 40 MB larger than the Windows one from the same two ffmpeg
+# binaries. Maximum costs build time, which is paid once, rather than download
+# size, which is paid by everyone.
+compression: maximum
+
+# electron-builder writes update metadata for each target and needs a publish
+# provider to name the channel. There is none here on purpose (see below), and
+# without one the deb target fails after the package is already built — so the
+# metadata is switched off rather than half-configured.
+publish: null
+
 # No publish target is configured on purpose: a placeholder owner makes
 # `electron-builder --publish` upload to a repository that does not exist, and
 # fail late. Add this block once the repository is real:

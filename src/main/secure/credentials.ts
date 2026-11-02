@@ -1,12 +1,43 @@
 import { safeStorage } from 'electron'
+import { describeCredentialStorage, type CredentialStorage } from '@shared/credentialStorage'
 import { getDb } from '@main/db'
 
 /**
- * Provider passwords are encrypted with the OS keychain (DPAPI on Windows) and
- * only the ciphertext is written to disk. They are never sent to the renderer.
+ * Provider passwords go to the OS keychain where there is one, and never to
+ * the renderer.
+ *
+ * Where there is not one, they are still stored — an IPTV player that forgets
+ * your account on every launch is not a player anyone keeps — but the
+ * interface says so rather than claiming an encryption that is not happening.
+ * See `describeCredentialStorage`.
  */
 
 const KEY_PREFIX = 'credential:'
+
+/**
+ * What is actually protecting these passwords on this machine.
+ *
+ * `getSelectedStorageBackend` exists only on Linux; everywhere else the
+ * platform answers the question on its own.
+ */
+export function credentialStorage(): CredentialStorage {
+  let backend: string | null = null
+  if (process.platform === 'linux') {
+    try {
+      backend = safeStorage.getSelectedStorageBackend()
+    } catch {
+      // Older Electron, or a backend it cannot name. Treated as unprotected,
+      // which is the safe direction to be wrong in.
+      backend = null
+    }
+  }
+
+  return describeCredentialStorage({
+    platform: process.platform,
+    available: safeStorage.isEncryptionAvailable(),
+    backend
+  })
+}
 
 export function setPassword(playlistId: number, password: string | null): void {
   const db = getDb()

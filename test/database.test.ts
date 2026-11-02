@@ -1,4 +1,8 @@
+import { statSync } from 'node:fs'
+import { join } from 'node:path'
+import { app } from 'electron'
 import { getDb } from '@main/db'
+import { databaseFileName } from '@main/db/relocate'
 import { importCatalog } from '@main/db/repo/import'
 import { createPlaylist, listPlaylists, markSynced } from '@main/db/repo/playlists'
 import * as catalog from '@main/db/repo/catalog'
@@ -352,8 +356,6 @@ check('pruning clears it', reminders.pruneReminders() >= 1)
 reminders.removeReminder(set.id)
 check('a reminder can be cancelled', reminders.listReminders().length === 0)
 
-console.log(failures === 0 ? '\nAll checks passed.\n' : `\n${failures} check(s) failed.\n`)
-process.exit(failures === 0 ? 0 : 1)
 
 function mk(
   count: number,
@@ -386,3 +388,36 @@ function ep(externalId: string, season: number, episode: number, title: string) 
     stillUrl: null
   }
 }
+
+console.log('\nThe file the passwords live in')
+
+// Only meaningful where the OS has no keyring: then this file is the only
+// thing standing between a provider password and anyone else with an account
+// on the machine. Skipped on Windows, which ignores POSIX modes and protects
+// the profile directory with its own ACL.
+if (process.platform === 'win32') {
+  console.log('  SKIP  POSIX modes do not apply on Windows')
+} else {
+  const dbPath = join(app.getPath('userData'), databaseFileName())
+
+  const mode = (path: string): number | null => {
+    try {
+      return statSync(path).mode & 0o777
+    } catch {
+      return null
+    }
+  }
+
+  check(`the database is owner-only (${(mode(dbPath) ?? 0).toString(8)})`, mode(dbPath) === 0o600, mode(dbPath))
+
+  // The write-ahead log holds the same rows before they are checkpointed, so
+  // leaving it readable would make the main file's mode decorative.
+  const wal = mode(`${dbPath}-wal`)
+  check(`the write-ahead log is too (${(wal ?? 0).toString(8)})`, wal === null || wal === 0o600, wal)
+
+  const shm = mode(`${dbPath}-shm`)
+  check(`and the shared-memory index (${(shm ?? 0).toString(8)})`, shm === null || shm === 0o600, shm)
+}
+
+console.log(failures === 0 ? '\nAll checks passed.\n' : `\n${failures} check(s) failed.\n`)
+process.exit(failures === 0 ? 0 : 1)

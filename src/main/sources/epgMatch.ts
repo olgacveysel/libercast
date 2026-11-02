@@ -118,6 +118,24 @@ export function normalizedKey(value: string): string {
   return normalizeName(value).join(' ')
 }
 
+/**
+ * Whether two names are the same channel beyond reasonable doubt.
+ *
+ * The identifying words, as a multiset: "Alto Sports 2 HD" and "ALTO SPORTS 2"
+ * are the same channel because the only difference is a word describing the
+ * feed, and "Sports Alto 2" is too because providers order words differently.
+ * "Alto Sports 2" and "Alto Sports 2 Turkey" are *not*, which is the whole
+ * point of having this separate from `similarity`: that pair scores 0.95 under
+ * the subset rule, high enough to play without asking, and a regional variant
+ * is not the channel someone asked for.
+ */
+export function sameChannelName(a: string, b: string): boolean {
+  const left = normalizeName(a)
+  const right = normalizeName(b)
+  if (left.length === 0 || right.length === 0) return false
+  return [...left].sort().join(' ') === [...right].sort().join(' ')
+}
+
 /** Character bigrams, used for the fallback similarity score. */
 function bigrams(value: string): Set<string> {
   const set = new Set<string>()

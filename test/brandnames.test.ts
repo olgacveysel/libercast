@@ -51,7 +51,29 @@ const FORBIDDEN: { name: string; pattern: RegExp }[] = [
 ]
 
 const SKIP = new Set(['node_modules', 'out', 'release', 'dist', '.git'])
-const EXTENSIONS = ['.ts', '.tsx', '.md', '.txt', '.yml', '.json', '.html', '.css']
+/**
+ * Everything with text in it, including the build and harness scripts.
+ *
+ * `.cjs` and `.mjs` were missing from this list, and the browser harnesses are
+ * written in `.cjs` — so the fixtures in `test/browser` were never scanned and
+ * went on naming a real broadcaster through the whole sweep that was supposed
+ * to have removed them. A lint that silently skips a directory is worse than
+ * no lint, because it is believed.
+ */
+const EXTENSIONS = [
+  '.ts',
+  '.tsx',
+  '.md',
+  '.txt',
+  '.yml',
+  '.json',
+  '.html',
+  '.css',
+  '.cjs',
+  '.mjs',
+  '.js',
+  '.jsx'
+]
 
 function sourceFiles(dir: string, found: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {
@@ -68,9 +90,16 @@ console.log('\nNo real broadcaster is named anywhere')
 // This file lists them, so it is the one place they are allowed to appear.
 const files = sourceFiles('src')
   .concat(sourceFiles('test').filter((f) => !f.endsWith('brandnames.test.ts')))
-  .concat(['README.md', 'FEATURES.md', 'package.json'])
+  // Build scripts and the installer notice template are shipped text too.
+  .concat(sourceFiles('tools'))
+  .concat(sourceFiles('resources'))
+  .concat(['README.md', 'FEATURES.md', 'package.json', 'electron-builder.yml'])
 
 check('there are files to check', files.length > 40, files.length)
+// A lint that quietly stops covering a directory still reports success, which
+// is how the browser harnesses kept a real name through an entire sweep. The
+// count is asserted so shrinking coverage fails rather than passing faster.
+check('and the whole repository is covered', files.length > 190, files.length)
 
 const found: string[] = []
 for (const file of files) {

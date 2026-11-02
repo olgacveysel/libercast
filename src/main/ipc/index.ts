@@ -12,7 +12,8 @@ import * as recordingsRepo from '@main/db/repo/recordings'
 import * as vodRepo from '@main/db/repo/vod'
 import * as reminders from '@main/db/repo/reminders'
 import { exportBackup, importBackup } from '@main/secure/backup'
-import { deletePassword, setPassword } from '@main/secure/credentials'
+import { rejectAlternate } from '@main/db/repo/failoverRejects'
+import { credentialStorage, deletePassword, setPassword } from '@main/secure/credentials'
 import * as parental from '@main/secure/parental'
 import { accountFor, syncPlaylist, testSource } from '@main/sources'
 import { autoMatch, refreshEpg, suggestionsFor } from '@main/sources/epg'
@@ -114,9 +115,16 @@ export function registerIpcHandlers(): void {
   /* ---------------- playback ---------------- */
 
   handle('stream:open', async (request) => {
-    const { session, provider, switched, playingChannelId } = await openStream(request)
+    const result = await openStream(request)
 
-    return {
+    // Nothing played, but there are names worth putting in front of someone.
+    // Not an error: an error here would be thrown across the bridge as a
+    // string, and the offers would be lost on the way.
+    if (result.kind === 'choose') return { playing: null, choose: result.choice }
+
+    const { session, provider, switched, playingChannelId } = result.outcome
+
+    const playing = {
       id: session.id,
       url: session.url,
       seekable: session.seekable,
@@ -135,9 +143,17 @@ export function registerIpcHandlers(): void {
       switched,
       playingChannelId
     }
+
+    return { playing, choose: null }
   })
 
   handle('stream:close', (sessionId: string) => streamServer.close(sessionId))
+
+  // "That is not my channel." Remembered, so the next bad evening on the main
+  // source does not ask the same question again.
+  handle('failover:reject', ({ channelId, alternateId }) => {
+    rejectAlternate(channelId, alternateId)
+  })
 
   handle('media:capabilities', () => {
     const resolved = binaries()
@@ -379,6 +395,8 @@ export function registerIpcHandlers(): void {
     scanFavorites(playlistId, (progress) => emit('health:progress', progress))
   )
   handle('health:cancel', () => cancelScan())
+
+  handle('app:credentialStorage', () => credentialStorage())
 
   handle('multiview:detach', ({ channelId, tile }) => openDetached(channelId, tile))
   handle('multiview:attach', (tile) => closeDetached(tile))

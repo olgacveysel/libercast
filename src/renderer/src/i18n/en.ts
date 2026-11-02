@@ -117,6 +117,13 @@ export const en = {
   'catchup.replaying': 'Replaying {title}',
   'catchup.backToLive': 'Back to live',
   'player.switchedSource': '{from} did not play — switched to {to}',
+  'player.alternateTitle': '{channel} did not play',
+  'player.alternateBody': 'Another source has a channel with a similar name. The names are not identical, so check it before playing — a word like a country or region usually means a different feed.',
+  'player.alternatePlay': 'Play this',
+  'player.alternateOn': 'on {source}',
+  'player.alternateNone': 'None of these',
+  'player.alternateNever': 'Never offer these',
+  'player.switchedWrong': 'Wrong channel',
   'player.audio': 'Audio',
   'player.subtitles': 'Subtitles',
   'player.speed': 'Speed',
@@ -297,7 +304,13 @@ export const en = {
   'settings.frugalBody': 'Playing a channel normally takes two connections in quick succession — one to identify the stream, one to play it. If your account allows only one, the second is refused and the channel opens only sometimes. Turn this on and a live channel that has not been played before is started on assumption instead.',
   'settings.frugalNote': 'Either way, what a stream turned out to be is remembered, so playing anything a second time costs a single connection. The audio and subtitle menus for a live channel stay empty until it has been played once.',
   'settings.failover': 'Play from another source when one fails',
-  'settings.failoverBody': 'With more than one source added, a live channel that will not start — or that stops partway through — is looked for on your other providers and played from there instead. Channel numbers are respected, so a channel numbered 2 is never replaced by the one numbered 4. A brief note says which source took over. Turn this off to spend connections only on the source you chose.',
+  'settings.failoverBody': 'With more than one source added, a live channel that will not start — or that stops partway through — can be played from one of your other providers instead. Two providers rarely spell a channel the same way, so the setting is about how sure the names have to be before anything is played without asking you.',
+  'settings.failoverAsk': 'Switch when certain, ask when not',
+  'settings.failoverConfident': 'Switch only when certain',
+  'settings.failoverOff': 'Never switch',
+  'settings.failoverAskNote': 'An identical name — ignoring HD, 4K and similar — is played straight away, and a short note says which source took over. A name that is only similar is shown to you first, because "Alto Sports 2" and "Alto Sports 2 Turkey" differ by one word and are different channels. Say a name is wrong once and it is never offered for that channel again.',
+  'settings.failoverConfidentNote': 'Only a channel whose name is identical — ignoring HD, 4K and similar — is ever played. Nothing interrupts you, and a channel your other provider spells differently will not be found.',
+  'settings.failoverOffNote': 'Connections are only ever spent on the source you chose. A channel that will not start reports the failure instead.',
   'settings.refreshEvery': 'Refresh sources every',
   'settings.refreshEveryBody': 'Off by default. A refresh talks to your provider, and it is skipped while something is playing so it can never take the connection a stream is using.',
   'settings.everyWeek': 'Week',
@@ -397,7 +410,18 @@ export const en = {
   'source.serverUrl': 'Server URL',
   'source.serverUrlHint': 'Paste the host your provider gave you. Any trailing path is removed automatically.',
   'source.password': 'Password',
-  'source.passwordHint': 'The password is encrypted with Windows DPAPI and never leaves this machine.',
+  'source.password.dpapi':
+    'The password is encrypted with Windows DPAPI, tied to your Windows account, and never leaves this machine.',
+  'source.password.keychain':
+    'The password is stored in the macOS Keychain and never leaves this machine.',
+  'source.password.libsecret':
+    'The password is stored in your desktop’s keyring and never leaves this machine.',
+  'source.password.kwallet':
+    'The password is stored in KWallet and never leaves this machine.',
+  'source.password.plain':
+    'This desktop has no keyring available, so the password is stored unencrypted in LiberCast’s data folder — readable by anything running as you. It still never leaves this machine.',
+  'source.password.none':
+    'This system offers no secure storage, so the password is stored unencrypted in LiberCast’s data folder — readable by anything running as you. It still never leaves this machine.',
   'source.playlistUrl': 'Playlist URL',
   'source.orLocalFile': '…or a local file',
   'source.browse': 'Browse…',

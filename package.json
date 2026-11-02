@@ -1,9 +1,10 @@
 {
   "name": "libercast",
   "version": "0.9.0-beta.3",
-  "description": "LiberCast — a free, open-source IPTV player for Windows. Xtream Codes, M3U and XMLTV EPG.",
+  "description": "LiberCast — a free, open-source IPTV player. Xtream Codes, M3U and XMLTV EPG.",
   "license": "MIT",
   "author": "Veysel Olgac",
+  "homepage": "https://github.com/olgacveysel/libercast",
   "main": "./out/main/index.js",
   "engines": {
     "node": ">=20"
@@ -12,7 +13,7 @@
     "dev": "electron-vite dev",
     "start": "electron-vite preview",
     "build": "npm run typecheck && electron-vite build",
-    "typecheck": "npm run typecheck:node && npm run typecheck:web",
+    "typecheck": "npm run typecheck:node && npm run typecheck:web && npm run typecheck:test",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json",
     "test": "node test/run.mjs",
@@ -27,7 +28,12 @@
     "verify:merged": "npm run build && electron test/browser/verify-merged.cjs",
     "verify:updates": "npm run build && electron test/browser/verify-updates.cjs",
     "verify:nextup": "npm run build && electron test/browser/verify-nextup.cjs",
-    "eula": "node tools/make-eula.mjs"
+    "eula": "node tools/make-eula.mjs win32",
+    "eula:linux": "node tools/make-eula.mjs linux",
+    "pack:linux": "npm run build && npm run eula:linux && electron-builder --linux --publish never",
+    "verify:credentials": "npm run build && electron test/browser/verify-credentials.cjs",
+    "typecheck:test": "tsc --noEmit -p tsconfig.test.json",
+    "verify:failover": "npm run build && electron test/browser/verify-failover.cjs"
   },
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.1",

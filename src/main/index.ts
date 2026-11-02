@@ -10,6 +10,7 @@ import { scheduler } from './media/scheduler'
 import { reminderScheduler } from './epgReminders'
 import { autoRefresh } from './autoRefresh'
 import { streamServer } from './media/streamServer'
+import { credentialStorage } from './secure/credentials'
 import { createWindow, getMainWindow } from './window'
 import { closeAllDetached } from './windows/detached'
 import { checkOnLaunch } from './updates'
@@ -53,6 +54,16 @@ function bootstrap(): void {
     if (!getSettings().hardwareAcceleration) {
       log.info('hardware acceleration disabled by settings; restart required to take effect')
     }
+
+    // Recorded once per launch so a log sent in with a question answers "where
+    // is my password kept on this machine" without anyone having to guess from
+    // the platform. The dialog tells the user the same thing; this is for the
+    // log, which is what gets attached to a bug report.
+    const credentials = credentialStorage()
+    log.info(
+      `provider passwords: ${credentials.backend}` +
+        (credentials.protectedByOs ? '' : ' (no OS protection on this machine)')
+    )
 
     // Many providers block requests that carry Electron's default UA.
     session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {

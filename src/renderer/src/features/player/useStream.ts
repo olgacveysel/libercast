@@ -1,12 +1,24 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { ExternalSubtitle, MediaTracks, StreamSource, VideoInfo } from '@shared/types'
+import type {
+  AlternateChoice,
+  ExternalSubtitle,
+  MediaTracks,
+  StreamSource,
+  SwitchedSource,
+  VideoInfo
+} from '@shared/types'
 import { invoke, messageOf } from '@renderer/lib/api'
 import { parseCueBlocks, streamSubtitles } from './subtitles'
 import { createStallWatch } from './stall'
 import { disableOthers, ensureShowing } from './textTracks'
 
 export interface StreamState {
-  status: 'idle' | 'loading' | 'playing' | 'error'
+  /**
+   * `choosing` is not an error state. Nothing is playing, but something
+   * probably could — the main process found names close enough to be worth
+   * offering and not close enough to play unasked.
+   */
+  status: 'idle' | 'loading' | 'playing' | 'error' | 'choosing'
   error: string | null
   /** What ffmpeg is doing: "direct copy", "audio ac3 → aac", and so on. */
   pipeline: string | null
@@ -39,7 +51,12 @@ export interface StreamState {
    * asked for. The switch itself is silent; this is how it gets reported
    * afterwards.
    */
-  switched: { channelName: string; from: string; to: string } | null
+  switched: SwitchedSource | null
+  /**
+   * Alternates waiting on an answer. Set with `status: 'choosing'`, cleared
+   * the moment one is picked or the question is dismissed.
+   */
+  choice: AlternateChoice | null
 }
 
 const NO_TRACKS: MediaTracks = { audio: [], subtitle: [] }
@@ -90,6 +107,12 @@ export function useStream({
   videoRef: React.RefObject<HTMLVideoElement>
   state: StreamState
   reload: () => void
+  /** Play an offered alternate: the user has read the name and said yes. */
+  approveAlternate: (channelId: number) => void
+  /** "Those are not my channel" — remembered, and retried without them. */
+  rejectAlternates: (channelIds: readonly number[]) => void
+  /** Dismiss the question and show why the original source failed. */
+  dismissChoice: () => void
 } {
   const videoRef = useRef<HTMLVideoElement>(null)
   const sessionRef = useRef<string | null>(null)
@@ -97,6 +120,19 @@ export function useStream({
   /** Set by the effect, so a successful open can restart the stall countdown. */
   const resetStall = useRef<(() => void) | null>(null)
   const subtitleAbort = useRef<AbortController | null>(null)
+
+  /**
+   * Answers to the "is this your channel?" question, wired by the effect.
+   *
+   * Approving an alternate has to re-enter the same open attempt — with its
+   * list of dead sources and its retry count — so the actions live inside the
+   * effect and are reached through a ref rather than rebuilt per render.
+   */
+  const answer = useRef<{
+    approve: (channelId: number) => void
+    reject: (channelIds: readonly number[]) => Promise<void>
+    dismiss: () => void
+  } | null>(null)
 
   /**
    * What the main process found wrong with this stream before deciding to play
@@ -128,6 +164,7 @@ export function useStream({
     subtitlesBurnedIn: false,
     absoluteTimeline: false,
     switched: null,
+    choice: null,
     subtitleProblem: null
   })
   const [nonce, setNonce] = useState(0)
@@ -152,6 +189,7 @@ export function useStream({
         subtitlesBurnedIn: false,
         absoluteTimeline: false,
         switched: null,
+        choice: null,
         subtitleProblem: null
       })
       return
@@ -171,6 +209,15 @@ export function useStream({
     const dead: number[] = []
     let playing: number | null = null
 
+    /**
+     * Alternates the user has looked at and said yes to, for this attempt.
+     *
+     * Kept here rather than in state because a re-open has to carry it and a
+     * re-render must not: approval is given for one channel on one occasion,
+     * not stored as a preference.
+     */
+    const allowed: number[] = []
+
     const closeSession = (): void => {
       if (sessionRef.current) {
         void invoke('stream:close', sessionRef.current)
@@ -183,18 +230,35 @@ export function useStream({
 
       try {
         closeSession()
-        const session = await invoke('stream:open', {
+        const result = await invoke('stream:open', {
           source,
           seekSecs,
           audioTrack,
           subtitleTrack,
           owner: ownerRef.current,
-          exclude: dead
+          exclude: dead,
+          allow: allowed
         })
         if (cancelled) {
-          void invoke('stream:close', session.id)
+          if (result.playing) void invoke('stream:close', result.playing.id)
           return
         }
+
+        // Nothing played, and the main process has names worth asking about.
+        // Retrying would ask the same question of the same sources, so the
+        // retry chain stops here and waits for an answer.
+        if (!result.playing) {
+          setState((prev) => ({
+            ...prev,
+            status: 'choosing',
+            error: null,
+            choice: result.choose,
+            attempt
+          }))
+          return
+        }
+
+        const session = result.playing
 
         sessionRef.current = session.id
         warningRef.current = session.warning
@@ -225,6 +289,7 @@ export function useStream({
           subtitlesBurnedIn: session.subtitlesBurnedIn,
           absoluteTimeline: session.absoluteTimeline,
           switched: session.switched,
+          choice: null,
           subtitleProblem: null
         })
         // The new stream gets the full grace period: the clock is about to
@@ -292,6 +357,39 @@ export function useStream({
      * The watch is reset on every successful open, so the grace period starts
      * from the new stream rather than from whenever the last frame arrived.
      */
+    answer.current = {
+      // Yes, that is my channel. Allowed for this attempt only, and the open
+      // is re-entered so it goes through the ordinary path rather than a
+      // second one that would have to be kept in step with it.
+      approve: (channelId) => {
+        if (!allowed.includes(channelId)) allowed.push(channelId)
+        setState((prev) => ({ ...prev, status: 'loading', choice: null }))
+        void open()
+      },
+      // No, and stop asking. The pair is remembered, and from then on it is
+      // the database that keeps this candidate out: `findAlternates` will not
+      // return it again, for this attempt or any future one.
+      reject: async (channelIds) => {
+        const requested = source.type === 'channel' ? source.id : null
+        if (requested === null) return
+        await Promise.all(
+          channelIds.map((alternateId) =>
+            invoke('failover:reject', { channelId: requested, alternateId })
+          )
+        )
+      },
+      // Not now. The question goes away and the original failure is what the
+      // user is left looking at, which is the truth of the situation.
+      dismiss: () => {
+        setState((prev) => ({
+          ...prev,
+          status: 'error',
+          choice: null,
+          error: prev.choice?.reason ?? prev.error
+        }))
+      }
+    }
+
     const stall = createStallWatch(Date.now())
     resetStall.current = () => stall.reset(Date.now())
 
@@ -319,6 +417,7 @@ export function useStream({
       cancelled = true
       clearInterval(poll)
       resetStall.current = null
+      answer.current = null
       if (retryTimer.current) clearTimeout(retryTimer.current)
       subtitleAbort.current?.abort()
       element.removeEventListener('error', recover)
@@ -368,7 +467,26 @@ export function useStream({
     }
   }, [externalSubtitle, subtitleOffsetSecs, seekSecs, state.status, state.absoluteTimeline])
 
-  return { videoRef, state, reload }
+  const approveAlternate = useCallback((channelId: number) => {
+    answer.current?.approve(channelId)
+  }, [])
+
+  const rejectAlternates = useCallback(
+    (channelIds: readonly number[]) => {
+      if (channelIds.length === 0) return
+      // Awaited, not fired and forgotten: the reload below re-reads the
+      // alternates from the database, and a reopen that overtakes the write
+      // would be offered the very channel that was just refused.
+      void answer.current?.reject(channelIds).then(reload)
+    },
+    [reload]
+  )
+
+  const dismissChoice = useCallback(() => {
+    answer.current?.dismiss()
+  }, [])
+
+  return { videoRef, state, reload, approveAlternate, rejectAlternates, dismissChoice }
 }
 
 /**

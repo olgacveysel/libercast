@@ -242,6 +242,43 @@ export interface ChannelQuery {
   offset?: number
 }
 
+/**
+ * How far LiberCast may go to find the same channel somewhere else.
+ *
+ * This started as a switch, and the switch was wrong. Two providers almost
+ * never spell a channel the same way, so the matcher has to accept some
+ * difference — and the rule that lets "Alto Sports 2 HD" match "ALTO SPORTS 2"
+ * also lets it match "Alto Sports 2 Turkey", which is a different region's
+ * feed of a different match. Playing that silently is worse than a black
+ * screen, because the user does not know why they are watching the wrong
+ * thing.
+ *
+ * So the question is no longer whether to fail over, but how sure the names
+ * have to be before nobody is interrupted:
+ *
+ * - `off`: never. The source that failed is the one you hear about.
+ * - `confident`: only when the identifying words are identical. Silent, and
+ *   it will sometimes find nothing where a human would have seen the match.
+ * - `ask`: as `confident`, and anything less certain is offered rather than
+ *   played. The default, because the alternative to asking is guessing.
+ */
+export type FailoverMode = 'off' | 'confident' | 'ask'
+
+/**
+ * Reads the setting, including the boolean it used to be.
+ *
+ * Settings are stored as loose JSON merged over the defaults, so an install
+ * from before this was a mode still has `true` or `false` in the database and
+ * will for as long as that install exists. `true` becomes `ask` rather than a
+ * silent-switching mode on purpose: it is the behaviour the old `true` was
+ * reaching for, minus the guessing it did by accident.
+ */
+export function failoverMode(value: unknown): FailoverMode {
+  if (value === 'off' || value === 'confident' || value === 'ask') return value
+  if (value === false) return 'off'
+  return 'ask'
+}
+
 export interface AppSettings {
   theme: 'dark' | 'light' | 'system'
   accentColor: string
@@ -279,11 +316,9 @@ export interface AppSettings {
    *
    * One provider dying mid-match is the most common thing that goes wrong
    * here, and someone with two sources is usually paying for the same match
-   * twice. On by default, because the alternative is a dead screen; off for
-   * anyone who would rather know their main source failed than quietly spend a
-   * connection on the backup.
+   * twice. See `FailoverMode` for why this is not a switch.
    */
-  sourceFailover: boolean
+  sourceFailover: FailoverMode
   /**
    * Ask GitHub about new versions without being told to.
    *
@@ -399,7 +434,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   maxConcurrentDownloads: 1,
   showStreamStats: false,
   singleConnection: false,
-  sourceFailover: true,
+  sourceFailover: 'ask',
   autoCheckUpdates: null,
   lastUpdateCheck: null,
   knownUpdateVersion: null,
@@ -750,6 +785,24 @@ export interface ExternalSubtitle {
   cues: number
 }
 
+/**
+ * The picture is coming from somewhere other than the source that was asked
+ * for.
+ *
+ * Carries both channel ids, not just names, because the only useful reply to
+ * "now playing from Backup Source" is "that is the wrong channel" — and acting
+ * on that means naming the pair, not the words on screen.
+ */
+export interface SwitchedSource {
+  channelName: string
+  from: string
+  to: string
+  /** The channel the user asked for. */
+  requestedChannelId: number
+  /** The channel actually playing. */
+  alternateChannelId: number
+}
+
 export interface StreamSession {
   id: string
   url: string
@@ -786,7 +839,7 @@ export interface StreamSession {
    * worse than the outage — but it is reported afterwards, so a source that
    * keeps dying is visible rather than mysterious.
    */
-  switched: { channelName: string; from: string; to: string } | null
+  switched: SwitchedSource | null
   /**
    * The channel actually playing, which is not the one asked for after a
    * failover.
@@ -797,6 +850,43 @@ export interface StreamSession {
    */
   playingChannelId: number | null
 }
+
+/**
+ * Another provider's channel that might be the one you asked for.
+ *
+ * Offered rather than played, because the name was close but not identical —
+ * the case where "Alto Sports 2" has turned into "Alto Sports 2 Turkey".
+ */
+export interface AlternateOffer {
+  channelId: number
+  /** The name on the other provider, shown as-is: the difference is the point. */
+  channelName: string
+  sourceName: string
+}
+
+/**
+ * Nothing played, and here is what else might be the same channel.
+ *
+ * `reason` is why the source the user actually asked for did not play, kept
+ * so declining an offer still ends with the honest error rather than silence.
+ */
+export interface AlternateChoice {
+  reason: string
+  channelName: string
+  fromSource: string
+  offers: AlternateOffer[]
+}
+
+/**
+ * Either a stream, or a question.
+ *
+ * A union rather than an optional field on the session: an opened stream and
+ * an unanswered question have nothing in common, and making the caller choose
+ * a branch is what stops a half-filled session being played by accident.
+ */
+export type StreamOpenResult =
+  | { playing: StreamSession; choose: null }
+  | { playing: null; choose: AlternateChoice }
 
 export interface StreamRequest {
   source: StreamSource
@@ -809,6 +899,14 @@ export interface StreamRequest {
    * straight back to the source that just failed.
    */
   exclude?: number[]
+  /**
+   * Alternates the user has looked at and approved.
+   *
+   * Failover will play a channel whose name is only similar when, and only
+   * when, its id is in here — which is to say after somebody read the name and
+   * said yes. Without it an uncertain match is offered, never played.
+   */
+  allow?: number[]
   /** Identifies the calling player, so its previous session can be retired. */
   owner?: string
   /** Index within the audio tracks. Omitted means "pick by preference". */

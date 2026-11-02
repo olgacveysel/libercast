@@ -1,9 +1,10 @@
-import { useState, type JSX } from 'react'
+import { useEffect, useState, type JSX } from 'react'
 import type { PlaylistDraft, SourceKind, XtreamAccountInfo } from '@shared/types'
 import { invoke, messageOf } from '@renderer/lib/api'
 import { formatDate } from '@renderer/lib/format'
 import { useAppStore } from '@renderer/store/useAppStore'
-import { useT } from '@renderer/i18n'
+import { useT, type TranslationKey } from '@renderer/i18n'
+import { credentialHintKey, type CredentialStorage } from '@shared/credentialStorage'
 
 interface Props {
   onClose: () => void
@@ -19,6 +20,11 @@ type Status =
 export function AddSourceDialog({ onClose, onCreated }: Props): JSX.Element {
   const refreshPlaylists = useAppStore((s) => s.refreshPlaylists)
   const t = useT()
+  const [storage, setStorage] = useState<CredentialStorage | null>(null)
+
+  useEffect(() => {
+    void invoke('app:credentialStorage').then(setStorage).catch(() => setStorage(null))
+  }, [])
 
   const [kind, setKind] = useState<SourceKind>('xtream')
   const [name, setName] = useState('')
@@ -152,7 +158,24 @@ export function AddSourceDialog({ onClose, onCreated }: Props): JSX.Element {
                 </div>
               </div>
 
-              <span className="field__hint">{t('source.passwordHint')}</span>
+              {/*
+                What is actually protecting it, which is not the same sentence
+                on every machine — and on a Linux desktop with no keyring it is
+                not a reassuring one, which is exactly why it is shown.
+
+                Nothing is shown until the main process has answered. The
+                obvious fallback, assuming DPAPI until told otherwise, puts the
+                exact claim this module exists to stop making on the screen of
+                every Linux user for as long as the round trip takes.
+              */}
+              {storage && (
+                <span
+                  className={`field__hint ${storage.protectedByOs ? '' : 'field__hint--warn'}`}
+                  data-credential-backend={storage.backend}
+                >
+                  {t(credentialHintKey(storage) as TranslationKey)}
+                </span>
+              )}
             </>
           ) : (
             <>

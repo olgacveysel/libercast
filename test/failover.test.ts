@@ -9,7 +9,8 @@ import { getDb } from '@main/db'
 import { importCatalog } from '@main/db/repo/import'
 import { createPlaylist } from '@main/db/repo/playlists'
 import * as catalog from '@main/db/repo/catalog'
-import { setSettings } from '@main/db/repo/settings'
+import { rejectAlternate, unrejectAlternate } from '@main/db/repo/failoverRejects'
+import { getSettings, setSettings } from '@main/db/repo/settings'
 import { binaries, resetBinaryCache } from '@main/media/binaries'
 import { openStream } from '@main/media/openStream'
 import { streamServer } from '@main/media/streamServer'
@@ -36,7 +37,7 @@ function check(label: string, condition: boolean, detail?: unknown): void {
 const work = mkdtempSync(join(tmpdir(), 'libercast-failover-'))
 
 /** Which URLs each fake provider was asked for, so a retry can be caught. */
-const asked: Record<string, string[]> = { good: [], dead: [] }
+const asked: { good: string[]; dead: string[] } = { good: [], dead: [] }
 
 function provider(name: 'good' | 'dead', clip: Buffer | null): Promise<Server> {
   return new Promise((resolve) => {
@@ -139,7 +140,13 @@ async function main(): Promise<void> {
   const goodPort = (good.address() as AddressInfo).port
 
   getDb()
-  setSettings({ sourceFailover: true })
+
+  // The setting used to be a boolean and some installs still hold one, so the
+  // old value is written here deliberately: everything below this line is also
+  // a test that `true` still means what it used to.
+  setSettings({ sourceFailover: true as unknown as 'ask' })
+  check('an install from before the mode existed reads as "ask"',
+    getSettings().sourceFailover === 'ask', getSettings().sourceFailover)
 
   const main1 = createPlaylist({ name: 'Main provider', kind: 'm3u', url: 'http://m3u/1' })
   const backup = createPlaylist({ name: 'Backup provider', kind: 'm3u', url: 'http://m3u/2' })
@@ -167,6 +174,13 @@ async function main(): Promise<void> {
     // a fallback onto a different match.
     channel('b-other', 'Lumen Channel', goodPort)
   ])
+  // The case this whole feature exists for: a name one word away from the one
+  // asked for, where that word is a region. It scores 0.95 under the subset
+  // rule — high enough that it used to be played without anyone being told.
+  const regional = createPlaylist({ name: 'Regional provider', kind: 'm3u', url: 'http://m3u/3' })
+  importCatalog(regional.id, 'live', [], [
+    channel('c-alto2tr', 'Alto Sports 2 Turkey', goodPort)
+  ])
 
   const all = catalog.queryChannels({ playlistId: main1.id, kind: 'live', limit: 50 })
   const alto2 = all.find((c) => c.name === 'Alto Sports 2 HD')!
@@ -174,15 +188,24 @@ async function main(): Promise<void> {
   const lonely = all.find((c) => c.name === 'Channel Nobody Else Has')!
 
   const found = findAlternates(alto2.id)
-  check('the backup copy is found through the database', found.length === 1, found)
-  check('and it names the provider it came from', found[0]?.playlistName === 'Backup provider', found)
+  check('both other providers\' copies are found through the database',
+    found.length === 2, found.map((a) => a.name))
+  check('the exact one comes first', found[0]?.playlistName === 'Backup provider', found)
   check('a channel with no counterpart finds none', findAlternates(lonely.id).length === 0)
   check('and neither does one whose number only exists here',
     findAlternates(alto4.id).length === 0, findAlternates(alto4.id))
 
+  /** Unwraps a result that is expected to be a playing stream. */
+  const played = (result: Awaited<ReturnType<typeof openStream>>) => {
+    if (result.kind !== 'playing') {
+      throw new Error(`expected a stream, got a question: ${JSON.stringify(result.choice)}`)
+    }
+    return result.outcome
+  }
+
   console.log('\nOpening through a dead source')
 
-  const outcome = await openStream({ source: { type: 'channel', id: alto2.id }, owner: 'test' })
+  const outcome = played(await openStream({ source: { type: 'channel', id: alto2.id }, owner: 'test' }))
   check('it played', outcome.session.url.startsWith('http://127.0.0.1'), outcome.session.url)
   check('from the backup, not the source that refused',
     outcome.playingChannelId !== alto2.id, outcome.playingChannelId)
@@ -196,11 +219,13 @@ async function main(): Promise<void> {
   console.log('\nWhen the first source must not be tried again')
 
   const before = asked.dead.length
-  const second = await openStream({
-    source: { type: 'channel', id: alto2.id },
-    owner: 'test',
-    exclude: [alto2.id]
-  })
+  const second = played(
+    await openStream({
+      source: { type: 'channel', id: alto2.id },
+      owner: 'test',
+      exclude: [alto2.id]
+    })
+  )
   check('a channel already known dead is skipped entirely', asked.dead.length === before, asked.dead.length)
   check('and it still plays', second.playingChannelId !== alto2.id, second.playingChannelId)
   check('the switch is still reported', second.switched !== null, second.switched)
@@ -212,7 +237,7 @@ async function main(): Promise<void> {
   // ffprobe, and a panel that answers the probe badly often streams fine. With
   // nothing else to try, playing through and carrying the explanation beats
   // refusing on the strength of a pre-flight check.
-  const alone = await openStream({ source: { type: 'channel', id: lonely.id }, owner: 'test' })
+  const alone = played(await openStream({ source: { type: 'channel', id: lonely.id }, owner: 'test' }))
   check('a channel with no alternate is still played', alone.session.url.length > 0)
   check('nothing is reported as switched', alone.switched === null, alone.switched)
   check('but the refusal is carried as a warning', alone.session.warning !== null, alone.session.warning)
@@ -220,11 +245,101 @@ async function main(): Promise<void> {
     alone.session.warning?.includes('403') === true, alone.session.warning)
   streamServer.close(alone.session.id)
 
+  console.log('\nA name that is close but not the same')
+
+  // The backup's exact copy is struck off, so the only thing left is the
+  // regional variant. Before this change it would simply have played.
+  const backupChannels = catalog.queryChannels({ playlistId: backup.id, kind: 'live', limit: 50 })
+  const exactBackup = backupChannels.find((c) => c.name === 'ALTO SPORTS 2')!
+  const variant = catalog
+    .queryChannels({ playlistId: regional.id, kind: 'live', limit: 50 })
+    .find((c) => c.name === 'Alto Sports 2 Turkey')!
+
+  const both = findAlternates(alto2.id)
+  check('the exact copy is ranked ahead of the regional one',
+    both[0]?.channelId === exactBackup.id, both.map((r) => r.name))
+  check('the exact copy is marked exact',
+    both.find((r) => r.channelId === exactBackup.id)?.confidence === 'exact', both)
+  check('and the regional one only likely',
+    both.find((r) => r.channelId === variant.id)?.confidence === 'likely', both)
+
+  const onlyVariant = { type: 'channel', id: alto2.id } as const
+  // Only the exact copy is struck off. The original is still tried — and still
+  // fails — so the reason carried back is a real one.
+  const skipExact = [exactBackup.id]
+
+  const askedVariantBefore = asked.good.length
+  const question = await openStream({ source: onlyVariant, owner: 'test', exclude: skipExact })
+  check('it is not played', question.kind === 'choose', question.kind)
+  check('nothing was asked of the provider holding it',
+    asked.good.length === askedVariantBefore, asked.good.length)
+  if (question.kind === 'choose') {
+    check('it is offered instead', question.choice.offers.length === 1, question.choice.offers)
+    check('under the name that other provider uses',
+      question.choice.offers[0]?.channelName === 'Alto Sports 2 Turkey', question.choice.offers)
+    check('naming the provider it is on',
+      question.choice.offers[0]?.sourceName === 'Regional provider', question.choice.offers)
+    check('and carrying why the original failed',
+      question.choice.reason.includes('403'), question.choice.reason)
+  }
+
+  console.log('\nWhen the user says yes')
+
+  const approved = played(
+    await openStream({
+      source: onlyVariant,
+      owner: 'test',
+      exclude: skipExact,
+      allow: [variant.id]
+    })
+  )
+  check('the approved alternate plays', approved.playingChannelId === variant.id, approved.playingChannelId)
+  check('and the switch is reported', approved.switched !== null, approved.switched)
+  check('carrying the ids the notice needs to undo it',
+    approved.switched?.requestedChannelId === alto2.id &&
+      approved.switched?.alternateChannelId === variant.id, approved.switched)
+  streamServer.close(approved.session.id)
+
+  console.log('\nWhen the user says it is the wrong channel')
+
+  rejectAlternate(alto2.id, variant.id)
+  check('it is no longer a candidate',
+    findAlternates(alto2.id).every((a) => a.channelId !== variant.id), findAlternates(alto2.id))
+
+  const afterReject = await openStream({ source: onlyVariant, owner: 'test', exclude: skipExact })
+  check('and it is never offered again',
+    afterReject.kind === 'playing' || afterReject.choice.offers.length === 0, afterReject)
+  if (afterReject.kind === 'playing') streamServer.close(afterReject.outcome.session.id)
+
+  check('the refusal holds in both directions',
+    findAlternates(variant.id).every((a) => a.channelId !== alto2.id), findAlternates(variant.id))
+
+  unrejectAlternate(alto2.id, variant.id)
+  check('and can be taken back',
+    findAlternates(alto2.id).some((a) => a.channelId === variant.id), findAlternates(alto2.id))
+
+  console.log('\nWhen only certain matches are wanted')
+
+  setSettings({ sourceFailover: 'confident' })
+  const confident = await openStream({ source: onlyVariant, owner: 'test', exclude: skipExact })
+  check('an uncertain name is not even offered',
+    confident.kind === 'playing' && confident.outcome.switched === null, confident)
+  if (confident.kind === 'playing') {
+    check('the dead source is played through instead',
+      confident.outcome.session.warning !== null, confident.outcome.session.warning)
+    streamServer.close(confident.outcome.session.id)
+  }
+
+  const stillExact = played(await openStream({ source: onlyVariant, owner: 'test', exclude: [alto2.id] }))
+  check('but an exact match still plays without asking',
+    stillExact.playingChannelId === exactBackup.id, stillExact.playingChannelId)
+  streamServer.close(stillExact.session.id)
+
   console.log('\nWith failover turned off')
 
-  setSettings({ sourceFailover: false })
+  setSettings({ sourceFailover: 'off' })
   const askedBefore = asked.good.length
-  const off = await openStream({ source: { type: 'channel', id: alto2.id }, owner: 'test' })
+  const off = played(await openStream({ source: { type: 'channel', id: alto2.id }, owner: 'test' }))
   check('the other provider is never contacted', asked.good.length === askedBefore, asked.good.length)
   check('the dead source is played through, as it was before failover existed',
     off.switched === null && off.session.warning !== null, off)

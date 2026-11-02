@@ -1,21 +1,16 @@
-import type { StreamRequest } from '@shared/types'
+import type { AlternateChoice, AlternateOffer, StreamRequest, SwitchedSource } from '@shared/types'
 import { getChannel } from '@main/db/repo/catalog'
 import { getPlaylist } from '@main/db/repo/playlists'
 import { clearHealth } from '@main/db/repo/health'
 import { getSettings } from '@main/db/repo/settings'
-import { findAlternates } from '@main/sources/failover'
+import { findAlternates, type MatchConfidence } from '@main/sources/failover'
 import { createLogger, errorMessage } from '@main/util/logger'
 import { resolveProviderStream, type ProviderStream } from './resolve'
 import { streamServer, type OpenedSession } from './streamServer'
 
 const log = createLogger('failover')
 
-export interface SwitchReport {
-  channelName: string
-  /** The provider that was asked for, and the one that ended up playing. */
-  from: string
-  to: string
-}
+export type SwitchReport = SwitchedSource
 
 export interface OpenOutcome {
   session: OpenedSession
@@ -27,6 +22,17 @@ export interface OpenOutcome {
 }
 
 /**
+ * What `openStream` came back with: a stream, or a question.
+ *
+ * The question is not a failure. Nothing played, but something probably could
+ * — and the only thing standing in the way is that a person has to confirm the
+ * name, which the main process is in no position to do.
+ */
+export type OpenResult =
+  | { kind: 'playing'; outcome: OpenOutcome }
+  | { kind: 'choose'; choice: AlternateChoice }
+
+/**
  * How many other providers are worth trying.
  *
  * Each attempt costs a connection on that account and a few seconds of the
@@ -35,10 +41,24 @@ export interface OpenOutcome {
  */
 const MAX_ALTERNATES = 2
 
+/**
+ * How many uncertain alternates are worth putting in front of someone.
+ *
+ * A list of near-matches is a different problem from a dead channel. Three is
+ * enough to cover "my other two providers carry it" and few enough to read
+ * while a match is going on.
+ */
+const MAX_OFFERS = 3
+
 interface Candidate {
   channelId: number
   sourceName: string
   channelName: string
+  /**
+   * How sure we are this is the right channel. The channel the user asked for
+   * is `exact` by definition — it is the one they named.
+   */
+  confidence: MatchConfidence
 }
 
 function describeChannel(channelId: number): Candidate | null {
@@ -48,7 +68,8 @@ function describeChannel(channelId: number): Candidate | null {
   return {
     channelId,
     channelName: channel.name,
-    sourceName: playlist?.name ?? 'this source'
+    sourceName: playlist?.name ?? 'this source',
+    confidence: 'exact'
   }
 }
 
@@ -72,9 +93,11 @@ function describeChannel(channelId: number): Candidate | null {
  * running would make failover cost two connections instead of one, on the
  * account that is already failing.
  */
-export async function openStream(request: StreamRequest): Promise<OpenOutcome> {
+export async function openStream(request: StreamRequest): Promise<OpenResult> {
   const settings = getSettings()
+  const mode = settings.sourceFailover
   const dead = request.exclude ?? []
+  const approved = new Set(request.allow ?? [])
 
   // Only live channels have a counterpart elsewhere. A recording, a download
   // or a specific series episode is the one file it is — and a catch-up window
@@ -82,22 +105,55 @@ export async function openStream(request: StreamRequest): Promise<OpenOutcome> {
   // on another provider is a different recording at different times, not a
   // fallback.
   const canFailOver =
-    settings.sourceFailover !== false && request.source.type === 'channel' && !isVod(request.source.id)
+    mode !== 'off' && request.source.type === 'channel' && !isVod(request.source.id)
 
   const requested = request.source.type === 'channel' ? describeChannel(request.source.id) : null
   const skipRequested = requested !== null && dead.includes(requested.channelId)
 
   const chain: Candidate[] = []
   if (requested !== null && !skipRequested) chain.push(requested)
-  else if (requested === null) chain.push({ channelId: -1, sourceName: '', channelName: '' })
+  else if (requested === null) {
+    chain.push({ channelId: -1, sourceName: '', channelName: '', confidence: 'exact' })
+  }
+
+  // Alternates that were found but are not ours to play: the name was only
+  // similar, and nobody has looked at it yet. Collected rather than dropped,
+  // because "I could not play this, but this other thing might be it" is a
+  // more useful answer than an error.
+  const offers: AlternateOffer[] = []
+  let playable = 0
 
   if (canFailOver && requested !== null) {
-    for (const alternate of findAlternates(requested.channelId, dead).slice(0, MAX_ALTERNATES)) {
-      chain.push({
+    for (const alternate of findAlternates(requested.channelId, dead)) {
+      const candidate: Candidate = {
         channelId: alternate.channelId,
         channelName: alternate.name,
-        sourceName: alternate.playlistName
-      })
+        sourceName: alternate.playlistName,
+        confidence: alternate.confidence
+      }
+
+      // An exact match is the same channel with a different feed description,
+      // so it plays. Anything less is a guess, and a guess is only playable
+      // once a person has agreed to it.
+      const allowed = candidate.confidence === 'exact' || approved.has(candidate.channelId)
+
+      if (allowed) {
+        if (playable < MAX_ALTERNATES) {
+          chain.push(candidate)
+          playable += 1
+        }
+        continue
+      }
+
+      // `confident` found nothing it was sure of and will not ask; the user
+      // chose to hear that the source failed rather than be interrupted.
+      if (mode === 'ask' && offers.length < MAX_OFFERS) {
+        offers.push({
+          channelId: candidate.channelId,
+          channelName: candidate.channelName,
+          sourceName: candidate.sourceName
+        })
+      }
     }
   }
 
@@ -127,7 +183,13 @@ export async function openStream(request: StreamRequest): Promise<OpenOutcome> {
 
       // A refusal the server played through anyway: take the next source if
       // there is one, and give this connection back first.
-      if (session.refused && index < chain.length - 1) {
+      //
+      // An unanswered offer counts as somewhere left to go. Playing on through
+      // a definitive refusal is the right call only when the alternative is a
+      // black screen; when there is a name worth asking about, continuing to
+      // push a 403 page at the user while saying nothing about it is not a
+      // kindness.
+      if (session.refused && (index < chain.length - 1 || offers.length > 0)) {
         log.warn(
           `${candidate.channelName} was refused by ${candidate.sourceName}: ` +
             `${session.warning ?? 'no reason given'} — trying another source`
@@ -147,7 +209,9 @@ export async function openStream(request: StreamRequest): Promise<OpenOutcome> {
             : {
                 channelName: candidate.channelName,
                 from: requested.sourceName,
-                to: candidate.sourceName
+                to: candidate.sourceName,
+                requestedChannelId: requested.channelId,
+                alternateChannelId: candidate.channelId
               }
 
       // It played, so whatever the last scan concluded about it is out of
@@ -162,10 +226,13 @@ export async function openStream(request: StreamRequest): Promise<OpenOutcome> {
       }
 
       return {
-        session,
-        provider,
-        switched,
-        playingChannelId: candidate.channelId === -1 ? null : candidate.channelId
+        kind: 'playing',
+        outcome: {
+          session,
+          provider,
+          switched,
+          playingChannelId: candidate.channelId === -1 ? null : candidate.channelId
+        }
       }
     } catch (error) {
       if (firstError === null) firstError = error
@@ -179,6 +246,27 @@ export async function openStream(request: StreamRequest): Promise<OpenOutcome> {
 
   // The message the user needs is the one about the channel they asked for,
   // not whatever the last backup happened to say.
+  const reason = errorMessage(firstError ?? new Error('That stream could not be opened'))
+
+  // Nothing played, but something here might be the right channel. Asking is
+  // the only honest move left: the names differ, and no threshold decides
+  // whether "Turkey" on the end is a region or a spelling.
+  if (offers.length > 0 && requested !== null) {
+    log.info(
+      `nothing played for "${requested.channelName}"; offering ${offers.length} ` +
+        `similar name(s): ${offers.map((offer) => `"${offer.channelName}"`).join(', ')}`
+    )
+    return {
+      kind: 'choose',
+      choice: {
+        reason,
+        channelName: requested.channelName,
+        fromSource: requested.sourceName,
+        offers
+      }
+    }
+  }
+
   throw firstError ?? new Error('That stream could not be opened')
 }
 

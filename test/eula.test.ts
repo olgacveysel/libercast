@@ -70,5 +70,54 @@ check('the template carries a placeholder, not a version',
   template.toString('latin1').includes('{{version}}'))
 check('and is itself ASCII', [...template].every((byte) => byte <= 127))
 
+console.log('\nEach platform gets its own')
+
+// The notice is the one document someone reads before deciding to trust an
+// unsigned binary, so a paragraph that is true on Windows and false on Linux
+// is worse than one that is missing.
+for (const [platform, expected, forbidden] of [
+  ['win32', 'Windows DPAPI|%APPDATA%|Windows will warn you', '~/.config|AppImage|Keychain'],
+  ['linux', '~/.config|keyring|AppImage', '%APPDATA%|Windows will warn you|Keychain'],
+  ['darwin', 'Keychain|Library/Application Support|notarised', '%APPDATA%|AppImage']
+] as const) {
+  execFileSync(process.execPath, [join(root, 'tools', 'make-eula.mjs'), platform], {
+    cwd: root,
+    env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+    stdio: 'pipe'
+  })
+  const written = readFileSync(join(root, 'resources', 'eula.txt'), 'latin1')
+
+  for (const phrase of expected.split('|')) {
+    check(`${platform} says "${phrase}"`, written.includes(phrase), written.slice(0, 60))
+  }
+  for (const phrase of forbidden.split('|')) {
+    check(`${platform} does not mention "${phrase}"`, !written.includes(phrase))
+  }
+  check(`${platform} is still ASCII`, [...Buffer.from(written, 'latin1')].every((b) => b <= 127))
+  check(`${platform} has nothing left unfilled`, !/\{\{/.test(written), written.match(/\{\{[a-z]*\}\}/i))
+}
+
+// An unknown platform must fail loudly rather than writing a notice with holes
+// in it where the paragraphs should be.
+check('an unknown platform is refused', (() => {
+  try {
+    execFileSync(process.execPath, [join(root, 'tools', 'make-eula.mjs'), 'plan9'], {
+      cwd: root,
+      env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+      stdio: 'pipe'
+    })
+    return false
+  } catch {
+    return true
+  }
+})())
+
+// Left as the Windows one, which is what `npm run pack:win` expects to find.
+execFileSync(process.execPath, [join(root, 'tools', 'make-eula.mjs'), 'win32'], {
+  cwd: root,
+  env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+  stdio: 'pipe'
+})
+
 console.log(failures === 0 ? '\neula: all passed' : `\neula: ${failures} failed`)
 process.exit(failures === 0 ? 0 : 1)
