@@ -55,15 +55,38 @@ files:
   - '!asar-*.txt'
 
   - '!node_modules/ffprobe-static/tests/**'
+
+  # better-sqlite3 brings the full SQLite C source and its own binding sources
+  # so it *can* be compiled. Nothing compiles it any more — the shipped binary
+  # is a Node-API prebuild — so this is 10 MB of source code in every
+  # installer, for a compile that never happens.
+  - '!node_modules/better-sqlite3/deps/**'
+  - '!node_modules/better-sqlite3/src/**'
+  - '!node_modules/better-sqlite3/binding.gyp'
 # Fails the build if the package came out far larger than the application is,
 # rather than letting an oversized installer reach someone's download folder.
 afterPack: tools/after-pack.cjs
+
+# better-sqlite3 ships Node-API prebuilds — one binary per platform, valid
+# across Node and Electron versions alike, because Node-API is ABI-stable. So
+# there is nothing to rebuild, and attempting it is not merely wasted work: it
+# sends node-gyp to fetch Electron's headers over the network on every install
+# and every package, which fails wherever that host is not reachable.
+#
+# This was `npmRebuild` doing its default job on a dependency that used to need
+# it and no longer does.
+npmRebuild: false
 
 asarUnpack:
   # ffmpeg and ffprobe are real executables and cannot be run from inside asar.
   - resources/**
   - node_modules/ffmpeg-static/**
   - node_modules/ffprobe-static/**
+  # A .node addon cannot be loaded from inside the archive — the dynamic
+  # linker needs a real file. electron-builder usually spots these on its own;
+  # it is stated here because "usually" is how the ffprobe exclusions went
+  # wrong, and a database that will not open is not a subtle failure.
+  - node_modules/better-sqlite3/**
 
 # Put beside LiberCast.exe rather than inside the asar, because the GPL text
 # has to be findable by someone who received the installer, and a licence
@@ -112,6 +135,15 @@ win:
     # Windows build so a build for anything else still gets its own ffprobe.
     - '!node_modules/ffprobe-static/bin/{darwin,linux}/**'
     - '!node_modules/ffprobe-static/bin/win32/ia32/**'
+    # Same reasoning for the database addon: eight platforms' prebuilds ship
+    # in the package, of which one is ever loaded.
+    #
+    # Named one by one rather than excluding the directory and adding one
+    # back. A re-include after a wildcard exclusion does not survive here —
+    # it produced a package with no prebuilds at all, which is an application
+    # that starts and then cannot open its database.
+    - '!node_modules/better-sqlite3/prebuilds/{darwin,linux,linuxmusl}-*'
+    - '!node_modules/better-sqlite3/prebuilds/win32-arm64.node'
   target:
     - target: nsis
       arch: [x64]
@@ -153,15 +185,23 @@ linux:
   # in this map would look like the source of truth while having no effect.
   # That description is what the menu shows, which is why it no longer names a
   # single platform — it used to say "for Windows", on a Linux desktop.
+  #
+  # electron-builder 25 nested these under `entry`; a flat map is now a schema
+  # error rather than something silently ignored, which is the better failure.
   desktop:
-    Name: LiberCast
-    GenericName: IPTV Player
-    Keywords: iptv;m3u;xtream;tv;stream;
+    entry:
+      Name: LiberCast
+      GenericName: IPTV Player
+      Keywords: iptv;m3u;xtream;tv;stream;
   files:
     # Same reasoning as the Windows build: ffprobe-static ships a binary for
     # every platform it supports and a Linux x64 build needs one of them.
     - '!node_modules/ffprobe-static/bin/{darwin,win32}/**'
     - '!node_modules/ffprobe-static/bin/linux/ia32/**'
+    # glibc, not musl: these packages target ordinary desktop distributions.
+    # Named one by one, for the reason given in the Windows block.
+    - '!node_modules/better-sqlite3/prebuilds/{darwin,win32,linuxmusl}-*'
+    - '!node_modules/better-sqlite3/prebuilds/linux-arm64.node'
   target:
     - target: AppImage
       arch: [x64]
