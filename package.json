@@ -33,7 +33,9 @@
     "pack:linux": "npm run build && npm run eula:linux && electron-builder --linux --publish never",
     "verify:credentials": "npm run build && electron test/browser/verify-credentials.cjs",
     "typecheck:test": "tsc --noEmit -p tsconfig.test.json",
-    "verify:failover": "npm run build && electron test/browser/verify-failover.cjs"
+    "verify:failover": "npm run build && electron test/browser/verify-failover.cjs",
+    "verify:all": "node tools/verify-all.mjs",
+    "ci": "npm run typecheck && npm test && npm run verify:all"
   },
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.1",
