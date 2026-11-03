@@ -112,6 +112,8 @@ export const en = {
 
   /* ---------------- player ---------------- */
   'player.fullscreen': 'Fullscreen',
+  'player.pip': 'Picture in picture',
+  'player.pipExit': 'Leave picture in picture',
   'catchup.replay': 'Watch this again from the provider’s archive',
   'catchup.replayOne': 'Watch {title} again',
   'catchup.replaying': 'Replaying {title}',

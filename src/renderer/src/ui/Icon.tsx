@@ -149,6 +149,17 @@ export function IconFullscreen(props: Props): JSX.Element {
   )
 }
 
+/** A small frame in the corner of a larger one: the shape every player uses. */
+export function IconPictureInPicture(props: Props & { active?: boolean }): JSX.Element {
+  const { active, ...rest } = props
+  return (
+    <svg {...base(rest)}>
+      <rect x="2.5" y="4.5" width="19" height="15" rx="2" />
+      <rect x="12.5" y="11.5" width="8" height="7" rx="1" fill={active ? 'currentColor' : 'none'} />
+    </svg>
+  )
+}
+
 export function IconMinimize(props: Props): JSX.Element {
   return (
     <svg {...base(props)} strokeWidth={1.4}>

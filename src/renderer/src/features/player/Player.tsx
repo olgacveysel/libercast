@@ -6,6 +6,7 @@ import { useAppStore } from '@renderer/store/useAppStore'
 import {
   IconAudio,
   IconFullscreen,
+  IconPictureInPicture,
   IconNext,
   IconPrevious,
   IconRecord,
@@ -25,6 +26,7 @@ import { useT } from '@renderer/i18n'
 import { StreamStats } from './StreamStats'
 import { AlternatePrompt } from './AlternatePrompt'
 import { SwitchedNotice } from './SwitchedNotice'
+import { usePictureInPicture } from './usePictureInPicture'
 import { useHotkeys } from './useHotkeys'
 import { stepVolume } from '@renderer/features/player/volume'
 
@@ -127,6 +129,8 @@ export function Player({
    * stage alone took the transport bar off screen with it, which left no way to
    * change channel, adjust volume or even see what was playing.
    */
+  const pip = usePictureInPicture(videoRef)
+
   const toggleFullscreen = (): void => {
     const root = rootRef.current
     if (!root) return
@@ -405,6 +409,23 @@ export function Player({
             </div>
 
             <PictureFitMenu />
+
+            {/*
+              Absent rather than disabled where the runtime does not offer it:
+              a control that is always there and never works is worse than one
+              that is not there.
+            */}
+            {pip.supported && (
+              <button
+                className={`btn btn--ghost ${pip.active ? 'btn--on' : ''}`}
+                style={{ padding: 6 }}
+                onClick={() => void pip.toggle()}
+                aria-label={t(pip.active ? 'player.pipExit' : 'player.pip')}
+                aria-pressed={pip.active}
+              >
+                <IconPictureInPicture size={17} active={pip.active} />
+              </button>
+            )}
 
             <button className="btn btn--ghost" style={{ padding: 6 }} onClick={toggleFullscreen} aria-label={t('player.fullscreen')}>
               <IconFullscreen size={17} />

@@ -108,6 +108,8 @@ export const de: Record<TranslationKey, string> = {
   'health.deadTitle': 'Dieser Sender hat bei der letzten Prüfung nicht geantwortet.',
 
   'player.fullscreen': 'Vollbild',
+  'player.pip': 'Bild im Bild',
+  'player.pipExit': 'Bild im Bild beenden',
   'catchup.replay': 'Aus dem Archiv des Anbieters erneut ansehen',
   'catchup.replayOne': '{title} erneut ansehen',
   'catchup.replaying': '{title} wird erneut abgespielt',

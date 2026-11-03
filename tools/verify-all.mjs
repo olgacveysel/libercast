@@ -73,7 +73,8 @@ const HARNESSES = [
   'verify-nextup',
   'verify-credentials',
   'verify-failover',
-  'verify-vodfilters'
+  'verify-vodfilters',
+  'verify-pip'
 ]
 
 function run(command, args, options = {}) {
