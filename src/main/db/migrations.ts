@@ -401,6 +401,35 @@ export const MIGRATIONS: Migration[] = [
         PRIMARY KEY (channel_id, alternate_id)
       );
     `
+  },
+  {
+    version: 12,
+    name: 'vod-list-metadata',
+    up: `
+      -- What a provider says about a film or show in the *list* response.
+      --
+      -- vod_info already holds richer metadata, but it is fetched one item at
+      -- a time when a detail page is opened, so it covers the few titles
+      -- somebody has clicked and nothing else. Sorting twenty thousand films
+      -- by rating needs the rating on every row, which means taking what the
+      -- list gives and storing it at import.
+      --
+      -- Nullable throughout and nullable on purpose: M3U sources carry none
+      -- of this, and panels disagree about the rest. A missing value means
+      -- "the provider did not say", which is different from zero.
+      ALTER TABLE channels ADD COLUMN rating REAL;
+      ALTER TABLE channels ADD COLUMN year INTEGER;
+
+      -- When the provider added it, not when this installation first saw it.
+      -- Our own added_at is identical for every row of a first sync, so it
+      -- sorts nothing.
+      ALTER TABLE channels ADD COLUMN provider_added_at INTEGER;
+
+      -- Browsing is always scoped to one kind, so every sort starts there.
+      CREATE INDEX idx_channels_vod_rating ON channels(kind, rating);
+      CREATE INDEX idx_channels_vod_year   ON channels(kind, year);
+      CREATE INDEX idx_channels_vod_added  ON channels(kind, provider_added_at);
+    `
   }
 ]
 

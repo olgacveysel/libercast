@@ -57,6 +57,14 @@ interface RawVodStream {
   stream_icon?: string
   category_id?: string | number | null
   container_extension?: string
+  // Panels disagree on which of these they send and in what type. All are
+  // read defensively and any of them may be absent.
+  rating?: string | number | null
+  rating_5based?: string | number | null
+  year?: string | number | null
+  releaseDate?: string | null
+  release_date?: string | null
+  added?: string | number | null
 }
 
 interface RawSeries {
@@ -64,6 +72,12 @@ interface RawSeries {
   name?: string
   cover?: string
   category_id?: string | number | null
+  rating?: string | number | null
+  rating_5based?: string | number | null
+  year?: string | number | null
+  releaseDate?: string | null
+  release_date?: string | null
+  last_modified?: string | number | null
 }
 
 interface RawVodInfoResponse {
@@ -190,7 +204,10 @@ export class XtreamClient {
           logoUrl: stream.stream_icon || null,
           streamUrl: this.vodStreamUrl(id, extension),
           containerExtension: extension,
-          isAdult: false
+          isAdult: false,
+          rating: vodRating(stream.rating, stream.rating_5based),
+          year: vodYear(stream.year, stream.releaseDate, stream.release_date),
+          providerAddedAt: vodAddedAt(stream.added)
         }
       ]
     })
@@ -221,7 +238,10 @@ export class XtreamClient {
           // Series have no single playable URL; episodes resolve individually.
           streamUrl: '',
           containerExtension: null,
-          isAdult: false
+          isAdult: false,
+          rating: vodRating(show.rating, show.rating_5based),
+          year: vodYear(show.year, show.releaseDate, show.release_date),
+          providerAddedAt: vodAddedAt(show.last_modified)
         }
       ]
     })
@@ -422,6 +442,58 @@ function num(value: unknown): number | null {
   if (value === null || value === undefined || value === '') return null
   const parsed = Number(value)
   return Number.isFinite(parsed) ? parsed : null
+}
+
+/**
+ * A rating on a 0-10 scale, whatever scale the panel used.
+ *
+ * Panels send `rating` on either a 5- or a 10-point scale and often send
+ * `rating_5based` alongside it. A 5-point value read as a 10-point one turns
+ * an excellent film into a middling one, so the two are reconciled rather than
+ * whichever arrives first being trusted.
+ */
+export function vodRating(raw: unknown, fiveBased: unknown): number | null {
+  const ten = num(raw)
+  const five = num(fiveBased)
+
+  // When both are present and the first really is on the 5-point scale, the
+  // panel has told us so by sending the same number twice.
+  if (ten !== null && five !== null && Math.abs(ten - five) < 0.01 && ten <= 5) {
+    return round1(ten * 2)
+  }
+  if (ten !== null && ten > 0 && ten <= 10) return round1(ten)
+  if (five !== null && five > 0 && five <= 5) return round1(five * 2)
+  return null
+}
+
+/** A four-digit year, from a year field or the front or back of a date. */
+export function vodYear(...values: unknown[]): number | null {
+  for (const value of values) {
+    const asNumber = num(value)
+    if (asNumber !== null && asNumber >= 1870 && asNumber <= 2200) return Math.trunc(asNumber)
+
+    const asText = typeof value === 'string' ? value : null
+    const match = asText?.match(/\b(1[89]\d{2}|20\d{2}|21\d{2})\b/)
+    if (match) return Number(match[1])
+  }
+  return null
+}
+
+/**
+ * When the provider added it, in milliseconds.
+ *
+ * Xtream sends unix seconds as a string. This is deliberately separate from
+ * the row's own `added_at`: ours is when *this installation* first saw the
+ * item, which on a first sync is every title at once and sorts by nothing.
+ */
+export function vodAddedAt(value: unknown): number | null {
+  const seconds = num(value)
+  if (seconds === null || seconds <= 0) return null
+  return seconds > 1e12 ? Math.trunc(seconds) : Math.trunc(seconds * 1000)
+}
+
+function round1(value: number): number {
+  return Math.round(value * 10) / 10
 }
 
 /** `backdrop_path` is an array of URLs on most panels and a bare string on some. */

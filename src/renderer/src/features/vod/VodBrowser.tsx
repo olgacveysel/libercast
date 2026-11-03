@@ -17,6 +17,22 @@ interface Props {
 /** Poster grids get heavy fast; this caps one page of results. */
 const PAGE_SIZE = 300
 
+type VodSort = 'name' | 'added' | 'rating' | 'year'
+
+/**
+ * Decades rather than a year picker.
+ *
+ * Providers date the same film differently and plenty give no year at all, so
+ * a precise year is precision the data does not support. A decade is a
+ * question the catalogue can actually answer.
+ */
+const DECADES = (() => {
+  const newest = Math.floor(new Date().getFullYear() / 10) * 10
+  const list: number[] = []
+  for (let start = newest; start >= 1950; start -= 10) list.push(start)
+  return list
+})()
+
 export function VodBrowser({ kind, onAddSource }: Props): JSX.Element {
   const { activePlaylistId, playlists } = useAppStore()
   const t = useT()
@@ -32,6 +48,18 @@ export function VodBrowser({ kind, onAddSource }: Props): JSX.Element {
   const [selected, setSelected] = useState<ChannelWithState | null>(null)
   const [playing, setPlaying] = useState<VodTarget | null>(null)
   const [syncing, setSyncing] = useState(false)
+  const [sort, setSort] = useState<VodSort>('name')
+  const [minRating, setMinRating] = useState(0)
+  const [decade, setDecade] = useState<number | null>(null)
+  /**
+   * Whether this source carries anything worth filtering on.
+   *
+   * M3U playlists carry no ratings or years at all, and plenty of panels send
+   * none either. Offering a rating filter there is offering a control that
+   * can only ever empty the screen, so the controls appear once the catalogue
+   * has shown it has the data.
+   */
+  const [hasMetadata, setHasMetadata] = useState({ rating: false, year: false })
 
   const playlist = useMemo(
     () => playlists.find((p) => p.id === activePlaylistId) ?? null,
@@ -49,6 +77,10 @@ export function VodBrowser({ kind, onAddSource }: Props): JSX.Element {
     setCategoryId(null)
     setSearch('')
     setSelected(null)
+    setSort('name')
+    setMinRating(0)
+    setDecade(null)
+    setHasMetadata({ rating: false, year: false })
     if (activePlaylistId == null) {
       setCategories([])
       return
@@ -70,7 +102,10 @@ export function VodBrowser({ kind, onAddSource }: Props): JSX.Element {
       kind,
       categoryId,
       search: debounced || undefined,
-      sort: 'name',
+      sort,
+      minRating: minRating > 0 ? minRating : undefined,
+      yearFrom: decade ?? undefined,
+      yearTo: decade == null ? undefined : decade + 9,
       limit: PAGE_SIZE
     }
 
@@ -80,12 +115,21 @@ export function VodBrowser({ kind, onAddSource }: Props): JSX.Element {
       const [rows, count] = await Promise.all([invoke('channels:query', query), invoke('channels:count', query)])
       setItems(rows)
       setTotal(count)
+
+      // Sticky: a filtered page can legitimately contain no rated titles, and
+      // hiding the control the user just used because its own result came
+      // back empty would be its own small madness. Reset happens when the
+      // source or the kind changes, below.
+      setHasMetadata((prev) => ({
+        rating: prev.rating || rows.some((row) => row.rating !== null),
+        year: prev.year || rows.some((row) => row.year !== null)
+      }))
     } catch (e) {
       setError(messageOf(e))
     } finally {
       setLoading(false)
     }
-  }, [activePlaylistId, categoryId, debounced, kind])
+  }, [activePlaylistId, categoryId, debounced, kind, sort, minRating, decade])
 
   useEffect(() => {
     void load()
@@ -168,6 +212,53 @@ export function VodBrowser({ kind, onAddSource }: Props): JSX.Element {
             onChange={(event) => setSearch(event.target.value)}
           />
         </div>
+
+        <select
+          className="input"
+          style={{ width: 150 }}
+          value={sort}
+          onChange={(event) => setSort(event.target.value as VodSort)}
+          aria-label={t('vod.sortBy')}
+        >
+          <option value="name">{t('vod.sortName')}</option>
+          <option value="added">{t('vod.sortAdded')}</option>
+          {hasMetadata.rating && <option value="rating">{t('vod.sortRating')}</option>}
+          {hasMetadata.year && <option value="year">{t('vod.sortYear')}</option>}
+        </select>
+
+        {hasMetadata.rating && (
+          <select
+            className="input"
+            style={{ width: 130 }}
+            value={String(minRating)}
+            onChange={(event) => setMinRating(Number(event.target.value))}
+            aria-label={t('vod.minRating')}
+          >
+            <option value="0">{t('vod.anyRating')}</option>
+            <option value="6">{t('vod.ratingAtLeast', { rating: '6' })}</option>
+            <option value="7">{t('vod.ratingAtLeast', { rating: '7' })}</option>
+            <option value="8">{t('vod.ratingAtLeast', { rating: '8' })}</option>
+          </select>
+        )}
+
+        {hasMetadata.year && (
+          <select
+            className="input"
+            style={{ width: 130 }}
+            value={decade === null ? '' : String(decade)}
+            onChange={(event) =>
+              setDecade(event.target.value === '' ? null : Number(event.target.value))
+            }
+            aria-label={t('vod.decade')}
+          >
+            <option value="">{t('vod.anyYear')}</option>
+            {DECADES.map((start) => (
+              <option key={start} value={String(start)}>
+                {start}s
+              </option>
+            ))}
+          </select>
+        )}
 
         <div className="spacer" />
 

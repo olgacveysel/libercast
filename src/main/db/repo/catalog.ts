@@ -65,6 +65,8 @@ interface ChannelRow {
   container_extension: string | null
   is_adult: number
   catchup_days: number | null
+  rating: number | null
+  year: number | null
   hidden: number
   added_at: number
   /** The override when one is set, otherwise the provider's own id. */
@@ -114,6 +116,22 @@ function buildWhere(query: ChannelQuery): { sql: string; params: unknown[] } {
 
   if (query.favoritesOnly) clauses.push('f.channel_id IS NOT NULL')
 
+  // A filter on something the provider did not send excludes the row. That is
+  // the honest reading of "rated 7 or better": a title with no rating has not
+  // met the bar, because nobody said it did.
+  if (query.minRating != null) {
+    clauses.push('ch.rating IS NOT NULL AND ch.rating >= ?')
+    params.push(query.minRating)
+  }
+  if (query.yearFrom != null) {
+    clauses.push('ch.year IS NOT NULL AND ch.year >= ?')
+    params.push(query.yearFrom)
+  }
+  if (query.yearTo != null) {
+    clauses.push('ch.year IS NOT NULL AND ch.year <= ?')
+    params.push(query.yearTo)
+  }
+
   // Parental filtering is applied here rather than in the UI so that no hidden
   // row ever reaches the renderer, whichever screen asked for it.
   const lock = lockClause('ch')
@@ -134,10 +152,24 @@ function buildWhere(query: ChannelQuery): { sql: string; params: unknown[] } {
   return { sql: clauses.join(' AND '), params }
 }
 
+/**
+ * Every sort puts rows the provider said nothing about last.
+ *
+ * A film with no rating is not a film rated zero, and letting the two sort
+ * together buries the unrated half of a catalogue under everything else — or,
+ * descending, floats it to the top. `IS NULL` first in each clause keeps
+ * "not stated" out of the ranking rather than guessing a value for it.
+ *
+ * Name is the tiebreaker throughout, so a page of equally rated films keeps a
+ * stable order between queries instead of shuffling.
+ */
 const ORDER_BY: Record<NonNullable<ChannelQuery['sort']>, string> = {
   name: 'ch.name_folded ASC',
   number: 'ch.number IS NULL, ch.number ASC, ch.name_folded ASC',
-  recent: 'h.last_watched_at IS NULL, h.last_watched_at DESC'
+  recent: 'h.last_watched_at IS NULL, h.last_watched_at DESC',
+  added: 'ch.provider_added_at IS NULL, ch.provider_added_at DESC, ch.name_folded ASC',
+  rating: 'ch.rating IS NULL, ch.rating DESC, ch.name_folded ASC',
+  year: 'ch.year IS NULL, ch.year DESC, ch.name_folded ASC'
 }
 
 /**
@@ -421,6 +453,8 @@ function attachEpg(rows: ChannelRow[]): ChannelWithState[] {
     containerExtension: r.container_extension,
     isAdult: r.is_adult === 1,
     catchupDays: r.catchup_days ?? 0,
+    rating: r.rating ?? null,
+    year: r.year ?? null,
     hidden: r.hidden === 1,
     addedAt: r.added_at,
     favorite: r.favorite === 1,

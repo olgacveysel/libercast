@@ -45,8 +45,9 @@ export function importCatalog(
     `INSERT INTO channels
        (playlist_id, category_id, external_id, kind, name, name_folded, number, logo_url,
         epg_channel_id, stream_url, container_extension, is_adult, catchup_days, match_key,
+        rating, year, provider_added_at,
         hidden, added_at, seen_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
      ON CONFLICT(playlist_id, external_id) DO UPDATE SET
        category_id = excluded.category_id,
        kind = excluded.kind,
@@ -60,6 +61,12 @@ export function importCatalog(
        is_adult = excluded.is_adult,
        catchup_days = excluded.catchup_days,
        match_key = excluded.match_key,
+       -- Only overwritten when the provider sent something. A panel that
+       -- omits the rating on one sync must not erase the one it sent on the
+       -- last, or a catalogue degrades a little every time it refreshes.
+       rating = COALESCE(excluded.rating, channels.rating),
+       year = COALESCE(excluded.year, channels.year),
+       provider_added_at = COALESCE(excluded.provider_added_at, channels.provider_added_at),
        seen_at = excluded.seen_at`
   )
 
@@ -92,6 +99,9 @@ export function importCatalog(
         Math.max(0, Math.trunc(channel.catchupDays ?? 0)),
         // What the same channel on another provider will also normalise to.
         normalizedKey(channel.name),
+        channel.rating ?? null,
+        channel.year ?? null,
+        channel.providerAddedAt ?? null,
         stamp,
         stamp
       )

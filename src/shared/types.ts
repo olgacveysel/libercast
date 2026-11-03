@@ -85,6 +85,15 @@ export interface Channel {
   /** ts, m3u8, mp4 ... used to pick a player backend hint. */
   containerExtension: string | null
   isAdult: boolean
+  /**
+   * What the provider said about a film or show in its list response.
+   *
+   * Null means the provider did not say, which is not a rating of zero or an
+   * unknown year — the browser needs to tell those apart, or a panel that
+   * sends no ratings shows "0.0" against every title it has.
+   */
+  rating: number | null
+  year: number | null
   hidden: boolean
   addedAt: number
   /**
@@ -237,7 +246,17 @@ export interface ChannelQuery {
   search?: string
   favoritesOnly?: boolean
   includeHidden?: boolean
-  sort?: 'name' | 'number' | 'recent'
+  /**
+   * `added`, `rating` and `year` only mean anything for films and series:
+   * they sort on what the provider said in its list response, which live
+   * channels do not have.
+   */
+  sort?: 'name' | 'number' | 'recent' | 'added' | 'rating' | 'year'
+  /** Keep only titles the provider rated at least this highly, out of 10. */
+  minRating?: number
+  /** Keep only titles released in this span, inclusive. */
+  yearFrom?: number
+  yearTo?: number
   limit?: number
   offset?: number
 }

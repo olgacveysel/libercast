@@ -17,6 +17,22 @@ export interface ParsedChannel {
   isAdult?: boolean
   /** Days of archive the provider keeps for this channel; 0 for none. */
   catchupDays?: number | null
+  /**
+   * Catalogue metadata a provider sends in the *list* response.
+   *
+   * Not to be confused with `vod_info`, which is richer and fetched one item
+   * at a time when a detail page is opened — so it exists for the handful of
+   * films someone has looked at and nothing else. Anything the browser has to
+   * filter or sort thousands of rows by has to come from the list, or it is
+   * not there when it is needed.
+   *
+   * All optional: M3U carries none of it, and panels disagree about the rest.
+   */
+  rating?: number | null
+  /** Release year, where the provider gives one. */
+  year?: number | null
+  /** When the *provider* added it, which is not when we first saw it. */
+  providerAddedAt?: number | null
 }
 
 export interface ParsedCatalog {

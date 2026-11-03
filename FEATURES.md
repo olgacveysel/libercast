@@ -82,7 +82,7 @@
 | 4.3 | Trailer playback where a YouTube ID is provided | M3 | Built |
 | 4.4 | Continue Watching with exact resume position | M3 | Built |
 | 4.5 | Optional TMDB enrichment when provider metadata is thin (user-supplied API key) | M3 | Not built |
-| 4.6 | Filter by genre / year / rating, sort by added / name / rating | M3 | Not built |
+| 4.6 | Filter by year and rating, sort by name / added / rating / year | M3 | Built — genre is served by the category pane; filters need a re-sync to populate |
 
 ## 5. Series
 
