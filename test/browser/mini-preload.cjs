@@ -18,7 +18,7 @@ const BASE_SETTINGS = {
   autoRefreshHours: 0, autoRefreshEpg: true, lastAutoRefresh: null,
   hardwareAcceleration: true, showStreamStats: false, resumeLastChannel: true,
   preferredAudioLanguages: [], preferredSubtitleLanguages: [],
-  recordingsPath: null, downloadsPath: null, ffmpegPath: null,
+  recordingsPath: null, recordingTemplate: '{channel} - {title} ({date} {time})', downloadsPath: null, ffmpegPath: null,
   maxConcurrentDownloads: 1, videoFit: 'fit', videoZoom: 1,
   sidebarCollapsed: false, multiViewColumns: 2, multiViewRows: 2,
   multiViewChannels: [], subtitleSize: 1, subtitleColor: '#ffffff',

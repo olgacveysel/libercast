@@ -27,7 +27,7 @@ const settings = {
   resumeLastChannel: true,
   preferredAudioLanguages: [],
   preferredSubtitleLanguages: [],
-  recordingsPath: null,
+  recordingsPath: null, recordingTemplate: '{channel} - {title} ({date} {time})',
   downloadsPath: null,
   ffmpegPath: null,
   maxConcurrentDownloads: 1,

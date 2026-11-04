@@ -126,7 +126,9 @@ async function main(): Promise<void> {
   check('omits a missing subtitle', safeFileName('Arrival', null, 'mp4') === 'Arrival.mp4')
   check(
     'strips characters Windows rejects',
-    safeFileName('A: B/C\\D?E*F"G<H>I|J', null, 'mp4') === 'A BCDEFGHIJ.mp4',
+    // Separators become spaces rather than disappearing, so the words either
+    // side of them stay words. The rest are simply not legal anywhere.
+    safeFileName('A: B/C\\D?E*F"G<H>I|J', null, 'mp4') === 'A B C DEFGHI J.mp4',
     safeFileName('A: B/C\\D?E*F"G<H>I|J', null, 'mp4')
   )
   check('never produces an empty name', safeFileName('///', null, 'mp4') === 'Download.mp4')

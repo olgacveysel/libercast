@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { app } from 'electron'
 import type { Recording, RecordingRequest } from '@shared/types'
 import { getChannel } from '@main/db/repo/catalog'
+import { renderTemplate } from '@shared/filename'
 import { getSettings } from '@main/db/repo/settings'
 import * as repo from '@main/db/repo/recordings'
 import { resolveProviderStream } from './resolve'
@@ -254,21 +255,19 @@ class Recorder {
 }
 
 /** Windows rejects several characters in file names, and very long names break tools. */
-export function safeFileName(channelName: string, title: string, startsAt: number): string {
-  const stamp = new Date(startsAt).toISOString().slice(0, 16).replace('T', ' ').replace(':', '-')
-
-  const clean = `${channelName} - ${title}`
-    .replace(/[<>:"/\\|?*]/g, '')
-    .replace(/[\u0000-\u001f]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 120)
-
-  return `${clean} (${stamp})`
-}
-
+/**
+ * The name a recording is saved under.
+ *
+ * The pattern belongs to the user; everything that makes it writable does
+ * not. See `@shared/filename` — in particular the Windows device names, which
+ * the function this replaces produced happily.
+ */
 function safeName(recording: Recording): string {
-  return safeFileName(recording.channelName, recording.title, recording.startsAt)
+  return renderTemplate(getSettings().recordingTemplate, {
+    channel: recording.channelName,
+    title: recording.title,
+    at: recording.startsAt
+  })
 }
 
 export const recorder = new Recorder()

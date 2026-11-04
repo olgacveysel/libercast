@@ -8,6 +8,7 @@ import type { Download, DownloadRequest } from '@shared/types'
 import { getChannel } from '@main/db/repo/catalog'
 import * as repo from '@main/db/repo/downloads'
 import { getSettings } from '@main/db/repo/settings'
+import { sanitize } from '@shared/filename'
 import { getEpisode } from '@main/db/repo/vod'
 import { buildHeaders } from '@main/util/http'
 import { createLogger, errorMessage } from '@main/util/logger'
@@ -326,16 +327,19 @@ async function sizeOf(path: string | null): Promise<number> {
 }
 
 /** Windows rejects several characters in file names, and long names break tools. */
+/**
+ * A download's filename: the title, the episode if there is one, the
+ * extension.
+ *
+ * No template here — a download is named after the thing it is, and there is
+ * no clock or channel to arrange. It shares the sanitiser, though, which is
+ * the half that was wrong: this function used to produce `CON.mp4` for a film
+ * called "Con", and Windows will not create that file.
+ */
 export function safeFileName(title: string, subtitle: string | null, extension: string): string {
   const base = [title, subtitle].filter(Boolean).join(' - ')
-  const clean = base
-    .replace(/[<>:"/\\|?*]/g, '')
-    .replace(/[\u0000-\u001f]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 150)
-
-  return `${clean || 'Download'}.${extension}`
+  const clean = sanitize(base)
+  return `${clean === 'Recording' ? 'Download' : clean}.${extension}`
 }
 
 export function extensionFor(url: string): string {

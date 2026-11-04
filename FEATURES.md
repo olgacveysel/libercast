@@ -19,7 +19,7 @@
 | **M1 — Spine** ✅ | App shell, Xtream + M3U sources, Live TV browsing, player, favorites, search |
 | **M2 — Guide** ✅ | XMLTV/Xtream EPG, timeline grid, now/next, ID matching (reminders pending) |
 | **M3 — VOD** ◐ | Movies, Series, continue watching, auto-next episode — TMDB enrichment, VOD filters and playlist folders never built |
-| **M4 — Capture** ◐ | Live recording, scheduled recordings, offline downloads — filename templates never built |
+| **M4 — Capture** ✅ | Live recording, scheduled recordings, offline downloads |
 | **M5 — Polish** ◐ | Parental controls, backup/restore, themes, i18n and update checks done; Stalker playback unverified |
 
 ---
@@ -46,7 +46,7 @@
 | # | Feature | Planned | Status |
 |---|---|---|---|
 | 2.1 | Category sidebar → channel list → player layout | M1 | Built |
-| 2.2 | Channel logos with disk cache and placeholder fallback | M1 | Built |
+| 2.2 | Channel logos with placeholder fallback | M1 | Built — caching is Chromium's, not the application's |
 | 2.3 | Virtualized channel list (must stay smooth at 50k+ entries) | M1 | Built |
 | 2.4 | Channel search, fuzzy match on name and group | M1 | Built |
 | 2.5 | Sort by name / channel number / group / recently watched | M1 | Built |
@@ -120,7 +120,7 @@
 | 7.5 | Download movies and episodes for offline viewing | — | Built |
 | 7.6 | Download queue: pause, resume, cancel, concurrency limit | — | Built |
 | 7.7 | Local library view for recordings and downloads | — | Built |
-| 7.8 | Configurable output folder and filename template | M4 | Partial — folder yes, filename template never built |
+| 7.8 | Configurable output folder and filename template | M4 | Built |
 
 ## 8. Protection & data
 
@@ -144,7 +144,7 @@
 | 9.5 | Global search across live, movies and series (Ctrl+K) | — | Built |
 | 9.6 | Full keyboard navigation + shortcut cheat sheet | — | Built |
 | 9.7 | Remote/gamepad-friendly focus mode for TV-style navigation | Post-1.0 | Not built |
-| 9.8 | Settings: startup behavior, cache size, hardware accel, download paths | M1 | Partial — No cache-size control |
+| 9.8 | Settings: startup behavior, hardware accel, download paths | M1 | Built — "cache size" dropped: the application manages no disk cache, logos come from Chromium's own HTTP cache and the rest is in memory |
 | 9.9 | i18n — English, German, Turkish | M5 | Built |
 | 9.10 | First-run onboarding wizard (add your first source) | M1 | Built |
 | 9.11 | Opt-in update checks, asked once on first run, never before an answer | — | Built |

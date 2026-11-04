@@ -6,6 +6,7 @@ import { useAppStore } from '@renderer/store/useAppStore'
 import { IconKeyboard, IconRefresh, IconTrash } from '@renderer/ui/Icon'
 import { SHORTCUTS } from '@renderer/features/player/useHotkeys'
 import { LANGUAGES, useT, type TranslationKey } from '@renderer/i18n'
+import { TOKENS, renderTemplate } from '@shared/filename'
 import { SubtitleAppearance } from './SubtitleAppearance'
 import { APP_NAME } from '@shared/app'
 import { AccountPanel } from './AccountPanel'
@@ -26,6 +27,19 @@ type UpdateState =
   | { state: 'current' }
   | { state: 'found'; version: string; url: string }
   | { state: 'failed'; reason: string }
+
+/**
+ * The example the preview is rendered from.
+ *
+ * A fixed date rather than the current time, so the preview does not change
+ * while someone is reading it, and an awkward enough title to show what the
+ * sanitiser does.
+ */
+const PREVIEW = {
+  channel: 'Alto Sports 2',
+  title: 'The Big Match',
+  at: new Date(2026, 0, 31, 20, 45).getTime()
+}
 
 export function Settings({ onAddSource }: Props): JSX.Element {
   // Read from the packaged app rather than duplicated in the UI, so a release
@@ -548,6 +562,37 @@ export function Settings({ onAddSource }: Props): JSX.Element {
               {t('settings.choose')}
             </button>
           </div>
+
+          <div className="settings__row">
+            <div>
+              <strong>{t('settings.recordingName')}</strong>
+              <span>{t('settings.recordingNameBody')}</span>
+            </div>
+            <input
+              className="input"
+              style={{ width: 300 }}
+              value={settings.recordingTemplate}
+              spellCheck={false}
+              onChange={(event) => void updateSettings({ recordingTemplate: event.target.value })}
+            />
+          </div>
+
+          {/*
+            A preview, because a filename template is the kind of setting whose
+            effect is invisible until a recording has already been named by it
+            — and by then the only way to change your mind is to rename files.
+            This is the real renderer on a real example, not a mock-up of one.
+          */}
+          <p
+            style={{ fontSize: 12, color: 'var(--text-dim)', margin: '2px 2px 0', lineHeight: 1.6 }}
+          >
+            {t('settings.recordingNamePreview')}{' '}
+            <code style={{ color: 'var(--text)' }}>
+              {renderTemplate(settings.recordingTemplate, PREVIEW)}.ts
+            </code>
+            <br />
+            {t('settings.recordingNameTokens')} <code>{TOKENS.map((x) => `{${x}}`).join(' ')}</code>
+          </p>
 
           <div className="settings__row">
             <div>

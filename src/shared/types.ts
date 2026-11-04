@@ -1,3 +1,4 @@
+import { DEFAULT_TEMPLATE } from './filename'
 /**
  * Normalized domain model.
  *
@@ -307,6 +308,15 @@ export interface AppSettings {
   volume: number
   muted: boolean
   recordingsPath: string | null
+  /**
+   * How a recording is named, e.g. `{channel} - {title} ({date} {time})`.
+   *
+   * Stored as the pattern rather than as a set of switches, because what
+   * people want differs: sorting by date needs the date first, while a media
+   * library that scrapes filenames wants the title first. The tokens are in
+   * `@shared/filename`, which is also what makes the result safe to write.
+   */
+  recordingTemplate: string
   downloadsPath: string | null
   /** Folder holding ffmpeg/ffprobe, when the bundled binaries do not work. */
   ffmpegPath: string | null
@@ -448,6 +458,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   volume: 0.8,
   muted: false,
   recordingsPath: null,
+  recordingTemplate: DEFAULT_TEMPLATE,
   downloadsPath: null,
   ffmpegPath: null,
   maxConcurrentDownloads: 1,
