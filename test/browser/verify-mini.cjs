@@ -16,6 +16,7 @@ const { execFileSync } = require('node:child_process')
 const { mkdtempSync } = require('node:fs')
 const { tmpdir } = require('node:os')
 const { join } = require('node:path')
+const { ffmpegPath } = require('./ffmpeg.cjs')
 
 let failures = 0
 function check(label, condition, detail) {
@@ -53,7 +54,7 @@ const state = () => `(() => {
 async function main() {
   const work = mkdtempSync(join(tmpdir(), 'mini-'))
   const clip = join(work, 'clip.mp4')
-  execFileSync('ffmpeg', [
+  execFileSync(ffmpegPath(), [
     '-hide_banner', '-loglevel', 'error',
     '-f', 'lavfi', '-i', 'testsrc=d=60:s=320x240',
     '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', '-y', clip

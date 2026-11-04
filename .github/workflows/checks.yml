@@ -1,0 +1,60 @@
+# Every push and every pull request.
+#
+# The browser harnesses are in here deliberately. They are slower than the unit
+# suite and they need a virtual display, but they are the tests that have
+# actually caught things: a card rendered underneath the transport bar, a hint
+# telling Linux users their password was protected by Windows DPAPI, a failover
+# prompt that offered no way to say no. None of those are visible to a test
+# that does not lay the interface out.
+name: Checks
+
+on:
+  push:
+    branches: ['**']
+    tags-ignore: ['**']
+  pull_request:
+
+# A second push to the same branch makes the first run pointless.
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Suite, types and harnesses
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # Chromium's own dependencies. ubuntu-latest carries most of them, but
+      # not all, and the failure without them is Electron exiting silently
+      # rather than saying what is missing.
+      - name: Install the libraries Electron needs
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            xvfb libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 \
+            libatspi2.0-0 libsecret-1-0 libasound2t64 || \
+          sudo apt-get install -y --no-install-recommends \
+            xvfb libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 \
+            libatspi2.0-0 libsecret-1-0 libasound2
+
+      - run: npm ci
+
+      - name: Types
+        run: npm run typecheck
+
+      - name: Suite
+        run: npm test
+
+      # tools/verify-all.mjs supplies xvfb and --no-sandbox itself, so this
+      # does not need to know how the harnesses want to be run.
+      - name: Browser harnesses
+        run: npm run verify:all

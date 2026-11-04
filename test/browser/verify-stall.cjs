@@ -16,6 +16,7 @@ const { execFileSync } = require('node:child_process')
 const { mkdtempSync, readFileSync } = require('node:fs')
 const { tmpdir } = require('node:os')
 const { join } = require('node:path')
+const { ffmpegPath } = require('./ffmpeg.cjs')
 
 const { createStallWatch, STALL_AFTER_MS } = require(
   join(__dirname, '..', '..', 'node_modules', '.cache', 'verify-stall', 'stall.cjs')
@@ -36,7 +37,7 @@ async function main() {
 
   // Fragmented MP4, because that is what the stream server pipes to the
   // element: playable as it arrives, with no index at the end.
-  execFileSync('ffmpeg', ['-hide_banner', '-loglevel', 'error',
+  execFileSync(ffmpegPath(), ['-hide_banner', '-loglevel', 'error',
     '-f', 'lavfi', '-i', 'testsrc=d=30:s=320x240', '-c:v', 'libx264', '-preset', 'ultrafast',
     '-g', '30', '-movflags', 'frag_keyframe+empty_moov+default_base_moof', '-y', clip])
 

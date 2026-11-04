@@ -18,6 +18,7 @@ const { execFileSync } = require('node:child_process')
 const { mkdtempSync, writeFileSync } = require('node:fs')
 const { tmpdir } = require('node:os')
 const { join } = require('node:path')
+const { ffmpegPath } = require('./ffmpeg.cjs')
 
 // Bundled by the npm script before this runs, because the main process is
 // TypeScript and Electron will not load it directly.
@@ -45,7 +46,7 @@ async function main() {
     '2\n00:00:14,000 --> 00:00:19,000\nSECOND LINE\n\n')
 
   const fixture = join(work, 'clip.mkv')
-  execFileSync('ffmpeg', ['-hide_banner','-loglevel','error',
+  execFileSync(ffmpegPath(), ['-hide_banner','-loglevel','error',
     '-f','lavfi','-i','testsrc=d=25:s=320x240','-f','lavfi','-i','sine=d=25','-i',srt,
     '-map','0:v','-map','1:a','-map','2:s',
     '-c:v','libx264','-preset','ultrafast','-g','75','-c:a','aac','-c:s','srt','-y',fixture])
@@ -176,7 +177,7 @@ fetch(${JSON.stringify(session.subtitlesUrl)}).then(async (res) => {
  */
 async function verifyCueAppearance(server, work, existingPage) {
   const flat = join(work, 'flat.mkv')
-  execFileSync('ffmpeg', ['-hide_banner','-loglevel','error',
+  execFileSync(ffmpegPath(), ['-hide_banner','-loglevel','error',
     '-f','lavfi','-i','color=c=black:s=640x360:d=20','-f','lavfi','-i','sine=d=20',
     '-map','0:v','-map','1:a','-c:v','libx264','-preset','ultrafast','-c:a','aac','-y',flat])
 
