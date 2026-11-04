@@ -36,7 +36,8 @@
     "verify:all": "node tools/verify-all.mjs",
     "ci": "npm run typecheck && npm test && npm run verify:all",
     "verify:vodfilters": "npm run build && electron test/browser/verify-vodfilters.cjs",
-    "verify:pip": "npm run build && electron test/browser/verify-pip.cjs"
+    "verify:pip": "npm run build && electron test/browser/verify-pip.cjs",
+    "verify:mini": "npm run build && electron test/browser/verify-mini.cjs"
   },
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.1",

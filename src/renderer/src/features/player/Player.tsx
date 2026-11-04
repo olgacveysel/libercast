@@ -34,6 +34,15 @@ interface Props {
   channel: ChannelWithState | null
   onToggleFavorite: (channel: ChannelWithState) => void
   capabilities: MediaCapabilities | null
+  /**
+   * Whether this player owns the keyboard.
+   *
+   * False while it is the corner window: the keys that change channel and
+   * adjust volume belong to whatever screen the user is actually looking at,
+   * and firing them from a player in the corner of the films grid would be
+   * baffling.
+   */
+  hotkeys?: boolean
   onOpenSettings: () => void
   onStepChannel?: (delta: number) => void
 }
@@ -46,7 +55,8 @@ export function Player({
   onToggleFavorite,
   capabilities,
   onOpenSettings,
-  onStepChannel
+  onStepChannel,
+  hotkeys = true
 }: Props): JSX.Element {
   const settings = useAppStore((s) => s.settings)
   const updateSettings = useAppStore((s) => s.updateSettings)
@@ -153,7 +163,7 @@ export function Player({
     cycleFit: () => void updateSettings({ videoFit: nextFit(settings.videoFit) }),
     previousChannel: onStepChannel ? () => onStepChannel(-1) : undefined,
     nextChannel: onStepChannel ? () => onStepChannel(1) : undefined
-  })
+  }, hotkeys)
 
   const toggleRecording = async (): Promise<void> => {
     if (!channel) return

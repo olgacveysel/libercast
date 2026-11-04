@@ -114,6 +114,8 @@ export const en = {
   'player.fullscreen': 'Fullscreen',
   'player.pip': 'Picture in picture',
   'player.pipExit': 'Leave picture in picture',
+  'player.miniExpand': 'Back to Live TV',
+  'player.miniClose': 'Stop and close',
   'catchup.replay': 'Watch this again from the provider’s archive',
   'catchup.replayOne': 'Watch {title} again',
   'catchup.replaying': 'Replaying {title}',

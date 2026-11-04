@@ -55,7 +55,7 @@
 | 2.8 | Hide / block channels and whole categories | M2 | Built |
 | 2.9 | Now-playing and next-up shown inline on each channel row | M2 | Built |
 | 2.10 | Last-channel toggle, channel up/down hotkeys, numeric channel entry | M2 | Built |
-| 2.11 | Picture-in-picture + mini player | M3 | Partial — picture-in-picture built; an in-app mini player that survives navigating away is a separate, larger piece |
+| 2.11 | Picture-in-picture + mini player | M3 | Built — picture-in-picture floats over other applications; the corner player keeps the stream alive while you browse elsewhere in LiberCast |
 | 2.12 | Multi-view: configurable grid of simultaneous channels | — | Built |
 
 ## 3. EPG / Guide

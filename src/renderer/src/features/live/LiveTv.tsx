@@ -11,17 +11,39 @@ import { Player } from '@renderer/features/player/Player'
 import { CHANNEL_ROW_HEIGHT, ChannelRow } from './ChannelRow'
 import { useNumberEntry } from './useNumberEntry'
 import { HealthScan } from './HealthScan'
+import { IconClose, IconFullscreen } from '@renderer/ui/Icon'
 import { useT } from '@renderer/i18n'
 
 interface Props {
   /** 'favorites' reuses this screen with the favorites filter pinned on. */
   mode: 'live' | 'favorites'
   onAddSource: () => void
+  display?: LiveDisplay
+  /** Go back to the full screen from the corner window. */
+  onExpand?: () => void
+  /** Close the corner window, which also stops the stream. */
+  onClose?: () => void
 }
 
 type Sort = NonNullable<ChannelQuery['sort']>
 
-export function LiveTv({ mode, onAddSource }: Props): JSX.Element {
+/**
+ * How this screen is being shown.
+ *
+ * `full` is the Live TV screen. `mini` is the same component, still mounted
+ * and still streaming, drawn as a small window in the corner while the user
+ * is somewhere else — the point being that navigating to the guide does not
+ * stop the match. `hidden` keeps the component alive but stops playback,
+ * which is what the screens that own playback themselves need.
+ *
+ * It is one component in one place in the tree throughout. Rendering the
+ * player somewhere else when it shrinks would remount it, and a remounted
+ * player is a closed stream and a fresh connection to the provider — the
+ * exact thing this feature exists to avoid.
+ */
+export type LiveDisplay = 'full' | 'mini' | 'hidden'
+
+export function LiveTv({ mode, onAddSource, display = 'full', onExpand, onClose }: Props): JSX.Element {
   const { activePlaylistId, allSources, playlists, activeChannel, setActiveChannel, capabilities, setRoute } =
     useAppStore()
   const settings = useAppStore((state) => state.settings)
@@ -307,9 +329,9 @@ export function LiveTv({ mode, onAddSource }: Props): JSX.Element {
       )}
 
       <div
-        className={`live ${mode === 'favorites' || allSources ? 'live--nocats' : ''} ${
-          listsCollapsed ? 'live--collapsed' : ''
-        }`}
+        className={`live live--${display} ${
+          mode === 'favorites' || allSources ? 'live--nocats' : ''
+        } ${listsCollapsed ? 'live--collapsed' : ''}`}
       >
         {mode === 'live' && !allSources && (
           <div className="pane">
@@ -382,9 +404,42 @@ export function LiveTv({ mode, onAddSource }: Props): JSX.Element {
           )}
         </div>
 
+        {display === 'mini' && (
+          <div className="minibar">
+            <button
+              className="minibar__name"
+              onClick={onExpand}
+              title={t('player.miniExpand')}
+            >
+              {activeChannel?.name ?? ''}
+            </button>
+            <button
+              className="minibar__btn"
+              onClick={onExpand}
+              aria-label={t('player.miniExpand')}
+            >
+              <IconFullscreen size={13} />
+            </button>
+            <button
+              className="minibar__btn"
+              onClick={onClose}
+              aria-label={t('player.miniClose')}
+            >
+              <IconClose size={12} />
+            </button>
+          </div>
+        )}
+
         <div className="pane pane--last">
           <Player
-            channel={pickedHere ? activeChannel : null}
+            /*
+              `hidden` is the screens that run playback themselves — multi-view
+              and favourites. Handing the player no channel there closes the
+              session, so those screens do not end up holding a second
+              connection against an account that may only allow one.
+            */
+            channel={display !== 'hidden' && pickedHere ? activeChannel : null}
+            hotkeys={display === 'full'}
             onToggleFavorite={(c) => void toggleFavorite(c)}
             capabilities={capabilities}
             onOpenSettings={() => setRoute('settings')}

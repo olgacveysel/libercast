@@ -109,6 +109,8 @@ export const tr: Record<TranslationKey, string> = {
   'player.fullscreen': 'Tam ekran',
   'player.pip': 'Küçük pencere',
   'player.pipExit': 'Küçük pencereden çık',
+  'player.miniExpand': 'Canlı TV’ye dön',
+  'player.miniClose': 'Durdur ve kapat',
   'catchup.replay': 'Bunu sağlayıcı arşivinden tekrar izle',
   'catchup.replayOne': '{title} programını tekrar izle',
   'catchup.replaying': '{title} tekrar oynatılıyor',

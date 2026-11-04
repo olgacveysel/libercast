@@ -11,7 +11,7 @@ import { Home } from '@renderer/features/home/Home'
 import { Library } from '@renderer/features/library/Library'
 import { MultiView } from '@renderer/features/multiview/MultiView'
 import { CommandPalette } from '@renderer/features/search/CommandPalette'
-import { LiveTv } from '@renderer/features/live/LiveTv'
+import { LiveTv, type LiveDisplay } from '@renderer/features/live/LiveTv'
 import { VodBrowser } from '@renderer/features/vod/VodBrowser'
 import { AddSourceDialog } from '@renderer/features/onboarding/AddSourceDialog'
 import { Settings } from '@renderer/features/settings/Settings'
@@ -32,6 +32,33 @@ export function App(): JSX.Element {
   const setActiveChannel = useAppStore((s) => s.setActiveChannel)
   const [showAddSource, setShowAddSource] = useState(false)
   const [showPalette, setShowPalette] = useState(false)
+  /** Set when the corner window is dismissed, cleared by going back to Live TV. */
+  const [miniClosed, setMiniClosed] = useState(false)
+  const activeChannel = useAppStore((s) => s.activeChannel)
+
+  /**
+   * Which screens the player follows you to.
+   *
+   * Favourites is this same screen with the favourites filter pinned on, and
+   * multi-view runs several streams of its own. A corner window on either
+   * would mean two sessions open at once — which on an account that allows a
+   * single connection is not a cosmetic problem: the provider refuses one of
+   * them, and the user sees a channel that will not start. So those two stop
+   * it, and everywhere else it keeps playing.
+   */
+  const liveDisplay: LiveDisplay =
+    route === 'live'
+      ? 'full'
+      : route === 'favorites' || route === 'multiview'
+        ? 'hidden'
+        : activeChannel && !miniClosed
+          ? 'mini'
+          : 'hidden'
+
+  // Arriving back at Live TV is the natural way to say "show it again".
+  useEffect(() => {
+    if (route === 'live') setMiniClosed(false)
+  }, [route])
   const rail = useSidebarRail()
   const t = useT()
 
@@ -113,7 +140,6 @@ export function App(): JSX.Element {
               {route === 'home' && (
                 <Home onAddSource={openAddSource} onOpenSearch={() => setShowPalette(true)} />
               )}
-              {route === 'live' && <LiveTv mode="live" onAddSource={openAddSource} />}
               {route === 'guide' && <Guide onAddSource={openAddSource} capabilities={capabilities} />}
               {route === 'multiview' && <MultiView onAddSource={openAddSource} />}
               {route === 'favorites' && <LiveTv mode="favorites" onAddSource={openAddSource} />}
@@ -123,6 +149,22 @@ export function App(): JSX.Element {
                 <Library capabilities={capabilities} onOpenSettings={() => setRoute('settings')} />
               )}
               {route === 'settings' && <Settings onAddSource={openAddSource} />}
+
+              {/*
+                Live TV is rendered here whatever route is showing, and told
+                how to draw itself. That is the whole mechanism: a component
+                rendered in a different branch is a different position to
+                React, so moving it would unmount it — and an unmounted player
+                is a closed stream, a dropped provider connection, and the
+                match you were watching gone.
+              */}
+              <LiveTv
+                mode="live"
+                onAddSource={openAddSource}
+                display={liveDisplay}
+                onExpand={() => setRoute('live')}
+                onClose={() => setMiniClosed(true)}
+              />
             </>
           )}
         </main>

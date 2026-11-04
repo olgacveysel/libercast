@@ -474,6 +474,117 @@ select {
   transition: grid-template-columns 0.16s var(--ease);
 }
 
+/*
+  The same screen, kept alive while the user is somewhere else.
+
+  Nothing here moves the player in the DOM — it is the same element in the
+  same place throughout, and only what surrounds it changes. Moving it would
+  mean React remounting it, and a remounted player has closed its stream and
+  taken a fresh connection from the provider.
+
+  Hidden rather than unmounted: `display: none` keeps the component, its
+  state and its position, so coming back is instant. Playback is stopped
+  separately, by handing the player no channel, because a hidden element goes
+  on playing audio perfectly happily.
+*/
+.live--hidden {
+  display: none;
+}
+
+.live--mini {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 40;
+  /* 16:9 at a size that reads at a glance without taking the screen. */
+  width: 340px;
+  height: 191px;
+  display: block;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: #000;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+  animation: mini-in 0.18s var(--ease);
+}
+
+/* Everything except the player itself: the lists, the toolbar, the panes. */
+.live--mini > *:not(.pane--last):not(.minibar) {
+  display: none;
+}
+
+.live--mini .pane--last {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+/*
+  The transport bar, the overlays and the stats are all sized for a screen and
+  are illegible at a third of it. The picture and the bar above it are the
+  whole of the corner window.
+*/
+.live--mini .player__overlay,
+.live--mini .switched,
+.live--mini .streamstats,
+.live--mini .replaybar {
+  display: none;
+}
+
+.minibar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 5px 5px 9px;
+  background: linear-gradient(rgba(0, 0, 0, 0.78), rgba(0, 0, 0, 0));
+  color: #fff;
+}
+
+.minibar__name {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.minibar__btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+}
+.minibar__btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+
+@keyframes mini-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.96);
+  }
+}
+
 /* Favorites renders no category pane. Without this the two panes it does
    render land in the 210px and 320px columns and the player is squeezed into
    320px with the 1fr column standing empty. */

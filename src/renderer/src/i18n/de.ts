@@ -110,6 +110,8 @@ export const de: Record<TranslationKey, string> = {
   'player.fullscreen': 'Vollbild',
   'player.pip': 'Bild im Bild',
   'player.pipExit': 'Bild im Bild beenden',
+  'player.miniExpand': 'Zurück zu Live-TV',
+  'player.miniClose': 'Stoppen und schließen',
   'catchup.replay': 'Aus dem Archiv des Anbieters erneut ansehen',
   'catchup.replayOne': '{title} erneut ansehen',
   'catchup.replaying': '{title} wird erneut abgespielt',
