@@ -22,7 +22,7 @@ const settings = {
   autoRefreshHours: 24,
   autoRefreshEpg: true,
   lastAutoRefresh: null,
-  hardwareAcceleration: true,
+  hardwareAcceleration: true, tvNavigation: false,
   showStreamStats: false,
   resumeLastChannel: true,
   preferredAudioLanguages: [],

@@ -49,6 +49,20 @@ export const SHORTCUTS: { keys: string; action: string }[] = [
  * modifier, which belongs to the OS or the browser.
  */
 export function useHotkeys(actions: HotkeyActions, enabled = true): void {
+  /**
+   * Whether the arrow keys belong to the player.
+   *
+   * With a mouse and keyboard they do: arrows seek and change the volume,
+   * which is what every player does. With a remote they cannot, because the
+   * arrows are the only way to move around — a player that swallowed them
+   * would leave the user stuck on the video with no way back to the channel
+   * list and no mouse to rescue them.
+   *
+   * Read from the document rather than passed down, because the same rule
+   * applies to every player on screen, including the detached ones.
+   */
+  const remote = typeof document !== 'undefined' && document.documentElement.dataset.tv === 'on'
+
   useEffect(() => {
     if (!enabled) return
 
@@ -77,12 +91,14 @@ export function useHotkeys(actions: HotkeyActions, enabled = true): void {
           break
 
         case 'ArrowLeft':
+          if (remote) break
           if (actions.seek) {
             handled()
             actions.seek(-10)
           }
           break
         case 'ArrowRight':
+          if (remote) break
           if (actions.seek) {
             handled()
             actions.seek(10)
@@ -104,18 +120,54 @@ export function useHotkeys(actions: HotkeyActions, enabled = true): void {
           break
 
         case 'ArrowUp':
+          if (remote) break
           if (actions.adjustVolume) {
             handled()
             actions.adjustVolume(0.05)
           }
           break
         case 'ArrowDown':
+          if (remote) break
           if (actions.adjustVolume) {
             handled()
             actions.adjustVolume(-0.05)
           }
           break
 
+        // What a remote sends instead. Chromium surfaces the dedicated media
+        // keys under these names, so volume still works when the arrows have
+        // been given up to navigation.
+        case 'AudioVolumeUp':
+          if (actions.adjustVolume) {
+            handled()
+            actions.adjustVolume(0.05)
+          }
+          break
+        case 'AudioVolumeDown':
+          if (actions.adjustVolume) {
+            handled()
+            actions.adjustVolume(-0.05)
+          }
+          break
+        case 'MediaPlayPause':
+          if (actions.togglePlay) {
+            handled()
+            actions.togglePlay()
+          }
+          break
+        case 'MediaTrackNext':
+          if (actions.nextChannel) {
+            handled()
+            actions.nextChannel()
+          }
+          break
+        case 'MediaTrackPrevious':
+          if (actions.previousChannel) {
+            handled()
+            actions.previousChannel()
+          }
+          break
+        case 'AudioVolumeMute':
         case 'm':
         case 'M':
           if (actions.toggleMute) {
@@ -188,5 +240,5 @@ export function useHotkeys(actions: HotkeyActions, enabled = true): void {
 
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [actions, enabled])
+  }, [actions, enabled, remote])
 }

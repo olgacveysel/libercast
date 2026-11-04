@@ -13,7 +13,7 @@ let settings = {
   language: 'en', theme: 'dark', accentColor: '#46b096', uiScale: 1,
   volume: 1, muted: false, singleConnection: false, sourceFailover: true,
   autoRefreshHours: 0, autoRefreshEpg: true, lastAutoRefresh: null,
-  hardwareAcceleration: true, showStreamStats: false, resumeLastChannel: true,
+  hardwareAcceleration: true, tvNavigation: false, showStreamStats: false, resumeLastChannel: true,
   preferredAudioLanguages: [], preferredSubtitleLanguages: [],
   recordingsPath: null, recordingTemplate: '{channel} - {title} ({date} {time})', downloadsPath: null, ffmpegPath: null,
   maxConcurrentDownloads: 1, videoFit: 'fit', videoZoom: 1,

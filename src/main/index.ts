@@ -25,14 +25,54 @@ if (!app.requestSingleInstanceLock()) {
   bootstrap()
 }
 
+/**
+ * Settings that can only be applied before Electron is ready.
+ *
+ * Both of these are switches Chromium reads once at startup, so they are
+ * useless after `whenReady` — which is where the hardware-acceleration
+ * setting was being read. It logged that a restart was required and then
+ * never did anything on the restart either: `disableHardwareAcceleration`
+ * was not called anywhere in this application. The toggle in Settings wrote a
+ * boolean and changed nothing, which is worse than not offering it, because
+ * someone with a struggling GPU turned it off and concluded it had not
+ * helped.
+ *
+ * Reading settings this early means opening the database before the app is
+ * ready. That is allowed — `app.getPath` resolves before ready, and SQLite
+ * has no opinion about Electron's lifecycle — and anything that does go wrong
+ * must not stop the application starting, so the whole thing is guarded.
+ */
+function applyStartupSwitches(): void {
+  let settings
+  try {
+    settings = getSettings()
+  } catch (error) {
+    log.warn('could not read settings before startup; using defaults', errorMessage(error))
+    return
+  }
+
+  if (!settings.hardwareAcceleration) {
+    app.disableHardwareAcceleration()
+    log.info('hardware acceleration disabled by settings')
+  }
+
+  if (settings.tvNavigation) {
+    // Arrow keys move focus to the nearest element in that direction instead
+    // of scrolling. Chromium does the geometry; the application only has to
+    // make focus visible and stop the player swallowing the keys.
+    app.commandLine.appendSwitch('enable-spatial-navigation')
+    log.info('remote navigation enabled: arrow keys move focus')
+  }
+}
+
 function bootstrap(): void {
-  // Settings must be read before the app is ready, because the hardware
-  // acceleration switch only takes effect if disabled this early.
   try {
     app.setPath('userData', app.getPath('userData'))
   } catch (error) {
     log.warn('could not set userData path', errorMessage(error))
   }
+
+  applyStartupSwitches()
 
   app.on('second-instance', () => {
     // The main window, not whichever window happens to be first: a detached
@@ -51,9 +91,6 @@ function bootstrap(): void {
 
     setFfmpegOverride(getSettings().ffmpegPath)
 
-    if (!getSettings().hardwareAcceleration) {
-      log.info('hardware acceleration disabled by settings; restart required to take effect')
-    }
 
     // Recorded once per launch so a log sent in with a question answers "where
     // is my password kept on this machine" without anyone having to guess from

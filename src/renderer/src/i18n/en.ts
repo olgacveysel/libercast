@@ -336,6 +336,8 @@ export const en = {
   'settings.playback': 'Playback',
   'settings.hwAccel': 'Hardware acceleration',
   'settings.hwAccelBody': 'Uses the GPU to decode video. Turn off only if playback tears or crashes.',
+  'settings.tvNav': 'Navigate with a remote',
+  'settings.tvNavBody': 'For using LiberCast on a television. The arrow keys move between things on screen instead of scrolling, and whatever is selected is clearly marked. The player gives up the arrow keys and uses a remote’s own volume and playback buttons instead. Takes effect after a restart.',
   'settings.streamInfo': 'Show stream info',
   'settings.streamInfoBody': 'Resolution, measured frame rate, dropped frames and codec, over the picture. Hidden in fullscreen. Press I to toggle while watching.',
   'settings.resumeLast': 'Resume last channel on start',

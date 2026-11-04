@@ -143,7 +143,7 @@
 | 9.4 | Skeleton loaders and optimistic UI on every list | M1 | Built |
 | 9.5 | Global search across live, movies and series (Ctrl+K) | — | Built |
 | 9.6 | Full keyboard navigation + shortcut cheat sheet | — | Built |
-| 9.7 | Remote/gamepad-friendly focus mode for TV-style navigation | Post-1.0 | Not built |
+| 9.7 | Remote-friendly focus mode for TV-style navigation | Post-1.0 | Built — arrow keys move focus, focus is visible, the player yields the arrows and takes a remote's media keys. Gamepads are not read; a remote that sends key events is |
 | 9.8 | Settings: startup behavior, hardware accel, download paths | M1 | Built — "cache size" dropped: the application manages no disk cache, logos come from Chromium's own HTTP cache and the rest is in memory |
 | 9.9 | i18n — English, German, Turkish | M5 | Built |
 | 9.10 | First-run onboarding wizard (add your first source) | M1 | Built |

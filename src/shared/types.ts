@@ -303,6 +303,17 @@ export interface AppSettings {
   theme: 'dark' | 'light' | 'system'
   accentColor: string
   hardwareAcceleration: boolean
+  /**
+   * Navigate with a remote or a D-pad instead of a mouse.
+   *
+   * Turns on Chromium's spatial navigation, so the arrow keys move focus to
+   * whatever is next in that direction rather than scrolling, and makes focus
+   * visible enough to follow from across a room. Off by default, because on a
+   * desktop it is a worse way to use the application.
+   *
+   * Like hardware acceleration it is a startup switch, so it takes a restart.
+   */
+  tvNavigation: boolean
   /** Restore the last watched channel when the app starts. */
   resumeLastChannel: boolean
   volume: number
@@ -454,6 +465,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   // The teal from the mark, so a fresh install matches its own icon.
   accentColor: '#22b58f',
   hardwareAcceleration: true,
+  tvNavigation: false,
   resumeLastChannel: true,
   volume: 0.8,
   muted: false,

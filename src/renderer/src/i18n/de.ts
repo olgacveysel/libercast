@@ -330,6 +330,8 @@ export const de: Record<TranslationKey, string> = {
   'settings.hwAccel': 'Hardwarebeschleunigung',
   'settings.hwAccelBody':
     'Dekodiert Video über die GPU. Nur abschalten, wenn das Bild reißt oder abstürzt.',
+  'settings.tvNav': 'Mit Fernbedienung navigieren',
+  'settings.tvNavBody': 'Für LiberCast am Fernseher. Die Pfeiltasten wechseln zwischen den Elementen auf dem Bildschirm, statt zu scrollen, und das Ausgewählte ist deutlich markiert. Der Player gibt die Pfeiltasten ab und nutzt stattdessen die Lautstärke- und Wiedergabetasten der Fernbedienung. Wird nach einem Neustart wirksam.',
   'settings.streamInfo': 'Streaminfos anzeigen',
   'settings.streamInfoBody':
     'Auflösung, gemessene Bildrate, verlorene Bilder und Codec, über dem Bild. Im Vollbild ausgeblendet. Während der Wiedergabe mit I umschalten.',

@@ -37,7 +37,8 @@
     "ci": "npm run typecheck && npm test && npm run verify:all",
     "verify:vodfilters": "npm run build && electron test/browser/verify-vodfilters.cjs",
     "verify:pip": "npm run build && electron test/browser/verify-pip.cjs",
-    "verify:mini": "npm run build && electron test/browser/verify-mini.cjs"
+    "verify:mini": "npm run build && electron test/browser/verify-mini.cjs",
+    "verify:tvnav": "npm run build && electron --enable-spatial-navigation test/browser/verify-tvnav.cjs"
   },
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.1",

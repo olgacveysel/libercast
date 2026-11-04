@@ -437,6 +437,47 @@ select {
   outline: none;
   transition: border-color 0.12s, box-shadow 0.12s;
 }
+/*
+  Remote navigation.
+
+  Every interactive element in this application is already a real button or
+  input, so Chromium's spatial navigation can reach all of them — what was
+  missing was being able to see where you are. There were five focus styles in
+  this stylesheet, which is fine with a mouse and useless from three metres
+  away.
+
+  Scoped to the mode: a desktop user gets the ordinary, restrained focus
+  treatment, and nobody is given a thick ring they did not ask for.
+*/
+:root[data-tv='on'] :focus-visible,
+:root[data-tv='on'] button:focus,
+:root[data-tv='on'] a:focus,
+:root[data-tv='on'] [tabindex]:focus {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+  /* The ring alone can vanish against a bright still, so the element is
+     lifted as well. */
+  box-shadow: 0 0 0 5px var(--accent-soft);
+  position: relative;
+  z-index: 1;
+}
+
+/* A focused row in a list is the commonest case and deserves a filled
+   treatment rather than an outline around a full-width strip. */
+:root[data-tv='on'] .chanrow:focus,
+:root[data-tv='on'] .catitem:focus,
+:root[data-tv='on'] .navitem:focus {
+  background: var(--accent-soft);
+}
+
+/*
+  Nothing here changes the interface scale. `--ui-scale` is written as an
+  inline style by the theme applier, so a rule in this file could never win
+  against it — and the existing interface-scale setting already does the job
+  properly for anyone sitting further away.
+*/
+
 .input:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);

@@ -17,7 +17,7 @@ const BASE = {
   autoCheckUpdates: false, lastUpdateCheck: null,
   knownUpdateVersion: null, knownUpdateUrl: null, dismissedUpdate: null,
   autoRefreshHours: 0, autoRefreshEpg: true, lastAutoRefresh: null,
-  hardwareAcceleration: true, showStreamStats: false, resumeLastChannel: true,
+  hardwareAcceleration: true, tvNavigation: false, showStreamStats: false, resumeLastChannel: true,
   preferredAudioLanguages: [], preferredSubtitleLanguages: [],
   recordingsPath: null, recordingTemplate: '{channel} - {title} ({date} {time})', downloadsPath: null, ffmpegPath: null,
   maxConcurrentDownloads: 1, videoFit: 'fit', videoZoom: 1,

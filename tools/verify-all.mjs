@@ -61,6 +61,17 @@ const BUNDLES = [
   }
 ]
 
+/**
+ * The real default settings, bundled for the preload stubs.
+ *
+ * Every stub used to carry a hand-written copy of `DEFAULT_SETTINGS`, and
+ * every copy drifted: three settings added today each broke a harness that
+ * was asserting against an interface rendered in a state no user has — in one
+ * case with the channel lists collapsed to zero width, which made spatial
+ * navigation look broken when it was the fixture that was wrong.
+ */
+const SETTINGS_BUNDLE = `${cache}/verify/settings.cjs`
+
 /** Harnesses, in the order they run. */
 const HARNESSES = [
   'verify-multiview',
@@ -75,7 +86,8 @@ const HARNESSES = [
   'verify-failover',
   'verify-vodfilters',
   'verify-pip',
-  'verify-mini'
+  'verify-mini',
+  'verify-tvnav'
 ]
 
 function run(command, args, options = {}) {
@@ -143,6 +155,12 @@ function main() {
     if (spec.entry.endsWith('detached.ts')) stageDetached()
     bundle(spec)
   }
+
+  bundle({
+    entry: 'src/shared/types.ts',
+    out: SETTINGS_BUNDLE,
+    args: ['--alias:@shared=./src/shared']
+  })
 
   const wrapper = displayWrapper()
   const flags = electronFlags()

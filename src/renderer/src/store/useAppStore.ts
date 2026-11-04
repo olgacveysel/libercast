@@ -160,6 +160,12 @@ function applyThemeOnly(settings: AppSettings): void {
   const resolved = settings.theme === 'system' ? (prefersLight ? 'light' : 'dark') : settings.theme
 
   root.dataset.theme = resolved
+  // Marks the whole document so the stylesheet can make focus visible enough
+  // to follow from a sofa, without changing anything for a mouse user. The
+  // navigation itself is a Chromium switch applied at startup; this is only
+  // how it is made legible.
+  if (settings.tvNavigation) root.dataset.tv = 'on'
+  else delete root.dataset.tv
   root.style.setProperty('--accent', settings.accentColor)
   root.style.setProperty('--accent-soft', hexToRgba(settings.accentColor, 0.14))
 

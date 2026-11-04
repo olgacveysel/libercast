@@ -414,6 +414,18 @@ export function Settings({ onAddSource }: Props): JSX.Element {
 
           <div className="settings__row">
             <div>
+              <strong>{t('settings.tvNav')}</strong>
+              <span>{t('settings.tvNavBody')}</span>
+            </div>
+            <input
+              type="checkbox"
+              checked={settings.tvNavigation}
+              onChange={(event) => void updateSettings({ tvNavigation: event.target.checked })}
+            />
+          </div>
+
+          <div className="settings__row">
+            <div>
               <strong>{t('settings.streamInfo')}</strong>
               <span>{t('settings.streamInfoBody')}</span>
             </div>

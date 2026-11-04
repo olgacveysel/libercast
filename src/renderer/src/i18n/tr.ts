@@ -325,6 +325,8 @@ export const tr: Record<TranslationKey, string> = {
   'settings.playback': 'Oynatma',
   'settings.hwAccel': 'Donanım hızlandırma',
   'settings.hwAccelBody': 'Videoyu çözmek için ekran kartını kullanır. Yalnızca görüntü yırtılıyor ya da oynatma çöküyorsa kapat.',
+  'settings.tvNav': 'Kumandayla gezin',
+  'settings.tvNavBody': 'LiberCast’i televizyonda kullanmak için. Ok tuşları kaydırmak yerine ekrandaki öğeler arasında gezinir ve seçili olan açıkça belirtilir. Oynatıcı ok tuşlarını bırakır; bunun yerine kumandanın kendi ses ve oynatma tuşlarını kullanır. Yeniden başlatınca etkin olur.',
   'settings.streamInfo': 'Yayın bilgilerini göster',
   'settings.streamInfoBody': 'Çözünürlük, ölçülen kare hızı, düşen kareler ve codec bilgisi görüntünün üzerinde gösterilir. Tam ekranda gizlenir. İzlerken açıp kapatmak için I tuşuna bas.',
   'settings.resumeLast': 'Açılışta son kanaldan devam et',
