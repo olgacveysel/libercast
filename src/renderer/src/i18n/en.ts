@@ -26,7 +26,6 @@ export const en = {
   'nav.allSourcesBody': 'Every source as one list, with duplicates merged',
   'settings.shortcutsNote': 'Shortcuts are ignored while typing in a field.',
   'vod.noEpisodes': 'This provider did not return episodes for this series.',
-  'vod.noEpisodesPortal': 'Episodes from portals are not read yet, so this series is listed but cannot be opened.',
   'nav.folderEmpty': 'Nothing in here yet',
   'settings.sourceFolders': 'Source folders',
   'settings.foldersBody': 'Group your sources in the sidebar. A folder holds nothing of its own — delete one and its sources return to the list above.',

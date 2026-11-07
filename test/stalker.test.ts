@@ -363,8 +363,8 @@ async function main(): Promise<void> {
   const shows = await client(shop).seriesCatalog()
   check('every show is listed', shows.channels.length === 2, shows.channels.length)
   check('they are filed as series', shows.kind === 'series')
-  check('a show has no single thing to play',
-    shows.channels.every((c) => c.streamUrl === ''), shows.channels.map((c) => c.streamUrl))
+  check('a show the portal gives nothing to play stays listed anyway',
+    shows.channels.some((c) => c.streamUrl === ''), shows.channels.map((c) => c.streamUrl))
   check('shows have their own categories',
     shows.categories.length === 1 && shows.categories[0]?.name === 'Drama', shows.categories)
 
@@ -376,6 +376,66 @@ async function main(): Promise<void> {
     shop.seen.requests.includes('series/get_ordered_list'), shop.seen.requests)
   check('a film is not a channel',
     films.channels.every((c) => !shows.channels.some((s) => s.externalId === c.externalId)))
+
+  console.log('\nEpisodes, which a portal puts on the listing row')
+
+  const playable = shows.channels.find((c) => c.streamUrl !== '')!
+  const unplayable = shows.channels.find((c) => c.streamUrl === '')!
+
+  check('a show carries its episode numbers',
+    playable.episodeNumbers?.join(',') === '1,2,3', playable.episodeNumbers)
+
+  // A list of episodes that all fail on click is a worse answer than saying
+  // there are none, so the numbers are only kept when there is a command to
+  // play them with.
+  check('a show with nothing to play them with carries none',
+    unplayable.episodeNumbers === undefined, unplayable.episodeNumbers)
+
+  check('a film carries none either',
+    films.channels.every((c) => c.episodeNumbers === undefined))
+
+  // The numbers are the identifiers the portal is given back, so they are
+  // kept as sent. Renumbering from one would make episode 4 of a part-listed
+  // show ask for episode 1.
+  check('numbers are kept as the portal sent them, not renumbered',
+    toVodItem({ id: '1', name: 'x', cmd: '/x', series: [4, 5, 6] }, 'series')
+      ?.episodeNumbers?.join(',') === '4,5,6')
+  check('out of order they are sorted',
+    toVodItem({ id: '1', name: 'x', cmd: '/x', series: [3, 1, 2] }, 'series')
+      ?.episodeNumbers?.join(',') === '1,2,3')
+  check('duplicates collapse',
+    toVodItem({ id: '1', name: 'x', cmd: '/x', series: [1, 1, 2] }, 'series')
+      ?.episodeNumbers?.join(',') === '1,2')
+  check('nonsense is dropped rather than stored as an episode',
+    toVodItem({ id: '1', name: 'x', cmd: '/x', series: ['x', -1, 2.5, 3] }, 'series')
+      ?.episodeNumbers?.join(',') === '3')
+  check('an empty list is no list at all',
+    toVodItem({ id: '1', name: 'x', cmd: '/x', series: [] }, 'series')?.episodeNumbers === undefined)
+
+  console.log('\nPlaying a film and an episode')
+
+  const filmLink = await client(shop).vodUrl('/media/1.mpg')
+  check('a film gets a link', filmLink.startsWith('http://'), filmLink)
+  check('without the player hint on the front', !filmLink.startsWith('ffmpeg'), filmLink)
+
+  // The failure this guards: a film asked for through the live handler comes
+  // back as a channel URL with an empty id, which looks exactly like success
+  // until it reaches ffmpeg.
+  check('a film is fetched through the portal\'s film handler, not its live one',
+    filmLink.includes('/play/vod.php'), filmLink)
+  check('and the live handler was not used for it',
+    !filmLink.includes('/play/live.php'), filmLink)
+
+  const episodeLink = await client(shop).vodUrl('/media/show-1.mpg', 2)
+  check('an episode names which episode it is', episodeLink.includes('series=2'), episodeLink)
+  check('a film asks for no episode at all', !filmLink.includes('series='), filmLink)
+
+  // `streamUrl` would, as a last resort, rebuild the command as /ch/<id>.
+  // A film has no channel id, so that attempt can only ask for a channel that
+  // does not exist — which is why the VOD path has its own shorter ladder.
+  check('the film path does not try to rebuild a channel command',
+    linkAttempts('/media/1.mpg').length === 1, linkAttempts('/media/1.mpg'))
+  check('where the live path would', linkAttempts('ffrt http://x/ch/9', '9').length > 1)
 
   shop.close()
 

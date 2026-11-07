@@ -25,7 +25,6 @@ export const tr: Record<TranslationKey, string> = {
   'nav.allSourcesBody': 'Tüm kaynaklar tek listede, tekrarlar birleştirilmiş',
   'settings.shortcutsNote': 'Bir alana yazarken kısayollar yok sayılır.',
   'vod.noEpisodes': 'Bu sağlayıcı bu dizi için bölüm döndürmedi.',
-  'vod.noEpisodesPortal': 'Portallardan bölümler henüz okunmuyor; bu dizi listeleniyor ancak açılamıyor.',
   'nav.folderEmpty': 'Burada henüz bir şey yok',
   'settings.sourceFolders': 'Kaynak klasörleri',
   'settings.foldersBody': 'Kaynaklarınızı kenar çubuğunda gruplayın. Klasörün kendine ait bir içeriği yoktur — sildiğinizde kaynakları yukarıdaki listeye geri döner.',

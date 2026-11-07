@@ -170,6 +170,67 @@ check(
   })()
 )
 
+console.log('\nEpisodes a portal sends with the catalogue')
+
+const portalPlaylist = createPlaylist({
+  name: 'Portal',
+  kind: 'stalker',
+  url: 'http://portal.invalid/c/',
+  macAddress: '00:1A:79:AA:BB:CC'
+})
+
+// Portals put a show's episode numbers on the listing row, so the episodes
+// arrive during the sync rather than being fetched when a show is opened.
+// That is the whole reason importCatalog knows about them at all.
+const portalShows = [
+  {
+    externalId: 'series:90',
+    name: 'Northern Lantern',
+    categoryExternalId: 's1',
+    streamUrl: '/media/show.mpg',
+    episodeNumbers: [1, 2, 3]
+  },
+  {
+    externalId: 'series:91',
+    name: 'Nothing To Play',
+    categoryExternalId: 's1',
+    streamUrl: ''
+  }
+]
+importCatalog(portalPlaylist.id, 'series', seriesCats, portalShows)
+
+const stored = catalog
+  .queryChannels({ playlistId: portalPlaylist.id, kind: 'series', limit: 50 })
+  .find((c) => c.externalId === 'series:90')!
+const portalSeasons = vod.listSeasons(stored.id)
+
+check('a portal show gets its episodes without a second call', portalSeasons.length === 1, portalSeasons.length)
+check('all three of them', portalSeasons[0]?.episodes.length === 3, portalSeasons[0]?.episodes.length)
+check(
+  'and they are numbered as the portal numbered them',
+  portalSeasons[0]?.episodes.map((e) => e.episode).join(',') === '1,2,3',
+  portalSeasons[0]?.episodes.map((e) => e.episode)
+)
+// The number is also the identifier the portal is handed back at play time,
+// so it has to survive the round trip through the database intact.
+check(
+  'the external id is the number the portal will be asked for',
+  portalSeasons[0]?.episodes.map((e) => e.externalId).join(',') === '1,2,3',
+  portalSeasons[0]?.episodes.map((e) => e.externalId)
+)
+
+const unplayable = catalog
+  .queryChannels({ playlistId: portalPlaylist.id, kind: 'series', limit: 50 })
+  .find((c) => c.externalId === 'series:91')!
+check('a show with nothing to play gets no episodes', vod.listSeasons(unplayable.id).length === 0)
+
+// A show that loses episodes between syncs has to lose them here too, or the
+// list keeps growing with episodes the provider no longer offers.
+importCatalog(portalPlaylist.id, 'series', seriesCats, [{ ...portalShows[0]!, episodeNumbers: [1, 2] }])
+const afterShrink = vod.listSeasons(stored.id)
+check('an episode the portal stopped listing goes away',
+  afterShrink[0]?.episodes.length === 2, afterShrink[0]?.episodes.length)
+
 console.log('\nSeries episodes and playback progress')
 const show = catalog.queryChannels({ playlistId: kindPlaylist.id, kind: 'series', limit: 1 })[0]!
 vod.saveEpisodes(show.id, [

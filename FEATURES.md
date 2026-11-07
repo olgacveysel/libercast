@@ -36,7 +36,7 @@
 | 1.6 | Connection test + account panel (status, expiry, max/active connections) | M1 | Built |
 | 1.7 | Manual + scheduled playlist refresh, diff report (added/removed channels) | M2 | Built |
 | 1.8 | Playlist folders / grouping | M3 | Built — collapsible folders in the sidebar; a folder groups only, so deleting one keeps its sources and returns them to the ungrouped list |
-| 1.9 | Stalker / MAC portal handshake | M5 | Partial — live TV, portal guide, films and series catalogues all read; a portal that sells no VOD still syncs. Playback from a portal remains unverified against a real subscription |
+| 1.9 | Stalker / MAC portal handshake | M5 | Partial — live TV, portal guide, films, series and their episodes all read, with films and episodes fetched through the portal's own VOD handler. A portal that sells no VOD still syncs. Playback from a portal remains unverified against a real subscription |
 | 1.10 | Credentials held by the OS keychain — DPAPI, Keychain, libsecret or KWallet — never plaintext on disk, and the interface says plainly when the machine offers none | M1 | Built |
 | 1.11 | Play the same channel from another source when one fails, asking first when the names only resemble each other | — | Built |
 | 1.12 | One merged channel list across sources, grouping the same channel from several providers | — | Built |

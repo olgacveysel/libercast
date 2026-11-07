@@ -502,6 +502,68 @@ export class StalkerClient {
    * Stalker portals carry a guide of their own, which is the only one a MAG
    * subscription comes with — there is usually no XMLTV URL to point at.
    */
+  /**
+   * A play URL for a film, or for one episode of a show.
+   *
+   * Deliberately not `streamUrl`. Two things differ and both matter:
+   *
+   * `type` is `vod`, not `itv` — a portal keeps its films behind a different
+   * handler and answers the live one with nothing useful for them.
+   *
+   * And the cmd ladder is shorter. `streamUrl` will, as a last resort,
+   * rebuild a command as `http://localhost/ch/<id>`, which is the canonical
+   * form for a *channel*. A film has no channel id, so that attempt could
+   * only ever ask the portal for a channel that does not exist — and if it
+   * somehow answered, it would play the wrong thing. So VOD tries what the
+   * catalogue stored, and the same without the player hint, and stops.
+   *
+   * `episode` is the number out of the show's own list, which is also the
+   * only identifier a portal gives an episode.
+   */
+  async vodUrl(cmd: string, episode?: number): Promise<string> {
+    await this.authenticate()
+    const endpoint = await this.resolveEndpoint()
+
+    const attempts = linkAttempts(cmd)
+    const refusals: string[] = []
+
+    for (const attempt of attempts) {
+      const raw = await this.call<Record<string, unknown>>(endpoint, {
+        type: 'vod',
+        action: 'create_link',
+        cmd: attempt.cmd,
+        series: episode === undefined ? '' : String(episode),
+        forced_storage: 'undefined',
+        disable_ad: '0',
+        download: '0',
+        force_ch_link_check: '0'
+      })
+
+      const answer = text(raw?.['cmd']) ?? text(raw?.['id'])
+      if (!answer) {
+        refusals.push(`${attempt.name}: no link in the answer`)
+        continue
+      }
+
+      const url = stripLinkPrefix(answer)
+      if (!/^https?:\/\//i.test(url)) {
+        refusals.push(`${attempt.name}: not a URL (${url.slice(0, 60)})`)
+        continue
+      }
+
+      if (attempt.name !== 'stored') {
+        log.info(`portal accepted the "${attempt.name}" cmd form for a ${episode === undefined ? 'film' : 'episode'}`)
+      }
+      return url
+    }
+
+    const what = episode === undefined ? 'this title' : `episode ${episode}`
+    throw new Error(
+      `The portal would not turn ${what} into a link. Tried ${attempts.length} ` +
+        `form(s): ${refusals.join('; ')}. The stored command was "${cmd.slice(0, 80)}".`
+    )
+  }
+
   async shortEpg(channelId: string, limit = 20): Promise<ParsedProgramme[]> {
     await this.authenticate()
     const endpoint = await this.resolveEndpoint()
@@ -837,6 +899,11 @@ export function toVodItem(row: Record<string, unknown>, kind: 'movie' | 'series'
   const cmd = text(row['cmd']) ?? firstCmd(row['cmds'])
   if (kind === 'movie' && !cmd) return null
 
+  // Some portals have no `type=series` section at all and file shows under
+  // `type=vod` with this flag instead. Such a row is a show: listed as a film
+  // it would be a title that cannot play, which is worse than not listing it.
+  if (kind === 'movie' && truthy(row['is_series'])) return null
+
   return {
     externalId: `${kind === 'movie' ? 'vod' : 'series'}:${rawId}`,
     name,
@@ -848,6 +915,9 @@ export function toVodItem(row: Record<string, unknown>, kind: 'movie' | 'series'
     containerExtension: null,
     isAdult: truthy(row['censored']),
     catchupDays: 0,
+    // Only when there is something to play them with. A list of episodes that
+    // all fail on click is a worse answer than saying there are none.
+    episodeNumbers: kind === 'series' && cmd ? episodeNumbersIn(row['series']) : undefined,
     // Portals send an IMDb-style ten-point figure under its own name, and
     // some send a five-point `rating` beside it; both forms go through the
     // same reconciliation the Xtream rows do.
@@ -872,6 +942,28 @@ export function toProgramme(channelId: string, row: Record<string, unknown>): Pa
     startsAt,
     endsAt
   }
+}
+
+/**
+ * The episode numbers on a show's listing row.
+ *
+ * Portals send `series: [1, 2, 3]`. The numbers are the episode identifiers
+ * themselves — `create_link` is given the show's `cmd` and one of them — so
+ * they are kept exactly as sent, deduplicated and ordered, rather than being
+ * renumbered from one. Renumbering would make episode 4 of a part-listed show
+ * ask the portal for episode 1.
+ */
+function episodeNumbersIn(value: unknown): number[] | undefined {
+  if (!Array.isArray(value)) return undefined
+
+  const numbers = new Set<number>()
+  for (const entry of value) {
+    const parsed = number(entry)
+    if (parsed === null || !Number.isInteger(parsed) || parsed < 0) continue
+    numbers.add(parsed)
+  }
+
+  return numbers.size > 0 ? [...numbers].sort((a, b) => a - b) : undefined
 }
 
 function firstCmd(value: unknown): string | null {

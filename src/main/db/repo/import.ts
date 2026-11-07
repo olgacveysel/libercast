@@ -107,6 +107,55 @@ export function importCatalog(
       )
     }
 
+    /*
+     * Episodes a portal already told us about.
+     *
+     * Only portals set this: they put a show's episode numbers on the listing
+     * row, so the episodes arrive with the catalogue and there is no per-show
+     * call to make. Xtream fetches its episodes lazily instead, when somebody
+     * opens a show, and leaves this undefined.
+     *
+     * Written inside the same transaction as the channels they belong to, so
+     * a sync that fails partway cannot leave a show whose episodes are from
+     * the run before.
+     */
+    const withEpisodes = channels.filter((channel) => (channel.episodeNumbers?.length ?? 0) > 0)
+    if (withEpisodes.length > 0) {
+      const findChannel = db.prepare(
+        'SELECT id FROM channels WHERE playlist_id = ? AND kind = ? AND external_id = ?'
+      )
+      const upsertEpisode = db.prepare(
+        `INSERT INTO series_episodes
+           (channel_id, external_id, season, episode, title, plot, duration_secs,
+            container_extension, still_url)
+         VALUES (?, ?, 1, ?, ?, NULL, NULL, NULL, NULL)
+         ON CONFLICT(channel_id, external_id) DO UPDATE SET
+           season = excluded.season,
+           episode = excluded.episode,
+           title = excluded.title`
+      )
+      const dropOthers = db.prepare(
+        `DELETE FROM series_episodes
+         WHERE channel_id = ?
+           AND external_id NOT IN (SELECT value FROM json_each(?))`
+      )
+
+      for (const channel of withEpisodes) {
+        const row = findChannel.get(playlistId, kind, channel.externalId) as { id: number } | undefined
+        if (!row) continue
+
+        const numbers = channel.episodeNumbers ?? []
+        for (const number of numbers) {
+          // A portal has no season dimension here — the number *is* the
+          // episode, and it is also the identifier `create_link` is given, so
+          // it is stored as the external id rather than renumbered.
+          upsertEpisode.run(row.id, String(number), number, `Episode ${number}`)
+        }
+        // A show that lost episodes between syncs should lose them here too.
+        dropOthers.run(row.id, JSON.stringify(numbers.map((number) => String(number))))
+      }
+    }
+
     // Stale rows: this playlist AND this kind, not touched by this import.
     const info = db
       .prepare('DELETE FROM channels WHERE playlist_id = ? AND kind = ? AND seen_at < ?')

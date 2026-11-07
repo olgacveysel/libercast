@@ -33,6 +33,19 @@ export interface ParsedChannel {
   year?: number | null
   /** When the *provider* added it, which is not when we first saw it. */
   providerAddedAt?: number | null
+  /**
+   * Episode numbers a show's *listing* row already carries.
+   *
+   * Portals work this way and Xtream does not. An Xtream series needs a
+   * second call per show to learn its episodes; a portal puts the numbers on
+   * the row it already sent, and addresses each episode by the show's own
+   * `cmd` plus that number. So for portals the episodes arrive with the
+   * catalogue and are stored during the same sync, with no per-show call at
+   * all — which also means a portal show opens to its episodes offline.
+   *
+   * Absent for every other kind of source.
+   */
+  episodeNumbers?: number[]
 }
 
 export interface ParsedCatalog {

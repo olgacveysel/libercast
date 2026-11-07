@@ -58,23 +58,6 @@ export async function seriesDetail(channelId: number, force = false): Promise<Se
   return { info: vodRepo.getVodInfo(channelId), seasons: vodRepo.listSeasons(channelId) }
 }
 
-export function resolveEpisodeStream(episodeId: number): { url: string; headers: Record<string, string> } {
-  const episode = vodRepo.getEpisode(episodeId)
-  if (!episode) throw new Error('Episode not found')
-
-  const channel = getChannel(episode.channelId)
-  if (!channel) throw new Error('Series not found')
-
-  const playlist = getPlaylist(channel.playlistId)
-  if (!playlist || playlist.kind !== 'xtream') throw new Error('Episodes require an Xtream source')
-
-  const client = xtreamClientFor(playlist)
-  return {
-    url: client.seriesEpisodeUrl(episode.externalId, episode.containerExtension ?? 'mp4'),
-    headers: {}
-  }
-}
-
 export function nextEpisodeOf(episodeId: number): SeriesEpisode | null {
   return vodRepo.nextEpisode(episodeId)
 }

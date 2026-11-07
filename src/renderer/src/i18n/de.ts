@@ -26,7 +26,6 @@ export const de: Record<TranslationKey, string> = {
   'nav.allSourcesBody': 'Alle Quellen als eine Liste, Doppelte zusammengefasst',
   'settings.shortcutsNote': 'Während der Eingabe in ein Feld werden Tastenkürzel ignoriert.',
   'vod.noEpisodes': 'Dieser Anbieter hat für diese Serie keine Folgen geliefert.',
-  'vod.noEpisodesPortal': 'Folgen von Portalen werden noch nicht gelesen, daher wird diese Serie zwar angezeigt, lässt sich aber nicht öffnen.',
   'nav.folderEmpty': 'Hier ist noch nichts',
   'settings.sourceFolders': 'Quellordner',
   'settings.foldersBody': 'Gruppieren Sie Ihre Quellen in der Seitenleiste. Ein Ordner enthält nichts Eigenes — wird er gelöscht, kehren seine Quellen in die Liste darüber zurück.',

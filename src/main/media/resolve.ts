@@ -100,7 +100,31 @@ export async function resolveProviderStream(source: StreamSource): Promise<Provi
     if (!channel) throw new Error('Series not found')
 
     const playlist = getPlaylist(channel.playlistId)
-    if (!playlist || playlist.kind !== 'xtream') throw new Error('Episodes require an Xtream source')
+    if (!playlist) throw new Error('Series not found')
+
+    // A portal names an episode by a number out of the show's own list, and
+    // plays it with the show's command plus that number. There is no
+    // per-episode address to build, so the link is fetched now, as it is for
+    // everything else on a portal.
+    if (playlist.kind === 'stalker') {
+      if (!channel.streamUrl) {
+        throw new Error('This series has no portal command saved. Re-sync the source.')
+      }
+      const number = Number.parseInt(episode.externalId, 10)
+      if (!Number.isFinite(number)) throw new Error('This episode has no portal number saved.')
+
+      return {
+        url: await stalkerClientFor(playlist).vodUrl(channel.streamUrl, number),
+        userAgent: playlist.userAgent,
+        referrer: playlist.referrer,
+        label: `${channel.name} - ${episode.title}`,
+        durationSecs: episode.durationSecs,
+        isLive: false,
+        alternates: []
+      }
+    }
+
+    if (playlist.kind !== 'xtream') throw new Error('Episodes require an Xtream source or a portal')
 
     const extension = episode.containerExtension ?? 'mp4'
     const client = xtreamClientFor(playlist)
@@ -171,11 +195,18 @@ export async function resolveProviderStream(source: StreamSource): Promise<Provi
   // link is fetched now, used now, and never stored: it expires in minutes and
   // on some portals works exactly once.
   if (playlist.kind === 'stalker') {
-    if (!url) throw new Error('This channel has no portal command saved. Re-sync the source.')
-    // The external id goes with it: when a portal does not recognise the cmd
-    // from its own channel list, rebuilding one from the id is the form that
-    // tends to work, and only the catalogue knows that id.
-    url = await stalkerClientFor(playlist).streamUrl(url, channel.externalId)
+    if (!url) throw new Error('This title has no portal command saved. Re-sync the source.')
+    const client = stalkerClientFor(playlist)
+
+    // A film and a channel are fetched through different handlers, and the
+    // live one must not be used for a film: its last-resort attempt rebuilds
+    // the command as `/ch/<external id>`, and a film's external id is
+    // `vod:17` — a channel that does not exist. The live path also passes the
+    // external id for exactly that rebuild, which is why it is only given
+    // here, for channels.
+    url = isLive
+      ? await client.streamUrl(url, channel.externalId)
+      : await client.vodUrl(url)
 
     return {
       url,

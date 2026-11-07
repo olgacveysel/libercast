@@ -144,6 +144,9 @@ export function startPortal(options: PortalOptions = {}): Promise<Portal> {
 
   // A show has no `cmd` of its own on most portals: episodes are addressed by
   // series number against the show. The listing still has to survive that.
+  // The first show is playable; the second is the portal that lists a show
+  // and gives nothing to play it with, which has to stay listed but must not
+  // produce episodes that fail on click.
   const show = (n: number) => ({
     id: String(n),
     name: `Northern Lantern ${n}`,
@@ -151,7 +154,8 @@ export function startPortal(options: PortalOptions = {}): Promise<Portal> {
     screenshot_uri: `http://localhost/show/${n}.jpg`,
     year: String(2015 + n),
     added: `2021-0${n}-02 09:30:00`,
-    series: [1, 2, 3]
+    series: [1, 2, 3],
+    ...(n === 1 ? { cmd: `/media/show-${n}.mpg` } : {})
   })
 
   const movies = Array.from({ length: config.movies }, (_, i) => movie(i + 1))
@@ -284,6 +288,23 @@ export function startPortal(options: PortalOptions = {}): Promise<Portal> {
         data: rows.slice(start, start + config.pageSize),
         total_items: rows.length,
         max_page_items: config.pageSize
+      })
+      return
+    }
+
+    if (action === 'create_link' && type === 'vod') {
+      // A portal answers films through its own handler. Asking the live one
+      // for a film gets a channel URL with nothing in it, which is the bug
+      // this branch exists to make visible.
+      const cmd = params.get('cmd') ?? ''
+      const series = params.get('series') ?? ''
+      send({
+        id: 1,
+        cmd:
+          `${config.linkPrefix}http://localhost/play/vod.php?mac=${config.mac}` +
+          `&file=${encodeURIComponent(cmd)}` +
+          (series === '' ? '' : `&series=${series}`) +
+          '&play_token=abc123'
       })
       return
     }
