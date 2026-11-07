@@ -1,5 +1,5 @@
 import { useEffect, useState, type JSX } from 'react'
-import type { AppSettings, AutoRefreshReport, FailoverMode } from '@shared/types'
+import type { AppSettings, AutoRefreshReport, FailoverMode, Playlist } from '@shared/types'
 import { invoke, messageOf } from '@renderer/lib/api'
 import { formatRelative } from '@renderer/lib/format'
 import { useAppStore } from '@renderer/store/useAppStore'
@@ -15,6 +15,14 @@ import { BackupSection } from './BackupSection'
 
 // Teal first: it is the mark's own colour, and the default.
 const ACCENTS = ['#22b58f', '#4f8cff', '#8f6bff', '#35c46b', '#f5a623', '#ff5f57']
+
+// Keyed off the union so a new kind of source fails to compile here instead
+// of silently describing itself as M3U, which is what a portal used to do.
+const KIND_LABEL: Record<Playlist['kind'], string> = {
+  xtream: 'Xtream Codes',
+  m3u: 'M3U',
+  stalker: 'Portal'
+}
 
 interface Props {
   onAddSource: () => void
@@ -51,7 +59,8 @@ export function Settings({ onAddSource }: Props): JSX.Element {
     void invoke('app:version').then(setVersion).catch(() => setVersion(null))
   }, [])
 
-  const { settings, updateSettings, playlists, refreshPlaylists, capabilities } = useAppStore()
+  const { settings, updateSettings, playlists, folders, refreshPlaylists, capabilities } = useAppStore()
+  const [newFolder, setNewFolder] = useState('')
   const t = useT()
   const [busy, setBusy] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -69,6 +78,60 @@ export function Settings({ onAddSource }: Props): JSX.Element {
       setError(messageOf(e))
     } finally {
       setRefreshing(false)
+    }
+  }
+
+  const moveToFolder = async (id: number, folderId: number | null): Promise<void> => {
+    setError(null)
+    try {
+      await invoke('playlists:setFolder', { id, folderId })
+      await refreshPlaylists()
+    } catch (e) {
+      setError(messageOf(e))
+    }
+  }
+
+  const addFolder = async (): Promise<void> => {
+    const name = newFolder.trim()
+    if (name === '') return
+    setError(null)
+    try {
+      await invoke('folders:create', name)
+      setNewFolder('')
+      await refreshPlaylists()
+    } catch (e) {
+      setError(messageOf(e))
+    }
+  }
+
+  const renameFolder = async (id: number, current: string): Promise<void> => {
+    const name = window.prompt(t('settings.folderRename'), current)
+    if (name === null || name.trim() === '' || name.trim() === current) return
+    setError(null)
+    try {
+      await invoke('folders:rename', { id, name })
+      await refreshPlaylists()
+    } catch (e) {
+      setError(messageOf(e))
+    }
+  }
+
+  /**
+   * Deleting a folder is not deleting what is in it, and the confirmation says
+   * so with the actual number. "Delete folder?" on its own invites the reader
+   * to assume the worst and keep a folder they do not want, or to click
+   * through expecting the worst and be relieved — neither of which is the
+   * interface doing its job.
+   */
+  const deleteFolder = async (id: number): Promise<void> => {
+    const count = playlists.filter((playlist) => playlist.folderId === id).length
+    if (!window.confirm(t('settings.folderDeleteConfirm', { count }))) return
+    setError(null)
+    try {
+      await invoke('folders:remove', id)
+      await refreshPlaylists()
+    } catch (e) {
+      setError(messageOf(e))
     }
   }
 
@@ -158,10 +221,33 @@ export function Settings({ onAddSource }: Props): JSX.Element {
                 <div className="plcard__text">
                   <strong>{playlist.name}</strong>
                   <span>
-                    {playlist.kind === 'xtream' ? 'Xtream Codes' : 'M3U'} · synced{' '}
+                    {KIND_LABEL[playlist.kind]} · synced{' '}
                     {formatRelative(playlist.lastSyncedAt)}
                   </span>
                 </div>
+                {/*
+                  Only offered once a folder exists. A picker whose only
+                  option is "No folder" is a control that does nothing.
+                */}
+                {folders.length > 0 && (
+                  <select
+                    className="input"
+                    style={{ width: 150 }}
+                    aria-label={`${t('settings.folderOf')}: ${playlist.name}`}
+                    value={playlist.folderId ?? ''}
+                    onChange={(event) =>
+                      void moveToFolder(playlist.id, event.target.value === '' ? null : Number(event.target.value))
+                    }
+                  >
+                    <option value="">{t('settings.folderNone')}</option>
+                    {folders.map((folder) => (
+                      <option key={folder.id} value={folder.id}>
+                        {folder.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+
                 <button
                   className="btn btn--ghost"
                   onClick={() => setEditing(editing === playlist.id ? null : playlist.id)}
@@ -202,6 +288,53 @@ export function Settings({ onAddSource }: Props): JSX.Element {
           <button className="btn btn--primary" onClick={onAddSource} style={{ marginTop: 6 }}>
             {t('nav.addSource')}
           </button>
+        </section>
+
+        <section className="settings__group">
+          <h3>{t('settings.sourceFolders')}</h3>
+
+          <p style={{ fontSize: 12, color: 'var(--text-dim)', margin: '0 2px 10px', lineHeight: 1.5 }}>
+            {t('settings.foldersBody')}
+          </p>
+
+          {folders.map((folder) => {
+            const count = playlists.filter((playlist) => playlist.folderId === folder.id).length
+            return (
+              <div key={folder.id} className="plcard" style={{ marginBottom: 8 }}>
+                <div className="plcard__text">
+                  <strong>{folder.name}</strong>
+                  <span>{count}</span>
+                </div>
+                <button className="btn btn--ghost" onClick={() => void renameFolder(folder.id, folder.name)}>
+                  {t('settings.folderRename')}
+                </button>
+                <button
+                  className="btn btn--danger"
+                  onClick={() => void deleteFolder(folder.id)}
+                  aria-label={`${t('settings.folderDelete')}: ${folder.name}`}
+                >
+                  <IconTrash size={15} />
+                </button>
+              </div>
+            )
+          })}
+
+          <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+            <input
+              className="input"
+              style={{ flex: 1 }}
+              value={newFolder}
+              placeholder={t('settings.folderNamePlaceholder')}
+              aria-label={t('settings.folderNamePlaceholder')}
+              onChange={(event) => setNewFolder(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') void addFolder()
+              }}
+            />
+            <button className="btn btn--primary" onClick={() => void addFolder()} disabled={newFolder.trim() === ''}>
+              {t('settings.folderCreate')}
+            </button>
+          </div>
         </section>
 
         <section className="settings__group">
@@ -558,7 +691,7 @@ export function Settings({ onAddSource }: Props): JSX.Element {
           </div>
           <p style={{ fontSize: 12, color: 'var(--text-dim)', margin: '8px 0 0', display: 'flex', gap: 6, alignItems: 'center' }}>
             <IconKeyboard size={14} />
-            Shortcuts are ignored while typing in a field.
+            {t('settings.shortcutsNote')}
           </p>
         </section>
 

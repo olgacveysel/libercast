@@ -87,7 +87,8 @@ const HARNESSES = [
   'verify-vodfilters',
   'verify-pip',
   'verify-mini',
-  'verify-tvnav'
+  'verify-tvnav',
+  'verify-folders'
 ]
 
 function run(command, args, options = {}) {

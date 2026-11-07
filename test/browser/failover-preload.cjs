@@ -88,6 +88,7 @@ const answers = {
     return { ...settings }
   },
   'playlists:list': () => [playlist(1, 'Main provider')],
+  'folders:list': () => [],
   'categories:list': () => [],
   'channels:query': () => [WANTED],
   'channels:count': () => 1,

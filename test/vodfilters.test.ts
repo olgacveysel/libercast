@@ -2,7 +2,7 @@ import { getDb } from '@main/db'
 import { importCatalog } from '@main/db/repo/import'
 import { createPlaylist } from '@main/db/repo/playlists'
 import * as catalog from '@main/db/repo/catalog'
-import { vodAddedAt, vodRating, vodYear } from '@main/sources/xtream'
+import { vodAddedAt, vodRating, vodYear } from '@main/sources/vodMeta'
 
 /**
  * Filtering and sorting a film catalogue.

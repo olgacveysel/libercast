@@ -46,6 +46,7 @@ const answers = {
     return { ...settings }
   },
   'playlists:list': () => [],
+  'folders:list': () => [],
   'media:capabilities': () => ({ ffmpeg: true, ffmpegSource: 'bundled', ffprobe: true, recordingsPath: null }),
   'app:version': () => '0.9.0-beta.2',
   'channels:recent': () => []

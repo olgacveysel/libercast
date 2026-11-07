@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { AppSettings, ChannelWithState, MediaCapabilities, Playlist, SyncProgress } from '@shared/types'
+import type { AppSettings, ChannelWithState, MediaCapabilities, Playlist, PlaylistFolder, SyncProgress } from '@shared/types'
 import { DEFAULT_SETTINGS } from '@shared/types'
 import { invoke } from '@renderer/lib/api'
 import { setFormatLocale } from '@renderer/lib/format'
@@ -21,6 +21,8 @@ interface AppState {
   route: Route
   settings: AppSettings
   playlists: Playlist[]
+  /** Source folders, in display order. Empty until somebody makes one. */
+  folders: PlaylistFolder[]
   activePlaylistId: number | null
   /**
    * Show every source as one list instead of one source at a time.
@@ -59,6 +61,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   route: 'home',
   settings: DEFAULT_SETTINGS,
   playlists: [],
+  folders: [],
   activePlaylistId: null,
   allSources: false,
   activeChannel: null,
@@ -75,14 +78,19 @@ export const useAppStore = create<AppState>((set, get) => ({
   setSleepAt: (sleepAt) => set({ sleepAt }),
 
   bootstrap: async () => {
-    const [settings, playlists, capabilities] = await Promise.all([
+    const [settings, playlists, folders, capabilities] = await Promise.all([
       invoke('settings:get'),
       invoke('playlists:list'),
+      invoke('folders:list'),
       invoke('media:capabilities')
     ])
     set({
       settings,
       playlists,
+      // A bridge that answers nothing means no folders, not a broken sidebar.
+      // Every source is still drawn, because the ungrouped list is defined as
+      // everything not in a folder that exists.
+      folders: folders ?? [],
       capabilities,
       activePlaylistId: playlists[0]?.id ?? null,
       route: playlists.length > 0 ? 'live' : 'home',
@@ -92,10 +100,14 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   refreshPlaylists: async () => {
-    const playlists = await invoke('playlists:list')
+    // Folders come back in the same breath. Every action that rearranges one
+    // list can rearrange the other — deleting a folder ungroups its sources,
+    // moving a source empties a folder — and fetching them separately is how
+    // the sidebar ends up drawing a source inside a folder that is gone.
+    const [playlists, folders] = await Promise.all([invoke('playlists:list'), invoke('folders:list')])
     const current = get().activePlaylistId
     const stillExists = playlists.some((p) => p.id === current)
-    set({ playlists, activePlaylistId: stillExists ? current : playlists[0]?.id ?? null })
+    set({ playlists, folders: folders ?? [], activePlaylistId: stillExists ? current : playlists[0]?.id ?? null })
     return playlists
   },
 

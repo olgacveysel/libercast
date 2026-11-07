@@ -15,6 +15,7 @@ interface PlaylistRow {
   referrer: string | null
   enabled: number
   sort_order: number
+  folder_id: number | null
   last_synced_at: number | null
   created_at: number
   server_timezone: string | null
@@ -35,6 +36,7 @@ function toPlaylist(row: PlaylistRow): Playlist {
     referrer: row.referrer,
     enabled: row.enabled === 1,
     sortOrder: row.sort_order,
+    folderId: row.folder_id,
     lastSyncedAt: row.last_synced_at,
     createdAt: row.created_at,
     serverTimezone: row.server_timezone
@@ -133,4 +135,56 @@ export function removePlaylist(id: number): void {
 
 export function markSynced(id: number): void {
   getDb().prepare('UPDATE playlists SET last_synced_at = ? WHERE id = ?').run(Date.now(), id)
+}
+
+/**
+ * Moves a source into a folder, or out of every folder when given null.
+ *
+ * The new position is the end of whatever it joins, not wherever its old
+ * sort_order happens to land it. Dropping a source into a folder and finding
+ * it third of five is the kind of small wrongness that makes an interface feel
+ * unreliable, and "it went where I put it" costs one extra query.
+ */
+export function setPlaylistFolder(id: number, folderId: number | null): Playlist {
+  const db = getDb()
+
+  if (folderId !== null) {
+    const exists = db.prepare('SELECT 1 AS ok FROM playlist_folders WHERE id = ?').get(folderId)
+    if (!exists) throw new Error(`no folder ${folderId}`)
+  }
+
+  const last = db
+    .prepare(
+      folderId === null
+        ? 'SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM playlists WHERE folder_id IS NULL'
+        : 'SELECT COALESCE(MAX(sort_order), -1) + 1 AS n FROM playlists WHERE folder_id = ?'
+    )
+    .get(...(folderId === null ? [] : [folderId])) as { n: number }
+
+  db.prepare('UPDATE playlists SET folder_id = ?, sort_order = ? WHERE id = ?').run(folderId, last.n, id)
+
+  const playlist = getPlaylist(id)
+  if (!playlist) throw new Error(`no playlist ${id}`)
+  return playlist
+}
+
+/**
+ * Rewrites the running order from a list of ids, as reorderFolders does.
+ *
+ * Order is global rather than per folder: one number, read within whichever
+ * group a source is displayed in. Two counters that have to agree is a thing
+ * to keep in step forever, and nothing here needs the second one.
+ */
+export function reorderPlaylists(ids: number[]): Playlist[] {
+  const db = getDb()
+  const known = new Set(listPlaylists().map((p) => p.id))
+  const ordered = ids.filter((id) => known.has(id))
+  const rest = [...known].filter((id) => !ordered.includes(id))
+
+  const update = db.prepare('UPDATE playlists SET sort_order = ? WHERE id = ?')
+  db.transaction(() => {
+    ;[...ordered, ...rest].forEach((id, index) => update.run(index, id))
+  })()
+
+  return listPlaylists()
 }

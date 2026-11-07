@@ -227,11 +227,32 @@ export async function syncPlaylist(playlistId: number, onProgress: ProgressSink)
         )
       }
 
+      // Films and shows, where the portal has them. Behind `safely` for the
+      // same reason Xtream's are: plenty of portals sell live TV and nothing
+      // else, and refusing the VOD actions is how they say so. Losing the
+      // channels that did arrive over that would be the wrong trade.
+      emit('movies', 'Loading films…', 0.72)
+      const movies = await safely(() => client.movieCatalog())
+
+      emit('series', 'Loading series…', 0.8)
+      const series = await safely(() => client.seriesCatalog())
+
       emit('saving', `Saving ${catalog.channels.length} channels…`, 0.9)
       const counts = importCatalog(playlistId, 'live', catalog.categories, catalog.channels)
       result.categories = counts.categories
       result.liveChannels = counts.channels
       result.removed = counts.removed
+
+      if (movies && movies.channels.length > 0) {
+        const vodCounts = importCatalog(playlistId, 'movie', movies.categories, movies.channels)
+        result.movies = vodCounts.channels
+        result.categories += vodCounts.categories
+      }
+      if (series && series.channels.length > 0) {
+        const seriesCounts = importCatalog(playlistId, 'series', series.categories, series.channels)
+        result.series = seriesCounts.channels
+        result.categories += seriesCounts.categories
+      }
     }
 
     markSynced(playlistId)

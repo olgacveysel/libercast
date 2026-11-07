@@ -1,6 +1,7 @@
 import type { ParsedCatalog, ParsedCategory, ParsedChannel, ParsedProgramme } from './types'
 import { request, type FetchOptions } from '@main/util/http'
 import { createLogger } from '@main/util/logger'
+import { vodAddedAtText, vodRating, vodYear } from './vodMeta'
 
 const log = createLogger('stalker')
 
@@ -298,6 +299,138 @@ export class StalkerClient {
     }
 
     return channels
+  }
+
+  /**
+   * Films, and the portal's own categories for them.
+   *
+   * Separate from live TV in more than name: a portal keeps VOD under
+   * `type=vod`, pages it rather than offering anything like
+   * `get_all_channels`, and insists on a `category` — `*` for everything.
+   *
+   * A portal that sells only live TV answers this with nothing, or 404s the
+   * action outright. That is a normal portal, not a broken one, so an empty
+   * result is returned rather than thrown; the caller decides what no films
+   * means.
+   */
+  async movieCatalog(
+    onProgress?: (loaded: number, total: number | null) => void
+  ): Promise<ParsedCatalog> {
+    return this.vodCatalog('vod', 'movie', onProgress)
+  }
+
+  /**
+   * Series, as the portal lists them.
+   *
+   * What comes back is the shows, not their episodes. A portal addresses an
+   * episode by the show's `cmd` plus a series number, which is a different
+   * shape from the season-and-episode tree the rest of this application is
+   * built around — so the episodes are left for their own pass rather than
+   * guessed at here. Browsing the shows is what this gives.
+   */
+  async seriesCatalog(
+    onProgress?: (loaded: number, total: number | null) => void
+  ): Promise<ParsedCatalog> {
+    return this.vodCatalog('series', 'series', onProgress)
+  }
+
+  private async vodCatalog(
+    type: 'vod' | 'series',
+    kind: 'movie' | 'series',
+    onProgress?: (loaded: number, total: number | null) => void
+  ): Promise<ParsedCatalog> {
+    await this.authenticate()
+    const endpoint = await this.resolveEndpoint()
+
+    const categories = await this.vodCategories(endpoint, type)
+    const channels = await this.vodItems(endpoint, type, kind, onProgress)
+
+    log.info(`portal ${type} catalogue: ${channels.length} items in ${categories.length} categories`)
+
+    return { kind, categories, channels }
+  }
+
+  private async vodCategories(endpoint: string, type: 'vod' | 'series'): Promise<ParsedCategory[]> {
+    let raw: unknown
+    try {
+      raw = await this.call<unknown>(endpoint, { type, action: 'get_categories' })
+    } catch (error) {
+      log.info(`portal has no ${type} categories`, error)
+      return []
+    }
+
+    const rows = Array.isArray(raw) ? raw : []
+    return rows
+      .map((row) => asRecord(row))
+      .filter((row): row is Record<string, unknown> => row !== null)
+      .map((row) => ({ externalId: text(row['id']) ?? '', name: text(row['title']) ?? '' }))
+      // As with genres, `*` is the portal's own "everything" menu entry.
+      .filter((category) => category.externalId !== '' && category.externalId !== '*')
+      .filter((category) => category.name !== '')
+  }
+
+  private async vodItems(
+    endpoint: string,
+    type: 'vod' | 'series',
+    kind: 'movie' | 'series',
+    onProgress?: (loaded: number, total: number | null) => void
+  ): Promise<ParsedChannel[]> {
+    const items: ParsedChannel[] = []
+    const seen = new Set<string>()
+    let total: number | null = null
+
+    for (let page = 1; page <= MAX_PAGES; page++) {
+      let raw: Record<string, unknown>
+      try {
+        raw = await this.call<Record<string, unknown>>(endpoint, {
+          type,
+          action: 'get_ordered_list',
+          category: '*',
+          // Newest first, so a portal with more pages than MAX_PAGES gives up
+          // the half worth having rather than an arbitrary half.
+          sortby: 'added',
+          fav: '0',
+          hd: '0',
+          p: String(page)
+        })
+      } catch (error) {
+        // A portal that sells no VOD refuses the action rather than answering
+        // an empty list. On the first page that means "none"; later it means
+        // the walk ended early, and what was collected still stands.
+        log.info(`portal stopped answering ${type} at page ${page}`, error)
+        break
+      }
+
+      const rows = listOf(raw)
+      if (rows.length === 0) break
+
+      if (total === null) total = number(raw['total_items'])
+      if (page === 1) {
+        reportUnreadable(
+          `${type}/get_ordered_list`,
+          rows,
+          rows.filter((row) => toVodItem(row, kind) !== null).length
+        )
+      }
+
+      let added = 0
+      for (const row of rows) {
+        const item = toVodItem(row, kind)
+        // Same guard as the channel walk: a portal that ignores `p` answers
+        // every page with page one, and counting what is new is what stops
+        // that being an endless loop.
+        if (!item || seen.has(item.externalId)) continue
+        seen.add(item.externalId)
+        items.push(item)
+        added++
+      }
+
+      onProgress?.(items.length, total)
+      if (added === 0) break
+      if (total !== null && items.length >= total) break
+    }
+
+    return items
   }
 
   /**
@@ -680,6 +813,47 @@ export function toChannel(row: Record<string, unknown>): ParsedChannel | null {
     // passed through so this application's parental lock can use it too.
     isAdult: truthy(row['censored']),
     catchupDays: number(row['tv_archive_duration']) ?? 0
+  }
+}
+
+/**
+ * One film or show out of a portal's VOD listing.
+ *
+ * The external id carries a `vod:` or `series:` prefix, matching what the
+ * Xtream client writes. That is not cosmetic: the rest of the application —
+ * the kind backfill included — reads the prefix to tell a film from a show
+ * from a channel, so a portal row without it would be filed as live TV.
+ *
+ * A show has no single thing to play; a portal addresses each episode by the
+ * show's own `cmd` plus a series number. So an empty stream URL is correct
+ * for a series and fatal for a film, and the two are treated differently
+ * rather than both being dropped for want of a `cmd`.
+ */
+export function toVodItem(row: Record<string, unknown>, kind: 'movie' | 'series'): ParsedChannel | null {
+  const rawId = text(row['id']) ?? text(row['movie_id'])
+  const name = text(row['name']) ?? text(row['o_name']) ?? text(row['title'])
+  if (!rawId || !name) return null
+
+  const cmd = text(row['cmd']) ?? firstCmd(row['cmds'])
+  if (kind === 'movie' && !cmd) return null
+
+  return {
+    externalId: `${kind === 'movie' ? 'vod' : 'series'}:${rawId}`,
+    name,
+    categoryExternalId: text(row['category_id']) ?? null,
+    number: null,
+    logoUrl: text(row['screenshot_uri']) ?? text(row['pic']) ?? null,
+    epgChannelId: null,
+    streamUrl: kind === 'movie' ? cmd! : (cmd ?? ''),
+    containerExtension: null,
+    isAdult: truthy(row['censored']),
+    catchupDays: 0,
+    // Portals send an IMDb-style ten-point figure under its own name, and
+    // some send a five-point `rating` beside it; both forms go through the
+    // same reconciliation the Xtream rows do.
+    rating: vodRating(row['rating_imdb'] ?? row['rating'], row['rating_5based']),
+    year: vodYear(row['year'], row['release_date'], row['releasedate']),
+    providerAddedAt: vodAddedAtText(row['added'])
   }
 }
 

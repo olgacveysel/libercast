@@ -82,6 +82,7 @@ const answers = {
     return { ...settings }
   },
   'playlists:list': () => [playlist],
+  'folders:list': () => [],
   'categories:list': () => [],
   'channels:recent': () => [],
   'progress:continueWatching': () => [],

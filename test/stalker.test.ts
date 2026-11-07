@@ -10,7 +10,8 @@ import {
   serialFor,
   stripLinkPrefix,
   toChannel,
-  toProgramme
+  toProgramme,
+  toVodItem
 } from '@main/sources/stalker'
 import { redact } from '@main/util/http'
 import { MAC, startPortal, type Portal } from './stalkerportal'
@@ -305,6 +306,89 @@ async function main(): Promise<void> {
   check('entities are decoded', plainText('Tom &amp; Jerry') === 'Tom & Jerry')
   check('plain text is left alone', plainText('Account expired') === 'Account expired')
   check('and runs of space are collapsed', plainText('a  \n  b') === 'a b')
+
+  console.log('\nReading a film out of a listing')
+
+  check('a film is prefixed so it is not filed as live TV',
+    toVodItem({ id: '7', name: 'A Film', cmd: '/media/7.mpg' }, 'movie')?.externalId === 'vod:7')
+  check('a show is prefixed too',
+    toVodItem({ id: '7', name: 'A Show' }, 'series')?.externalId === 'series:7')
+
+  // A show has no single thing to play — episodes are addressed by series
+  // number against the show — so an empty stream URL is correct for one and
+  // fatal for a film. Dropping shows for want of a `cmd` would list none.
+  check('a film with no command is dropped',
+    toVodItem({ id: '8', name: 'No Command' }, 'movie') === null)
+  check('a show with no command is kept',
+    toVodItem({ id: '8', name: 'No Command' }, 'series')?.streamUrl === '')
+
+  check('a row with no name is dropped',
+    toVodItem({ id: '9', cmd: '/x' }, 'movie') === null)
+  check('the second-choice name is used when the first is missing',
+    toVodItem({ id: '9', o_name: 'ORIGINAL', cmd: '/x' }, 'movie')?.name === 'ORIGINAL')
+
+  check('a ten-point rating is read',
+    toVodItem({ id: '1', name: 'x', cmd: '/x', rating_imdb: '7.4' }, 'movie')?.rating === 7.4)
+  check('the year is read',
+    toVodItem({ id: '1', name: 'x', cmd: '/x', year: '1999' }, 'movie')?.year === 1999)
+
+  // `added` is when the portal listed it, which is not when the film was
+  // made. Reading it as a year would mislabel everything whose year is blank.
+  check('the date it was added is not mistaken for the release year',
+    toVodItem({ id: '1', name: 'x', cmd: '/x', added: '2020-01-15 18:04:00' }, 'movie')?.year === null)
+  check('but it is kept as when the provider added it',
+    toVodItem({ id: '1', name: 'x', cmd: '/x', added: '2020-01-15 18:04:00' }, 'movie')
+      ?.providerAddedAt === Date.UTC(2020, 0, 15, 18, 4, 0))
+  check('a zeroed date is nothing, not 1970',
+    toVodItem({ id: '1', name: 'x', cmd: '/x', added: '0000-00-00 00:00:00' }, 'movie')
+      ?.providerAddedAt === null)
+
+  console.log('\nAgainst a portal that also sells films and shows')
+
+  const shop = await startPortal({ movies: 3, shows: 2, pageSize: 2 })
+
+  const films = await client(shop).movieCatalog()
+  check('every film is listed, across pages', films.channels.length === 3, films.channels.length)
+  check('they are filed as films', films.kind === 'movie')
+  check('film categories are read', films.categories.length === 2, films.categories)
+  check('the "all" pseudo-category is not one of them',
+    films.categories.every((c) => c.externalId !== '*'), films.categories)
+  check('a film keeps its poster',
+    films.channels[0]?.logoUrl?.includes('/poster/') === true, films.channels[0]?.logoUrl)
+  check('a film keeps its rating', films.channels.every((c) => typeof c.rating === 'number'))
+  check('the adult flag survives here too', films.channels.some((c) => c.isAdult === true))
+  check('a film with no year listed simply has none',
+    films.channels.some((c) => c.year === null), films.channels.map((c) => c.year))
+
+  const shows = await client(shop).seriesCatalog()
+  check('every show is listed', shows.channels.length === 2, shows.channels.length)
+  check('they are filed as series', shows.kind === 'series')
+  check('a show has no single thing to play',
+    shows.channels.every((c) => c.streamUrl === ''), shows.channels.map((c) => c.streamUrl))
+  check('shows have their own categories',
+    shows.categories.length === 1 && shows.categories[0]?.name === 'Drama', shows.categories)
+
+  // The same action serves all three; only `type` says which. Asking for
+  // films and getting channels back is the failure that looks like success.
+  check('films were asked for as films',
+    shop.seen.requests.includes('vod/get_ordered_list'), shop.seen.requests)
+  check('and shows as shows',
+    shop.seen.requests.includes('series/get_ordered_list'), shop.seen.requests)
+  check('a film is not a channel',
+    films.channels.every((c) => !shows.channels.some((s) => s.externalId === c.externalId)))
+
+  shop.close()
+
+  console.log('\nAgainst a portal that sells live TV and nothing else')
+
+  const liveOnly = await startPortal({ noVod: true })
+  const none = await client(liveOnly).movieCatalog()
+  check('asking for films gets an empty catalogue, not an error', none.channels.length === 0)
+  check('and no categories either', none.categories.length === 0)
+  const stillWorks = await client(liveOnly).liveCatalog()
+  check('and the channels it does sell are unaffected', stillWorks.channels.length === 5,
+    stillWorks.channels.length)
+  liveOnly.close()
 
   console.log('\nThe MAC never reaches the log')
 

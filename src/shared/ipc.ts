@@ -28,6 +28,7 @@ import type {
   MediaTrack,
   MediaTracks,
   Playlist,
+  PlaylistFolder,
   PlaylistDraft,
   ParentalRules,
   ParentalStatus,
@@ -65,6 +66,18 @@ export interface IpcContract {
   'playlists:sync': { req: number; res: SyncResult }
   /** The provider's own account report for a saved source. */
   'playlists:account': { req: number; res: XtreamAccountInfo | null }
+  /** Move a source into a folder, or out of all of them with null. */
+  'playlists:setFolder': { req: { id: number; folderId: number | null }; res: Playlist }
+  /** The whole running order, not a move. */
+  'playlists:reorder': { req: number[]; res: Playlist[] }
+
+  'folders:list': { req: void; res: PlaylistFolder[] }
+  'folders:create': { req: string; res: PlaylistFolder }
+  'folders:rename': { req: { id: number; name: string }; res: PlaylistFolder }
+  /** Deletes the folder only. The sources inside it become ungrouped. */
+  'folders:remove': { req: number; res: void }
+  'folders:reorder': { req: number[]; res: PlaylistFolder[] }
+  'folders:collapse': { req: { id: number; collapsed: boolean }; res: void }
 
   'categories:list': { req: { playlistId: number; kind: ContentKind }; res: Category[] }
 
@@ -268,6 +281,14 @@ export const IPC_CHANNELS: IpcChannel[] = [
   'playlists:test',
   'playlists:account',
   'playlists:sync',
+  'playlists:setFolder',
+  'playlists:reorder',
+  'folders:list',
+  'folders:create',
+  'folders:rename',
+  'folders:remove',
+  'folders:reorder',
+  'folders:collapse',
   'categories:list',
   'channels:query',
   'channels:count',
@@ -284,6 +305,8 @@ export const IPC_CHANNELS: IpcChannel[] = [
   'failover:reject',
   'stream:close',
   'media:capabilities',
+  'subtitles:pickFile',
+  'subtitles:loadFile',
   'downloads:list',
   'downloads:enqueue',
   'downloads:forItem',
@@ -385,6 +408,7 @@ export type {
   MediaTrack,
   MediaTracks,
   Playlist,
+  PlaylistFolder,
   PlaylistDraft,
   ParentalRules,
   ParentalStatus,

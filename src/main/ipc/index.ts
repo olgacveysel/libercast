@@ -6,6 +6,7 @@ import type { PlaylistDraft, SyncProgress } from '@shared/types'
 import * as catalog from '@main/db/repo/catalog'
 import * as epgRepo from '@main/db/repo/epg'
 import * as playlists from '@main/db/repo/playlists'
+import * as folders from '@main/db/repo/playlistFolders'
 import * as settings from '@main/db/repo/settings'
 import * as downloadsRepo from '@main/db/repo/downloads'
 import * as recordingsRepo from '@main/db/repo/recordings'
@@ -90,6 +91,23 @@ export function registerIpcHandlers(): void {
   })
 
   handle('playlists:test', (draft: PlaylistDraft) => testSource(draft))
+
+  /* ---------------- folders ---------------- */
+
+  handle('playlists:setFolder', ({ id, folderId }) => playlists.setPlaylistFolder(id, folderId))
+  handle('playlists:reorder', (ids: number[]) => playlists.reorderPlaylists(ids))
+
+  handle('folders:list', () => folders.listFolders())
+  handle('folders:create', (name: string) => folders.createFolder(name))
+  handle('folders:rename', ({ id, name }) => folders.renameFolder(id, name))
+
+  // Only the folder. The sources inside it keep their credentials and their
+  // catalogue and reappear ungrouped, which is what the schema's SET NULL
+  // does and what the interface promises when it asks.
+  handle('folders:remove', (id: number) => folders.removeFolder(id))
+
+  handle('folders:reorder', (ids: number[]) => folders.reorderFolders(ids))
+  handle('folders:collapse', ({ id, collapsed }) => folders.setFolderCollapsed(id, collapsed))
 
   handle('playlists:sync', (id: number) => syncPlaylist(id, emitProgress))
 

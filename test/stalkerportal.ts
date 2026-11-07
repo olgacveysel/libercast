@@ -49,6 +49,18 @@ export interface PortalOptions {
    * it. Nothing about the response says anything went wrong.
    */
   acceptsCmd?: 'stored' | 'bare' | 'canonical'
+  /** How many films this portal sells. */
+  movies?: number
+  /** How many shows. */
+  shows?: number
+  /**
+   * A portal that sells live TV and nothing else.
+   *
+   * Plenty do, and they do not answer the VOD actions politely — they refuse
+   * them. A sync that treats that as a failure would report a working
+   * subscription as broken, so it is the case worth modelling.
+   */
+  noVod?: boolean
 }
 
 export interface Portal {
@@ -78,6 +90,9 @@ export function startPortal(options: PortalOptions = {}): Promise<Portal> {
     noAccountInfo: false,
     oddFieldNames: false,
     acceptsCmd: 'stored' as const,
+    movies: 3,
+    shows: 2,
+    noVod: false,
     mac: MAC,
     ...options
   }
@@ -110,6 +125,37 @@ export function startPortal(options: PortalOptions = {}): Promise<Portal> {
     stream_cmd: row.cmd,
     number: row.number
   })
+
+  // Films carry their metadata in the listing, in the shapes portals actually
+  // use: a ten-point figure under its own name, a date with no timezone on it,
+  // and a year that is sometimes absent.
+  const movie = (n: number) => ({
+    id: String(n),
+    name: `The Quiet Harbour ${n}`,
+    o_name: `QUIET HARBOUR ${n}`,
+    category_id: String((n % 2) + 1),
+    cmd: `/media/${n}.mpg`,
+    screenshot_uri: `http://localhost/poster/${n}.jpg`,
+    year: n === 2 ? '' : String(1998 + n),
+    added: `2020-0${n}-15 18:04:00`,
+    rating_imdb: String(6 + n / 10),
+    censored: n === 3 ? 1 : 0
+  })
+
+  // A show has no `cmd` of its own on most portals: episodes are addressed by
+  // series number against the show. The listing still has to survive that.
+  const show = (n: number) => ({
+    id: String(n),
+    name: `Northern Lantern ${n}`,
+    category_id: '9',
+    screenshot_uri: `http://localhost/show/${n}.jpg`,
+    year: String(2015 + n),
+    added: `2021-0${n}-02 09:30:00`,
+    series: [1, 2, 3]
+  })
+
+  const movies = Array.from({ length: config.movies }, (_, i) => movie(i + 1))
+  const shows = Array.from({ length: config.shows }, (_, i) => show(i + 1))
 
   const all = Array.from({ length: config.channels }, (_, i) => {
     const row = channel(i + 1)
@@ -185,6 +231,22 @@ export function startPortal(options: PortalOptions = {}): Promise<Portal> {
       return
     }
 
+    if (action === 'get_categories') {
+      // A live-only portal refuses rather than answering an empty list, which
+      // is the shape the client has to survive.
+      if (config.noVod) {
+        res.writeHead(404, { 'content-type': 'text/html' })
+        res.end('<html><body><h1>404 Not Found</h1></body></html>')
+        return
+      }
+      send(
+        type === 'series'
+          ? [{ id: '*', title: 'All' }, { id: '9', title: 'Drama' }]
+          : [{ id: '*', title: 'All' }, { id: '1', title: 'Action' }, { id: '2', title: 'Comedy' }]
+      )
+      return
+    }
+
     if (action === 'get_genres') {
       send([
         { id: '*', title: 'All' },
@@ -206,11 +268,21 @@ export function startPortal(options: PortalOptions = {}): Promise<Portal> {
     }
 
     if (action === 'get_ordered_list') {
+      // The same action serves live TV, films and shows; only `type` says
+      // which. A client that forgets to send it gets channels back, which is
+      // exactly the bug worth being able to catch here.
+      if ((type === 'vod' || type === 'series') && config.noVod) {
+        res.writeHead(404, { 'content-type': 'text/html' })
+        res.end('<html><body><h1>404 Not Found</h1></body></html>')
+        return
+      }
+
+      const rows = type === 'vod' ? movies : type === 'series' ? shows : all
       const page = config.ignorePages ? 1 : Number(params.get('p') ?? '1')
       const start = (page - 1) * config.pageSize
       send({
-        data: all.slice(start, start + config.pageSize),
-        total_items: all.length,
+        data: rows.slice(start, start + config.pageSize),
+        total_items: rows.length,
         max_page_items: config.pageSize
       })
       return

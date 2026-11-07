@@ -1,6 +1,8 @@
 import { useEffect, useState, type JSX } from 'react'
 import type { ChannelWithState, SeriesEpisode, SeriesSeason, VodInfo } from '@shared/types'
 import { invoke, messageOf } from '@renderer/lib/api'
+import { useAppStore } from '@renderer/store/useAppStore'
+import { useT } from '@renderer/i18n'
 import { initials } from '@renderer/lib/format'
 import { IconClose, IconStar } from '@renderer/ui/Icon'
 import { DownloadButton } from '@renderer/features/downloads/DownloadButton'
@@ -16,6 +18,20 @@ interface Props {
 
 export function VodDetail({ channel, onClose, onPlay, onToggleFavorite }: Props): JSX.Element {
   const isSeries = channel.kind === 'series'
+  const t = useT()
+
+  /*
+   * Which message an empty season list gets.
+   *
+   * A portal lists its shows but addresses each episode by series number
+   * against the show, which this build does not read yet. Saying "this
+   * provider did not return episodes" there would blame the provider for a
+   * gap on our side, and send somebody to complain to their supplier about
+   * something the supplier did nothing wrong.
+   */
+  const fromPortal = useAppStore(
+    (state) => state.playlists.find((playlist) => playlist.id === channel.playlistId)?.kind === 'stalker'
+  )
 
   const [info, setInfo] = useState<VodInfo | null>(null)
   const [seasons, setSeasons] = useState<SeriesSeason[]>([])
@@ -192,7 +208,7 @@ export function VodDetail({ channel, onClose, onPlay, onToggleFavorite }: Props)
         <div className="sheet__body">
           {seasons.length === 0 && !loading ? (
             <p style={{ color: 'var(--text-dim)', fontSize: 13 }}>
-              This provider did not return episodes for this series.
+              {t(fromPortal ? 'vod.noEpisodesPortal' : 'vod.noEpisodes')}
             </p>
           ) : (
             <>

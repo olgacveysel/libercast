@@ -11,6 +11,22 @@ export type SourceKind = 'xtream' | 'm3u' | 'stalker'
 export type ContentKind = 'live' | 'movie' | 'series'
 
 /** A configured provider. Secrets are NOT part of this object — see CredentialStore. */
+/**
+ * A folder in the source list.
+ *
+ * It groups and nothing else: a folder owns no channels, holds no credentials
+ * and is never synced. Deleting one returns its sources to the ungrouped list
+ * rather than removing them.
+ */
+export interface PlaylistFolder {
+  id: number
+  name: string
+  sortOrder: number
+  /** Shut in the sidebar. Per folder, so it survives being reordered. */
+  collapsed: boolean
+  createdAt: number
+}
+
 export interface Playlist {
   id: number
   name: string
@@ -32,6 +48,8 @@ export interface Playlist {
   referrer: string | null
   enabled: boolean
   sortOrder: number
+  /** Folder this source sits in, or null when it is ungrouped. */
+  folderId: number | null
   lastSyncedAt: number | null
   createdAt: number
   /**

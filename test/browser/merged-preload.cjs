@@ -58,6 +58,7 @@ const answers = {
     return { ...settings }
   },
   'playlists:list': () => [playlist(1, 'Main'), playlist(2, 'Backup')],
+  'folders:list': () => [],
   'media:capabilities': () => ({ ffmpeg: true, ffmpegSource: 'bundled', ffprobe: true, recordingsPath: null }),
   'categories:list': () => [{ id: 9, playlistId: 1, externalId: 'c', name: 'Sports', kind: 'live', channelCount: 2 }],
   'channels:query': (q) => (q.merge ? MERGED : SINGLE),

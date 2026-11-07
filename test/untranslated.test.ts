@@ -37,6 +37,8 @@ const TEXT_ATTRIBUTES = ['title', 'placeholder', 'aria-label', 'label', 'descrip
 const ALLOWED = new Set<string>([
   // A product name is the same in every language.
   'LiberCast',
+  // Protocol and product names, which are not translated either.
+  'Xtream Codes',
   // Codec and container names are not words.
   'MPEG-TS',
   'WebVTT'
@@ -73,6 +75,8 @@ function scan(file: string): Finding[] {
   const found: Finding[] = []
   const lines = readFileSync(file, 'utf8').split('\n')
   let inBlockComment = false
+  /** The same lines with comments blanked out, for the whole-file pass. */
+  const keep: string[] = []
 
   lines.forEach((raw, index) => {
     const line = raw.trim()
@@ -80,13 +84,18 @@ function scan(file: string): Finding[] {
     // Comments in this codebase carry a lot of prose, and none of it ships.
     if (inBlockComment) {
       if (line.includes('*/')) inBlockComment = false
+      keep.push('')
       return
     }
     if (line.startsWith('/*') || line.startsWith('{/*')) {
       if (!line.includes('*/')) inBlockComment = true
+      keep.push('')
       return
     }
-    if (line.startsWith('//') || line.startsWith('*')) return
+    if (line.startsWith('//') || line.startsWith('*')) {
+      keep.push('')
+      return
+    }
 
     for (const attribute of TEXT_ATTRIBUTES) {
       const match = raw.match(new RegExp(`(?:^|\\s)${attribute}="([^"]+)"`))
@@ -95,11 +104,16 @@ function scan(file: string): Finding[] {
       }
     }
 
-    // A bare JSX text node: >Some words<
+    // A bare JSX text node that opens and closes on the same line.
+    // Text wrapped across lines is caught afterwards, over the whole file.
     const node = raw.match(/>\s*([A-Za-z][^<>{}\n]*)\s*</)
     if (node?.[1] && looksLikeEnglish(node[1])) {
       found.push({ file, line: index + 1, text: node[1].trim() })
     }
+
+    // Keep the line for the whole-file pass below, blanked if it was a
+    // comment, so prose in comments is still not mistaken for markup.
+    keep.push(raw)
 
     // A whole sentence in a string literal: the status messages a screen sets
     // after an action ("That reminder could not be set.") are as visible as
@@ -113,6 +127,29 @@ function scan(file: string): Finding[] {
       found.push({ file, line: index + 1, text: `'${value}'` })
     }
   })
+
+  /*
+   * Text wrapped across lines.
+   *
+   *   <p>
+   *     This provider did not return episodes for this series.
+   *   </p>
+   *
+   * The line-by-line pass above cannot see this: the sentence shares a line
+   * with neither its opening tag nor its closing one, so there is no `>text<`
+   * on any single line to match. It is the ordinary way a long sentence gets
+   * formatted, which made it the ordinary way to slip an untranslated string
+   * past a check that reported zero and was believed.
+   */
+  const body = keep.join('\n')
+  for (const match of body.matchAll(/>\s*\n\s*([A-Za-z][^<>{}]*?)\s*\n\s*</g)) {
+    const text = match[1]!.replace(/\s+/g, ' ').trim()
+    if (!looksLikeEnglish(text)) continue
+    const line = body.slice(0, match.index).split('\n').length
+    // The single-line pass may already have it; report each string once.
+    if (found.some((f) => f.text === text)) continue
+    found.push({ file, line, text })
+  }
 
   return found
 }

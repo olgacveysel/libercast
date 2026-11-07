@@ -44,6 +44,7 @@ const answers = {
   'settings:get': () => ({ ...settings }),
   'settings:set': (patch) => Object.assign(settings, patch),
   'playlists:list': () => [],
+  'folders:list': () => [],
   'channels:recent': () => [],
   'media:capabilities': () => ({
     ffmpeg: true, ffmpegSource: 'bundled', ffprobe: true, recordingsPath: null

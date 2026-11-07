@@ -1,3 +1,14 @@
+# Typecheck, tests and a build on Windows.
+#
+# This overlaps checks.yml deliberately. checks.yml runs the same gates on
+# Linux, because that is where the browser harnesses can be given a display
+# under xvfb. This one runs them on the platform LiberCast is developed on and
+# mostly used from, where a path separator, a line ending, a native module or
+# a credential store can behave differently and nothing else would notice.
+#
+# It packages nothing. release.yml owns that, from a tag. Two steps here used
+# to try, gated on refs/tags/*, but `on.push.branches` means this workflow
+# never runs on a tag push at all, so they could not fire. They are gone.
 name: Build
 
 on:
@@ -19,13 +30,3 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
-      - name: Package
-        if: startsWith(github.ref, 'refs/tags/')
-        run: npm run pack:win
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/upload-artifact@v4
-        if: startsWith(github.ref, 'refs/tags/')
-        with:
-          name: windows-installer
-          path: release/*.exe

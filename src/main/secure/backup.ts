@@ -23,6 +23,16 @@ interface BackupPlaylist {
   userAgent: string | null
   referrer: string | null
   sortOrder: number
+  /**
+   * The folder this source sat in, by name rather than id.
+   *
+   * Same reason favorites name their channel by provider identity: ids are
+   * local to one database and mean nothing in the one being restored into.
+   *
+   * Optional, so a backup written before folders existed reads without a
+   * compatibility branch.
+   */
+  folder?: string | null
   /** Present only when the user asked to include credentials. */
   password?: string
 }
@@ -52,6 +62,13 @@ interface BackupPayload {
   version: number
   exportedAt: number
   playlists: BackupPlaylist[]
+  /**
+   * Carried separately as well as on each source, so a folder someone made
+   * and has not filled yet is not silently dropped by its own backup.
+   *
+   * Optional for backups that predate folders.
+   */
+  folders?: { name: string; sortOrder: number }[]
   favorites: BackupChannelRef[]
   history: (BackupChannelRef & { lastWatchedAt: number; watchCount: number })[]
   progress: BackupProgress[]
@@ -132,6 +149,12 @@ export function buildPayload(includeCredentials: boolean): BackupPayload {
     unknown
   >[]
 
+  const folderRows = db
+    .prepare('SELECT id, name, sort_order FROM playlist_folders ORDER BY sort_order, id')
+    .all() as { id: number; name: string; sort_order: number }[]
+
+  const folderNames = new Map(folderRows.map((row) => [row.id, row.name]))
+
   const playlists: BackupPlaylist[] = playlistRows.map((row) => {
     const entry: BackupPlaylist = {
       name: String(row.name),
@@ -144,7 +167,8 @@ export function buildPayload(includeCredentials: boolean): BackupPayload {
       epgOffsetMinutes: Number(row.epg_offset_min ?? 0),
       userAgent: (row.user_agent as string) ?? null,
       referrer: (row.referrer as string) ?? null,
-      sortOrder: Number(row.sort_order ?? 0)
+      sortOrder: Number(row.sort_order ?? 0),
+      folder: row.folder_id === null ? null : (folderNames.get(Number(row.folder_id)) ?? null)
     }
 
     if (includeCredentials) {
@@ -206,6 +230,7 @@ export function buildPayload(includeCredentials: boolean): BackupPayload {
     version: VERSION,
     exportedAt: Date.now(),
     playlists,
+    folders: folderRows.map((row) => ({ name: row.name, sortOrder: row.sort_order })),
     favorites,
     history,
     progress,
@@ -292,9 +317,37 @@ export async function importBackup(options: RestoreOptions): Promise<RestoreSumm
     const insertPlaylist = db.prepare(
       `INSERT INTO playlists
          (name, kind, url, file_path, username, mac_address, epg_url, epg_offset_min,
-          user_agent, referrer, enabled, sort_order, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`
+          user_agent, referrer, enabled, sort_order, created_at, folder_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`
     )
+
+    /*
+     * Folders are matched by name and made if they are missing, the same way
+     * sources are. Both the folders list and the name on each source are
+     * consulted, so a backup from before folders existed simply produces none,
+     * and an empty folder still comes back.
+     */
+    const findFolder = db.prepare('SELECT id FROM playlist_folders WHERE name = ?')
+    const insertFolder = db.prepare(
+      'INSERT INTO playlist_folders (name, sort_order, collapsed, created_at) VALUES (?, ?, 0, ?)'
+    )
+    const folderIds = new Map<string, number>()
+
+    const folderId = (name: string | null | undefined, sortOrder = 0): number | null => {
+      if (!name) return null
+      const cached = folderIds.get(name)
+      if (cached !== undefined) return cached
+
+      const existingFolder = findFolder.get(name) as { id: number } | undefined
+      const id = existingFolder
+        ? existingFolder.id
+        : Number(insertFolder.run(name, sortOrder, Date.now()).lastInsertRowid)
+
+      folderIds.set(name, id)
+      return id
+    }
+
+    for (const folder of payload.folders ?? []) folderId(folder.name, folder.sortOrder)
 
     const playlistIds = new Map<string, number>()
 
@@ -303,7 +356,10 @@ export async function importBackup(options: RestoreOptions): Promise<RestoreSumm
 
       let id: number
       if (existing) {
-        // Merging must not duplicate a source the user already has.
+        // Merging must not duplicate a source the user already has — nor
+        // rearrange one. A source already on this machine keeps whatever
+        // folder it is in now, because the person restoring a backup over a
+        // working install did not ask for their sidebar to be reorganised.
         id = existing.id
       } else {
         const info = insertPlaylist.run(
@@ -318,7 +374,8 @@ export async function importBackup(options: RestoreOptions): Promise<RestoreSumm
           playlist.userAgent,
           playlist.referrer,
           playlist.sortOrder,
-          Date.now()
+          Date.now(),
+          folderId(playlist.folder)
         )
         id = Number(info.lastInsertRowid)
         summary.playlists += 1

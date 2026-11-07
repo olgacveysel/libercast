@@ -430,6 +430,38 @@ export const MIGRATIONS: Migration[] = [
       CREATE INDEX idx_channels_vod_year   ON channels(kind, year);
       CREATE INDEX idx_channels_vod_added  ON channels(kind, provider_added_at);
     `
+  },
+  {
+    version: 13,
+    name: 'playlist-folders',
+    up: `
+      -- Somewhere to put sources once there are more of them than fit in a
+      -- glance. A folder is a label and an order, nothing more: it owns no
+      -- channels, carries no credentials and syncs nothing.
+      CREATE TABLE playlist_folders (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        name        TEXT    NOT NULL,
+        sort_order  INTEGER NOT NULL DEFAULT 0,
+        -- Whether the folder is shut in the sidebar. In the database rather
+        -- than in settings because it belongs to the folder, and a folder can
+        -- be deleted; a settings key would outlive it and quietly accumulate.
+        collapsed   INTEGER NOT NULL DEFAULT 0,
+        created_at  INTEGER NOT NULL
+      );
+
+      -- Null means ungrouped, which is what every existing source becomes.
+      -- That is the whole migration story for anyone upgrading: the sidebar
+      -- looks exactly as it did until they make a folder themselves.
+      --
+      -- SET NULL rather than CASCADE, emphatically. Deleting a folder must
+      -- lose the grouping and nothing else; a folder delete that took four
+      -- configured providers and their stored passwords with it would be a
+      -- data-loss bug wearing the clothes of a tidy-up.
+      ALTER TABLE playlists ADD COLUMN folder_id INTEGER
+        REFERENCES playlist_folders(id) ON DELETE SET NULL;
+
+      CREATE INDEX idx_playlists_folder ON playlists(folder_id, sort_order);
+    `
   }
 ]
 

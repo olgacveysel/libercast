@@ -279,6 +279,43 @@ select {
   color: var(--success);
 }
 
+/* Folders ------------------------------------------------------------ */
+
+.navfolder {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* The header is a sibling of the sources, not a heading above them, so it
+   gets the indent instead of them: a folder's contents line up with the
+   ungrouped sources above, and the folder itself sits half a step out. */
+.navitem--folder {
+  color: var(--text-dim);
+  font-weight: 600;
+}
+.navitem--folder[aria-expanded='true'] {
+  color: var(--text);
+}
+.navfolder .navitem--source {
+  margin-left: 10px;
+}
+
+/* Square rather than rounded, so a shut folder cannot be mistaken at a glance
+   for a source whose initials happen to be short. */
+.navitem__dot--folder {
+  border-radius: 3px;
+  font-size: calc(11px * var(--ui-scale));
+  line-height: 1;
+}
+
+.navfolder__empty {
+  margin: 0 0 2px 10px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
 .sidebar__hint {
   padding: 4px 10px;
   margin: 0;

@@ -58,6 +58,7 @@ const answers = {
     return { ...current }
   },
   'playlists:list': () => [],
+  'folders:list': () => [],
   'media:capabilities': () => ({
     ffmpeg: false,
     ffmpegSource: 'bundled',

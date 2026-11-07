@@ -58,6 +58,7 @@ const answers = {
     return { ...settings }
   },
   'playlists:list': () => [playlist],
+  'folders:list': () => [],
   'categories:list': () => [],
   'channels:query': () => CHANNELS,
   'channels:count': () => CHANNELS.length,

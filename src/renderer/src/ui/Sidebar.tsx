@@ -1,4 +1,6 @@
 import type { JSX, ReactNode } from 'react'
+import type { Playlist, PlaylistFolder } from '@shared/types'
+import { invoke } from '@renderer/lib/api'
 import { useAppStore, type Route } from '@renderer/store/useAppStore'
 import { formatRelative, initials } from '@renderer/lib/format'
 import { useT, type TranslationKey } from '@renderer/i18n'
@@ -34,9 +36,27 @@ const NAV: { route: Route; label: TranslationKey; icon: ReactNode }[] = [
   { route: 'library', label: 'nav.library', icon: <IconLibrary size={18} /> }
 ]
 
+// A portal is neither of the other two and used to be labelled M3U, which is
+// the one thing it definitely is not. Keyed off the type so a fourth kind
+// fails to compile rather than quietly inheriting a wrong badge.
+const KIND_BADGE: Record<Playlist['kind'], string> = {
+  xtream: 'XC',
+  m3u: 'M3U',
+  stalker: 'MAC'
+}
+
 export function Sidebar({ onAddSource, collapsed }: Props): JSX.Element {
-  const { route, setRoute, playlists, activePlaylistId, allSources, setActivePlaylist, setAllSources } =
-    useAppStore()
+  const {
+    route,
+    setRoute,
+    playlists,
+    folders,
+    activePlaylistId,
+    allSources,
+    setActivePlaylist,
+    setAllSources,
+    refreshPlaylists
+  } = useAppStore()
   const settings = useAppStore((state) => state.settings)
   const updateSettings = useAppStore((state) => state.updateSettings)
   const t = useT()
@@ -57,6 +77,66 @@ export function Sidebar({ onAddSource, collapsed }: Props): JSX.Element {
     if (next === 'live' || next === 'favorites') {
       void updateSettings({ liveListsCollapsed: !settings.liveListsCollapsed })
     }
+  }
+
+  /**
+   * Sources that are in no folder. These stay at the top level rather than
+   * being herded into an "Other" folder, because a source nobody has filed is
+   * not in a category called unfiled — it is just there, where it has always
+   * been.
+   *
+   * Defined as "not in a folder that exists" rather than "folderId is null",
+   * which is the same thing right up until it is not. A source pointing at a
+   * folder that has gone would otherwise be drawn nowhere at all: absent from
+   * the top level because it claims a folder, and absent from every folder
+   * because none of them is the one it claims. Losing the grouping is a
+   * cosmetic bug; a provider vanishing from the sidebar is the user
+   * reasonably concluding the application has lost their account.
+   */
+  const folderIds = new Set(folders.map((folder) => folder.id))
+  const ungrouped = playlists.filter(
+    (playlist) => playlist.folderId == null || !folderIds.has(playlist.folderId)
+  )
+
+  const toggleFolder = async (folder: PlaylistFolder): Promise<void> => {
+    await invoke('folders:collapse', { id: folder.id, collapsed: !folder.collapsed })
+    await refreshPlaylists()
+  }
+
+  /**
+   * One source, drawn the same whether it sits at the top level or inside a
+   * folder. Written once so a folder cannot quietly grow a different-looking
+   * row from the ungrouped ones.
+   */
+  function renderPlaylist(playlist: Playlist): JSX.Element {
+    return (
+      <button
+        key={playlist.id}
+        className={`navitem navitem--source ${
+          activePlaylistId === playlist.id && !allSources ? 'navitem--active' : ''
+        }`}
+        onClick={() => {
+          setActivePlaylist(playlist.id)
+          if (route === 'home' || route === 'settings') setRoute('live')
+        }}
+        title={
+          collapsed ? playlist.name : `${t('nav.lastSynced', { when: formatRelative(playlist.lastSyncedAt) })}`
+        }
+      >
+        {/*
+          In rail mode the initials stand in for the name: two letters say
+          which source is active, where a bare status dot does not.
+        */}
+        <span
+          className={`navitem__dot ${playlist.lastSyncedAt ? 'navitem__dot--ok' : ''}`}
+          aria-hidden="true"
+        >
+          {initials(playlist.name)}
+        </span>
+        <span className="navitem__label navitem__label--grow">{playlist.name}</span>
+        <span className="navitem__badge">{KIND_BADGE[playlist.kind]}</span>
+      </button>
+    )
   }
 
   // A tooltip is only added in rail mode. On a labelled button it is noise: the
@@ -106,36 +186,47 @@ export function Sidebar({ onAddSource, collapsed }: Props): JSX.Element {
           </button>
         )}
 
-        {playlists.map((playlist) => (
-          <button
-            key={playlist.id}
-            className={`navitem ${
-              activePlaylistId === playlist.id && !allSources ? 'navitem--active' : ''
-            }`}
-            onClick={() => {
-              setActivePlaylist(playlist.id)
-              if (route === 'home' || route === 'settings') setRoute('live')
-            }}
-            title={
-              collapsed
-                ? playlist.name
-                : `${t('nav.lastSynced', { when: formatRelative(playlist.lastSyncedAt) })}`
-            }
-          >
-            {/*
-              In rail mode the initials stand in for the name: two letters say
-              which source is active, where a bare status dot does not.
-            */}
-            <span
-              className={`navitem__dot ${playlist.lastSyncedAt ? 'navitem__dot--ok' : ''}`}
-              aria-hidden="true"
-            >
-              {initials(playlist.name)}
-            </span>
-            <span className="navitem__label navitem__label--grow">{playlist.name}</span>
-            <span className="navitem__badge">{playlist.kind === 'xtream' ? 'XC' : 'M3U'}</span>
-          </button>
-        ))}
+        {/*
+          Ungrouped sources first, then the folders. Someone who has never
+          made a folder sees exactly the list they saw before this existed,
+          because everything is ungrouped until they say otherwise.
+
+          In rail mode the grouping is dropped and every source is listed
+          flat. A folder header in a 56px rail is two letters and a chevron,
+          which reads as another source rather than as a container, and
+          collapsing one would hide sources behind something unlabelled.
+        */}
+        {(collapsed ? playlists : ungrouped).map(renderPlaylist)}
+
+        {!collapsed &&
+          folders.map((folder) => {
+            const contents = playlists.filter((playlist) => playlist.folderId === folder.id)
+            return (
+              <div key={folder.id} className="navfolder">
+                <button
+                  className="navitem navitem--folder"
+                  aria-expanded={!folder.collapsed}
+                  onClick={() => void toggleFolder(folder)}
+                  title={folder.name}
+                >
+                  <span className="navitem__dot navitem__dot--folder" aria-hidden="true">
+                    {folder.collapsed ? '+' : '\u2212'}
+                  </span>
+                  <span className="navitem__label navitem__label--grow">{folder.name}</span>
+                  <span className="navitem__badge">{contents.length}</span>
+                </button>
+
+                {/*
+                  An empty folder still shows, and says so. A folder that
+                  renders as nothing at all looks like the application lost it.
+                */}
+                {!folder.collapsed && contents.length === 0 && (
+                  <p className="navfolder__empty">{t('nav.folderEmpty')}</p>
+                )}
+                {!folder.collapsed && contents.map(renderPlaylist)}
+              </div>
+            )
+          })}
 
         <button className="navitem" onClick={onAddSource} {...tip(t('nav.addSource'))}>
           <IconPlus size={18} />

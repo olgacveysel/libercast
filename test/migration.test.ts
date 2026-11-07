@@ -76,6 +76,46 @@ for (const table of ['vod_info', 'series_episodes', 'playback_progress', 'epg_st
   check(`${table} created`, tableExists(db, table))
 }
 
+console.log('\nFolders, on a database that predates them')
+
+check('playlist_folders created', tableExists(db, 'playlist_folders'))
+check('playlists gained folder_id', hasColumn(db, 'playlists', 'folder_id'))
+
+// The upgrade story: nothing moves. A source configured before folders
+// existed stays exactly where it was, and the sidebar is unchanged until
+// somebody makes a folder on purpose.
+const ungrouped = db.prepare('SELECT folder_id FROM playlists WHERE id = 1').get() as {
+  folder_id: number | null
+}
+check('an existing source is ungrouped, not swept into a default folder', ungrouped.folder_id === null)
+
+db.prepare("INSERT INTO playlist_folders (name, sort_order, collapsed, created_at) VALUES ('Living room', 0, 0, ?)").run(
+  Date.now()
+)
+db.prepare('UPDATE playlists SET folder_id = 1 WHERE id = 1').run()
+check(
+  'a source can be put in a folder',
+  (db.prepare('SELECT folder_id FROM playlists WHERE id = 1').get() as { folder_id: number | null })
+    .folder_id === 1
+)
+
+// The one that matters. A folder is a label; deleting it must cost the user
+// the grouping and nothing else. If this ever became CASCADE it would delete
+// configured providers and their stored credentials, and the symptom would be
+// "my sources vanished when I tidied up".
+const channelsBefore = (db.prepare('SELECT COUNT(*) AS n FROM channels').get() as { n: number }).n
+db.prepare('DELETE FROM playlist_folders WHERE id = 1').run()
+
+const survivor = db.prepare('SELECT folder_id FROM playlists WHERE id = 1').get() as
+  | { folder_id: number | null }
+  | undefined
+check('deleting a folder leaves the source alone', survivor !== undefined)
+check('and puts it back to ungrouped', survivor?.folder_id === null)
+check(
+  'and takes none of its channels with it',
+  (db.prepare('SELECT COUNT(*) AS n FROM channels').get() as { n: number }).n === channelsBefore
+)
+
 migrate(db)
 check('re-running the migration is a no-op', (db.prepare('SELECT COUNT(*) AS n FROM schema_migrations').get() as { n: number }).n === MIGRATIONS.length)
 
