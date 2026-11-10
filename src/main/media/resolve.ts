@@ -159,11 +159,34 @@ export async function resolveProviderStream(source: StreamSource): Promise<Provi
   if (!playlist) throw new Error('Playlist not found')
 
   if (source.type === 'catchup') {
-    if (playlist.kind !== 'xtream') throw new Error('Catch-up needs an Xtream source')
     if (channel.catchupDays <= 0) throw new Error('This channel has no catch-up archive')
     if (!canReplay(source, channel.catchupDays)) {
       throw new Error('That programme is outside the archive this channel keeps')
     }
+
+    /*
+     * A portal does not address its archive by clock.
+     *
+     * An Xtream panel takes a start time and a length and builds a URL from
+     * them, so nothing has to be looked up. A portal keeps a list of discrete
+     * recordings, each with its own command, and replaying a moment means
+     * finding the recording that covers it first — one request before
+     * playback, and a different failure when the archive does not reach back
+     * that far.
+     */
+    if (playlist.kind === 'stalker') {
+      return {
+        url: await stalkerClientFor(playlist).archiveUrl(channel.externalId, source.startsAt),
+        userAgent: playlist.userAgent,
+        referrer: playlist.referrer,
+        label: `${channel.name} (catch-up)`,
+        durationSecs: Math.round((source.endsAt - source.startsAt) / 1000),
+        isLive: false,
+        alternates: []
+      }
+    }
+
+    if (playlist.kind !== 'xtream') throw new Error('Catch-up needs an Xtream source or a portal')
 
     const client = xtreamClientFor(playlist)
     const start = formatStart(source.startsAt, playlist.serverTimezone)

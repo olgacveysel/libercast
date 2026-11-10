@@ -36,7 +36,7 @@
 | 1.6 | Connection test + account panel (status, expiry, max/active connections) | M1 | Built |
 | 1.7 | Manual + scheduled playlist refresh, diff report (added/removed channels) | M2 | Built |
 | 1.8 | Playlist folders / grouping | M3 | Built — collapsible folders in the sidebar; a folder groups only, so deleting one keeps its sources and returns them to the ungrouped list |
-| 1.9 | Stalker / MAC portal handshake | M5 | Partial — live TV, portal guide, films, series and their episodes all read, with films and episodes fetched through the portal's own VOD handler. A portal that sells no VOD still syncs. Playback from a portal remains unverified against a real subscription |
+| 1.9 | Stalker / MAC portal handshake | M5 | Partial — live TV, portal guide, films, series, episodes and archive replay all read, each through the portal handler that serves it. A portal that sells no VOD or keeps no archive still syncs. Playback from a portal remains unverified against a real subscription |
 | 1.10 | Credentials held by the OS keychain — DPAPI, Keychain, libsecret or KWallet — never plaintext on disk, and the interface says plainly when the machine offers none | M1 | Built |
 | 1.11 | Play the same channel from another source when one fails, asking first when the names only resemble each other | — | Built |
 | 1.12 | One merged channel list across sources, grouping the same channel from several providers | — | Built |
@@ -71,7 +71,7 @@
 | 3.7 | Fuzzy `tvg-id` ↔ EPG channel matching with manual override screen | — | Built |
 | 3.8 | Reminders with Windows toast notifications | M2 | Built |
 | 3.9 | EPG cached in local DB, incremental update, prune past programs | M2 | Built |
-| 3.10 | Catch-up / archive playback where the provider exposes it | Post-1.0 | Partial — Xtream sources only |
+| 3.10 | Catch-up / archive playback where the provider exposes it | Post-1.0 | Built — Xtream by clock, portals by looking up the recording that covers the moment. The portal path is unverified against a real subscription |
 
 ## 4. Movies (VOD)
 

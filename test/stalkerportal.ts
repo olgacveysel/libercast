@@ -61,6 +61,10 @@ export interface PortalOptions {
    * subscription as broken, so it is the case worth modelling.
    */
   noVod?: boolean
+  /** How many hourly recordings this portal keeps, ending now. */
+  archiveHours?: number
+  /** Refuse the archive handler outright, as a portal without one does. */
+  noArchive?: boolean
 }
 
 export interface Portal {
@@ -93,6 +97,8 @@ export function startPortal(options: PortalOptions = {}): Promise<Portal> {
     movies: 3,
     shows: 2,
     noVod: false,
+    archiveHours: 4,
+    noArchive: false,
     mac: MAC,
     ...options
   }
@@ -156,6 +162,27 @@ export function startPortal(options: PortalOptions = {}): Promise<Portal> {
     added: `2021-0${n}-02 09:30:00`,
     series: [1, 2, 3],
     ...(n === 1 ? { cmd: `/media/show-${n}.mpg` } : {})
+  })
+
+  /*
+   * Hourly recordings, oldest first, ending at the top of the current hour.
+   *
+   * Real archives are built this way — discrete recordings rather than a
+   * seekable span — and the gap between what a guide says and what the
+   * archive actually holds is where a clock-based client goes wrong.
+   */
+  const hourMs = 60 * 60 * 1000
+  const archiveEnd = Math.floor(Date.now() / hourMs) * hourMs
+  const archive = Array.from({ length: config.archiveHours }, (_, i) => {
+    const startsAt = archiveEnd - (config.archiveHours - i) * hourMs
+    return {
+      id: String(900 + i),
+      ch_id: '1',
+      name: `Recorded hour ${i + 1}`,
+      start_timestamp: Math.floor(startsAt / 1000),
+      stop_timestamp: Math.floor((startsAt + hourMs) / 1000),
+      cmd: `auto /media/archive-${900 + i}.mpg`
+    }
   })
 
   const movies = Array.from({ length: config.movies }, (_, i) => movie(i + 1))
@@ -268,6 +295,29 @@ export function startPortal(options: PortalOptions = {}): Promise<Portal> {
         return
       }
       send({ data: all, total_items: all.length })
+      return
+    }
+
+    if (type === 'tv_archive' && (action === 'get_ordered_list' || action === 'create_link')) {
+      if (config.noArchive) {
+        res.writeHead(404, { 'content-type': 'text/html' })
+        res.end('<html><body><h1>404 Not Found</h1></body></html>')
+        return
+      }
+
+      if (action === 'get_ordered_list') {
+        const forChannel = params.get('ch_id') === '1' ? archive : []
+        send({ data: forChannel, total_items: forChannel.length })
+        return
+      }
+
+      const cmd = params.get('cmd') ?? ''
+      send({
+        id: 1,
+        cmd:
+          `${config.linkPrefix}http://localhost/play/archive.php?mac=${config.mac}` +
+          `&file=${encodeURIComponent(cmd)}&play_token=abc123`
+      })
       return
     }
 

@@ -1,4 +1,10 @@
-import type { ParsedCatalog, ParsedCategory, ParsedChannel, ParsedProgramme } from './types'
+import type {
+  ParsedArchiveRecord,
+  ParsedCatalog,
+  ParsedCategory,
+  ParsedChannel,
+  ParsedProgramme
+} from './types'
 import { request, type FetchOptions } from '@main/util/http'
 import { createLogger } from '@main/util/logger'
 import { vodAddedAtText, vodRating, vodYear } from './vodMeta'
@@ -581,6 +587,85 @@ export class StalkerClient {
   }
 
   /**
+   * The portal's archive for one channel.
+   *
+   * A portal does not address its archive by clock the way an Xtream panel
+   * does. It keeps a list of *recordings* — each with its own start, stop and
+   * `cmd` — and the only way to replay a moment is to find the recording that
+   * covers it and ask for a link to that. So there is a lookup here where the
+   * Xtream path has none, and it costs one request before playback.
+   *
+   * Written against the `tv_archive` handler, which is the form portals are
+   * known to use. **It has not been confirmed against a real subscription**,
+   * like everything else on the portal play path — so a portal that answers
+   * differently fails with what it said rather than silently.
+   */
+  async archiveRecords(channelId: string, limit = 200): Promise<ParsedArchiveRecord[]> {
+    await this.authenticate()
+    const endpoint = await this.resolveEndpoint()
+
+    const raw = await this.call<Record<string, unknown>>(endpoint, {
+      type: 'tv_archive',
+      action: 'get_ordered_list',
+      ch_id: channelId,
+      size: String(limit),
+      p: '1'
+    })
+
+    return listOf(raw)
+      .map((row) => toArchiveRecord(row))
+      .filter((record): record is ParsedArchiveRecord => record !== null)
+      .sort((a, b) => a.startsAt - b.startsAt)
+  }
+
+  /**
+   * A play URL for a moment in a channel's archive.
+   *
+   * `startsAt` is when the programme began, as the guide has it. The record
+   * covering that instant is the one asked for; a guide and an archive rarely
+   * agree to the second, so a record is accepted when the requested start
+   * falls inside it, and otherwise the nearest start within a few minutes is
+   * taken rather than refusing over a rounding difference.
+   */
+  async archiveUrl(channelId: string, startsAt: number): Promise<string> {
+    const records = await this.archiveRecords(channelId)
+    if (records.length === 0) {
+      throw new Error('The portal listed no archive for this channel.')
+    }
+
+    const record = archiveCovering(records, startsAt)
+    if (!record) {
+      const first = new Date(records[0]!.startsAt).toISOString()
+      const last = new Date(records[records.length - 1]!.startsAt).toISOString()
+      throw new Error(
+        `The portal has no recording covering that time. Its archive for this ` +
+          `channel runs from ${first} to ${last}.`
+      )
+    }
+
+    const endpoint = await this.resolveEndpoint()
+    const raw = await this.call<Record<string, unknown>>(endpoint, {
+      type: 'tv_archive',
+      action: 'create_link',
+      cmd: record.cmd,
+      series: '',
+      forced_storage: 'undefined',
+      disable_ad: '0',
+      download: '0'
+    })
+
+    const answer = text(raw?.['cmd']) ?? text(raw?.['id'])
+    if (!answer) throw new Error('The portal answered the archive request with no link.')
+
+    const url = stripLinkPrefix(answer)
+    if (!/^https?:\/\//i.test(url)) {
+      throw new Error(`The portal answered the archive request with something that is not a URL.`)
+    }
+
+    return url
+  }
+
+  /**
    * Finds the path this portal answers on, once.
    *
    * Tried in order and settled on the first handshake that comes back with a
@@ -925,6 +1010,61 @@ export function toVodItem(row: Record<string, unknown>, kind: 'movie' | 'series'
     year: vodYear(row['year'], row['release_date'], row['releasedate']),
     providerAddedAt: vodAddedAtText(row['added'])
   }
+}
+
+/** One recording out of a portal's archive listing. */
+export function toArchiveRecord(row: Record<string, unknown>): ParsedArchiveRecord | null {
+  const cmd = text(row['cmd']) ?? firstCmd(row['cmds'])
+  const startsAt = epochMs(row['start_timestamp'])
+  const endsAt = epochMs(row['stop_timestamp'])
+
+  // Without a command there is nothing to play, and without a span there is
+  // no way to tell which moment it covers. Either way the row is no use.
+  if (!cmd || startsAt === null || endsAt === null || endsAt <= startsAt) return null
+
+  return {
+    externalId: text(row['id']) ?? text(row['record_id']) ?? cmd,
+    cmd,
+    startsAt,
+    endsAt,
+    title: text(row['name']) ?? text(row['title'])
+  }
+}
+
+/**
+ * The recording covering a moment.
+ *
+ * A guide and an archive are rarely written by the same thing and rarely
+ * agree to the second, so an exact containment test alone would refuse a
+ * replay over a minute's difference. A record that contains the instant wins;
+ * failing that, the nearest start within the tolerance below is taken.
+ *
+ * The tolerance is deliberately small. Half an hour would make a request for
+ * the eight o'clock news return whatever was on at half past, which is worse
+ * than saying no.
+ */
+const ARCHIVE_TOLERANCE_MS = 5 * 60 * 1000
+
+export function archiveCovering(
+  records: ParsedArchiveRecord[],
+  startsAt: number
+): ParsedArchiveRecord | null {
+  const containing = records.find(
+    (record) => startsAt >= record.startsAt && startsAt < record.endsAt
+  )
+  if (containing) return containing
+
+  let nearest: ParsedArchiveRecord | null = null
+  let best = Number.POSITIVE_INFINITY
+  for (const record of records) {
+    const distance = Math.abs(record.startsAt - startsAt)
+    if (distance < best) {
+      best = distance
+      nearest = record
+    }
+  }
+
+  return best <= ARCHIVE_TOLERANCE_MS ? nearest : null
 }
 
 /** One programme out of the portal's short guide. */

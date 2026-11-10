@@ -79,6 +79,24 @@ export interface ParsedEpisode {
   stillUrl: string | null
 }
 
+/**
+ * One recording in a portal's archive.
+ *
+ * Xtream has no equivalent: it builds an archive URL from a start time and a
+ * length, so there is nothing to list. A portal keeps discrete recordings and
+ * each carries the command that plays it, so replaying a moment means finding
+ * the recording that covers it first.
+ */
+export interface ParsedArchiveRecord {
+  /** The portal's own id for the recording. */
+  externalId: string
+  /** What plays it; exchanged for a URL at play time, like everything else. */
+  cmd: string
+  startsAt: number
+  endsAt: number
+  title: string | null
+}
+
 export interface ParsedProgramme {
   channelId: string
   title: string

@@ -11,7 +11,9 @@ import {
   stripLinkPrefix,
   toChannel,
   toProgramme,
-  toVodItem
+  toVodItem,
+  toArchiveRecord,
+  archiveCovering
 } from '@main/sources/stalker'
 import { redact } from '@main/util/http'
 import { MAC, startPortal, type Portal } from './stalkerportal'
@@ -438,6 +440,92 @@ async function main(): Promise<void> {
   check('where the live path would', linkAttempts('ffrt http://x/ch/9', '9').length > 1)
 
   shop.close()
+
+  console.log('\nFinding a moment in a portal archive')
+
+  const rec = (id: string, startsAt: number, endsAt: number) => ({
+    externalId: id, cmd: `/media/${id}.mpg`, startsAt, endsAt, title: null
+  })
+  const hour = 60 * 60 * 1000
+  const base = 1_700_000_000_000
+  const window = [rec('a', base, base + hour), rec('b', base + hour, base + 2 * hour)]
+
+  check('a moment inside a recording finds it',
+    archiveCovering(window, base + 10 * 60 * 1000)?.externalId === 'a')
+  check('the boundary belongs to the recording that starts there',
+    archiveCovering(window, base + hour)?.externalId === 'b')
+
+  // A guide and an archive are rarely written by the same thing and rarely
+  // agree to the second, so a near miss is accepted rather than refused over
+  // a rounding difference.
+  check('a start a minute early still finds its recording',
+    archiveCovering(window, base - 60 * 1000)?.externalId === 'a')
+
+  // But only just. Half an hour of slack would answer a request for the eight
+  // o'clock news with whatever was on at half past, which is worse than no.
+  check('a start half an hour out finds nothing',
+    archiveCovering(window, base - 30 * 60 * 1000) === null)
+  check('a time the archive never covered finds nothing',
+    archiveCovering(window, base - 5 * 24 * hour) === null)
+  check('an empty archive finds nothing', archiveCovering([], base) === null)
+
+  check('a record with no command is unusable',
+    toArchiveRecord({ id: '1', start_timestamp: 1, stop_timestamp: 2 }) === null)
+  check('a record with no span is unusable',
+    toArchiveRecord({ id: '1', cmd: '/x', start_timestamp: 5, stop_timestamp: 5 }) === null)
+  check('a record that ends before it starts is unusable',
+    toArchiveRecord({ id: '1', cmd: '/x', start_timestamp: 9, stop_timestamp: 5 }) === null)
+  check('a good record is read',
+    toArchiveRecord({ id: '7', cmd: '/x', start_timestamp: 100, stop_timestamp: 200, name: 'News' })
+      ?.title === 'News')
+
+  console.log('\nReplaying from a portal archive')
+
+  const archived = await startPortal({ archiveHours: 4 })
+
+  const records = await client(archived).archiveRecords('1')
+  check('the archive is listed', records.length === 4, records.length)
+  check('oldest first', records[0]!.startsAt < records[3]!.startsAt)
+  check('a channel with no archive lists none',
+    (await client(archived).archiveRecords('2')).length === 0)
+
+  const replay = await client(archived).archiveUrl('1', records[1]!.startsAt + 5 * 60 * 1000)
+  check('a moment inside the archive gets a link', replay.startsWith('http://'), replay)
+  check('without the player hint', !replay.startsWith('auto'), replay)
+  // The archive has its own handler. Asking the live one would return a
+  // channel URL, which plays now rather than then.
+  check('fetched through the archive handler, not the live one',
+    replay.includes('/play/archive.php'), replay)
+  check('and it is the recording that covers that moment, not merely the first',
+    replay.includes(encodeURIComponent(records[1]!.cmd)), replay)
+
+  // The honest refusal: a portal keeps a finite archive, and asking beyond it
+  // has to say so rather than return the nearest thing it has.
+  let tooOld: string | null = null
+  try {
+    await client(archived).archiveUrl('1', records[0]!.startsAt - 5 * 24 * 60 * 60 * 1000)
+  } catch (error) {
+    tooOld = error instanceof Error ? error.message : String(error)
+  }
+  check('a time before the archive begins is refused', tooOld !== null)
+  check('and the refusal says how far back the archive goes',
+    tooOld?.includes('runs from') === true, tooOld)
+
+  archived.close()
+
+  console.log('\nAgainst a portal with no archive at all')
+
+  const noArchive = await startPortal({ noArchive: true })
+  let refused: string | null = null
+  try {
+    await client(noArchive).archiveUrl('1', Date.now() - hour)
+  } catch (error) {
+    refused = error instanceof Error ? error.message : String(error)
+  }
+  check('replaying fails rather than hanging or returning nothing', refused !== null, refused)
+  check('and the live catalogue still works',
+    (await client(noArchive).liveCatalog()).channels.length === 5)
+  noArchive.close()
 
   console.log('\nAgainst a portal that sells live TV and nothing else')
 
