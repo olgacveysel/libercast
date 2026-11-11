@@ -15,6 +15,7 @@ import {
   IconVolume
 } from '@renderer/ui/Icon'
 import { TrackMenu } from '@renderer/ui/TrackMenu'
+import { SubtitleSearchDialog } from './SubtitleSearchDialog'
 import { useStream } from './useStream'
 import { useFullscreen } from './useFullscreen'
 import { useIdleControls } from './useIdleControls'
@@ -67,6 +68,7 @@ export function Player({
   const [audioTrack, setAudioTrack] = useState<number | undefined>(undefined)
   const [subtitleTrack, setSubtitleTrack] = useState<number | null | undefined>(undefined)
   const [externalSubtitle, setExternalSubtitle] = useState<ExternalSubtitle | null>(null)
+  const [searchingSubtitles, setSearchingSubtitles] = useState(false)
   const [subtitleOffset, setSubtitleOffset] = useState(0)
   const [subtitleError, setSubtitleError] = useState<string | null>(null)
 
@@ -225,6 +227,23 @@ export function Player({
           onDoubleClick={toggleFullscreen}
         />
 
+        {searchingSubtitles && channel && (
+          <SubtitleSearchDialog
+            /*
+             * The programme's title where the guide knows one, and the
+             * channel's name otherwise. A subtitle search for a channel name
+             * finds nothing; what is on at the time is the thing subtitles
+             * exist for.
+             */
+            query={channel.now?.title ?? channel.name}
+            onPicked={(subtitle) => {
+              setExternalSubtitle(subtitle)
+              setSubtitleOffset(0)
+            }}
+            onClose={() => setSearchingSubtitles(false)}
+          />
+        )}
+
         {replay && (
           <div className="replaybar">
             <span>{t('catchup.replaying', { title: replay.title })}</span>
@@ -380,6 +399,7 @@ export function Player({
               onSelect={setSubtitleTrack}
               externalLabel={externalSubtitle?.label ?? null}
               onOpenFile={() => void openSubtitleFile()}
+              onSearch={() => setSearchingSubtitles(true)}
               onClearExternal={() => setExternalSubtitle(null)}
               offsetSecs={subtitleOffset}
               onOffsetChange={setSubtitleOffset}

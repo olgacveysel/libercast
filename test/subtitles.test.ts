@@ -133,11 +133,36 @@ async function main(): Promise<void> {
 
   const noVideo = parseProbeOutput(JSON.stringify({ streams: [{ codec_type: 'audio', codec_name: 'aac' }] }))
   check('a radio stream has no video info', noVideo.videoInfo === null)
+
+  console.log('\nWhat the loader will open')
+
+  // Reachable over IPC, where the argument is a string and nothing more. An
+  // unrecognised extension used to be handed to ffmpeg, which opens a great
+  // deal more than subtitles.
+  let refused: string | null = null
+  try {
+  await loadSubtitleFile(join(work, 'passwd'))
+  } catch (error) {
+  refused = error instanceof Error ? error.message : String(error)
+  }
+  check('a file with no subtitle extension is refused', refused !== null, refused)
+  check('and the refusal names what it does read',
+  refused?.includes('srt') === true, refused)
+
+  for (const nasty of ['/etc/passwd', 'C:\\Windows\\win.ini', 'clip.mkv', 'script.sh']) {
+  let threw = false
+  try {
+    await loadSubtitleFile(nasty)
+  } catch {
+    threw = true
+  }
+  check(`"${nasty}" is not opened`, threw)
+  }
 }
 
 void main().then(
   () => {
-    console.log(failures === 0 ? '\nAll checks passed.\n' : `\n${failures} check(s) failed.\n`)
+  console.log(failures === 0 ? '\nAll checks passed.\n' : `\n${failures} check(s) failed.\n`)
     process.exit(failures === 0 ? 0 : 1)
   },
   (error) => {

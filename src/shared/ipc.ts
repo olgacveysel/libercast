@@ -3,6 +3,7 @@ import type { AvailableUpdate } from '@shared/releases'
 import type {
   AppSettings,
   AutoRefreshReport,
+  DiagnosticsReport,
   BackupOptions,
   BackupSummary,
   Category,
@@ -29,6 +30,9 @@ import type {
   MediaTracks,
   Playlist,
   PlaylistFolder,
+  SubtitleHit,
+  SubtitleSearch,
+  SubtitleSearchStatus,
   PlaylistDraft,
   ParentalRules,
   ParentalStatus,
@@ -111,6 +115,20 @@ export interface IpcContract {
   /** Opens a file picker and returns the chosen subtitle converted to WebVTT. */
   'subtitles:pickFile': { req: void; res: ExternalSubtitle | null }
   'subtitles:loadFile': { req: string; res: ExternalSubtitle }
+
+  /** Whether subtitle search is usable at all, and who it is signed in as. */
+  'subtitles:searchStatus': { req: void; res: SubtitleSearchStatus }
+  'subtitles:search': { req: SubtitleSearch; res: SubtitleHit[] }
+  /** Fetches one result and returns it ready to show. */
+  'subtitles:fetch': { req: number; res: ExternalSubtitle }
+  'subtitles:setKey': { req: string | null; res: SubtitleSearchStatus }
+  /** Checks a key without saving it, so Settings can test before committing. */
+  'subtitles:testKey': { req: string | null; res: void }
+  'subtitles:setAccount': {
+    req: { username: string | null; password: string | null }
+    res: SubtitleSearchStatus
+  }
+  'subtitles:testAccount': { req: { username: string; password: string }; res: void }
 
   'downloads:list': { req: void; res: Download[] }
   'downloads:enqueue': { req: DownloadRequest; res: Download }
@@ -199,6 +217,15 @@ export interface IpcContract {
   'sources:refreshNow': { req: void; res: AutoRefreshReport }
 
   'app:version': { req: void; res: string }
+
+  /**
+   * Everything a bug report needs about this installation.
+   *
+   * Gathered on demand rather than kept current: the GPU table in particular
+   * is only truthful once a window has been drawn, so asking when the button
+   * is pressed is both simpler and more accurate than caching it.
+   */
+  'app:diagnostics': { req: void; res: { report: DiagnosticsReport; text: string } }
 
   /**
    * Opens the folder holding the log file, and selects it.
@@ -307,6 +334,13 @@ export const IPC_CHANNELS: IpcChannel[] = [
   'media:capabilities',
   'subtitles:pickFile',
   'subtitles:loadFile',
+  'subtitles:searchStatus',
+  'subtitles:search',
+  'subtitles:fetch',
+  'subtitles:setKey',
+  'subtitles:testKey',
+  'subtitles:setAccount',
+  'subtitles:testAccount',
   'downloads:list',
   'downloads:enqueue',
   'downloads:forItem',
@@ -358,6 +392,7 @@ export const IPC_CHANNELS: IpcChannel[] = [
   'reminders:find',
   'sources:refreshNow',
   'app:version',
+  'app:diagnostics',
   'app:showLogs',
   'app:checkUpdate',
   'app:credentialStorage',
@@ -409,6 +444,9 @@ export type {
   MediaTracks,
   Playlist,
   PlaylistFolder,
+  SubtitleHit,
+  SubtitleSearch,
+  SubtitleSearchStatus,
   PlaylistDraft,
   ParentalRules,
   ParentalStatus,

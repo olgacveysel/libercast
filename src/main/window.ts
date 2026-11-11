@@ -1,4 +1,5 @@
 import { join } from 'node:path'
+import { createLogger } from '@main/util/logger'
 import { app, BrowserWindow, shell } from 'electron'
 import { is } from '@electron-toolkit/utils'
 
@@ -9,6 +10,8 @@ import { is } from '@electron-toolkit/utils'
 function windowIcon(): string | undefined {
   return app.isPackaged ? undefined : join(__dirname, '../../resources/icon.png')
 }
+
+const log = createLogger('window')
 
 let mainWindow: BrowserWindow | null = null
 
@@ -52,10 +55,37 @@ export function createWindow(): BrowserWindow {
     mainWindow = null
   })
 
-  // External links open in the user's browser, never inside the app shell.
+  /*
+   * External links open in the user's browser, never inside the app shell —
+   * and only if they are web links.
+   *
+   * `shell.openExternal` hands the string to the operating system, which will
+   * happily act on far more than http: a `file:` URL opens a file, and on
+   * Windows the scheme table reaches a good deal further than that. Nothing
+   * in this application needs to open anything but a web page, and the
+   * strings reaching here are not all ours — a playlist, a guide and a
+   * subtitle file are all somebody else's text.
+   */
   window.webContents.setWindowOpenHandler(({ url }) => {
-    void shell.openExternal(url)
+    if (isWebLink(url)) void shell.openExternal(url)
+    else log.warn(`refused to open a non-web link: ${url.slice(0, 80)}`)
     return { action: 'deny' }
+  })
+
+  /*
+   * The window itself never navigates.
+   *
+   * It loads the renderer once and stays there; every other destination is a
+   * link, handled above. Without this, anything that can set `location` —
+   * including a bug in our own code — replaces the application with a remote
+   * page that then inherits the preload bridge.
+   */
+  window.webContents.on('will-navigate', (event, url) => {
+    const here = window.webContents.getURL()
+    if (url === here) return
+    event.preventDefault()
+    log.warn(`blocked navigation to ${url.slice(0, 80)}`)
+    if (isWebLink(url)) void shell.openExternal(url)
   })
 
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
@@ -65,4 +95,20 @@ export function createWindow(): BrowserWindow {
   }
 
   return window
+}
+
+/**
+ * Whether a string is a plain web link.
+ *
+ * Parsed rather than pattern-matched: `javascript:` and `file:` are easy to
+ * spot, and the point is to admit only what is known good rather than to
+ * guess at a list of what is known bad.
+ */
+export function isWebLink(value: string): boolean {
+  try {
+    const { protocol } = new URL(value)
+    return protocol === 'http:' || protocol === 'https:'
+  } catch {
+    return false
+  }
 }

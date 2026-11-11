@@ -837,6 +837,56 @@ export interface VideoInfo {
 }
 
 /** A subtitle file the user opened themselves, already converted to WebVTT. */
+/**
+ * Searching OpenSubtitles for a subtitle to go with what is playing.
+ *
+ * The feature is off until the user supplies their own API key: LiberCast
+ * ships none, because its source is public and a shipped key would be
+ * extractable — and the account revoked over somebody else's abuse would be
+ * the maintainer's. Signing in is separate and optional; it raises the
+ * download allowance rather than unlocking anything.
+ */
+export interface SubtitleSearch {
+  query: string
+  /** ISO 639-2B codes, as the service expects them. Empty means any. */
+  languages: string[]
+  year?: number | null
+  season?: number
+  episode?: number
+}
+
+/** One result, reduced to what somebody choosing between them needs. */
+export interface SubtitleHit {
+  fileId: number
+  fileName: string
+  language: string | null
+  /** The film or episode the service matched, where it named one. */
+  title: string | null
+  downloads: number
+  hearingImpaired: boolean
+}
+
+/**
+ * What is left of the user's download allowance.
+ *
+ * The user's, not the key's: five a day anonymously, ten to a thousand signed
+ * in. Reported so the interface can say how many remain rather than letting
+ * somebody discover the limit by hitting it.
+ */
+export interface SubtitleQuota {
+  remaining: number | null
+  /** When the allowance refills, as the service words it. */
+  resetsAt: string | null
+}
+
+/** Whether subtitle search is usable, and who it is signed in as. */
+export interface SubtitleSearchStatus {
+  /** False until the user sets an API key. Nothing works without one. */
+  configured: boolean
+  signedIn: boolean
+  quota: SubtitleQuota | null
+}
+
 export interface ExternalSubtitle {
   label: string
   filePath: string
@@ -993,4 +1043,31 @@ export interface Result<T> {
   ok: boolean
   data?: T
   error?: string
+}
+
+/**
+ * A snapshot of the installation, for a bug report.
+ *
+ * Deliberately all facts and no conclusions: which binaries were resolved and
+ * from where, what Chromium says about the GPU, what the user has switched on.
+ * Whoever reads it draws the conclusion.
+ */
+export interface DiagnosticsReport {
+  generatedAt: number
+  app: { version: string; packaged: boolean }
+  runtime: { electron: string; chrome: string; node: string; v8: string }
+  system: { platform: string; arch: string; release: string; memoryGb: number }
+  gpu: {
+    /** Chromium's own feature table, verbatim — names and values both. */
+    features: Record<string, string>
+    /** The Settings switch, which is not the same as what Chromium decided. */
+    accelerationEnabled: boolean
+  }
+  media: {
+    ffmpeg: string | null
+    ffmpegSource: string
+    ffprobe: string | null
+    ffprobeSource: string
+  }
+  logPath: string | null
 }

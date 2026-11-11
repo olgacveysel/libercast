@@ -26,11 +26,15 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      # 24 because that is what Electron 44 bundles — the application's own
+      # runtime — so the build toolchain and the thing being built agree.
+      # 20 went end-of-life in April 2026 and stops getting security fixes;
+      # 24 is supported into 2028.
+      - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       # Chromium's own dependencies. ubuntu-latest carries most of them, but
@@ -47,6 +51,13 @@ jobs:
             libatspi2.0-0 libsecret-1-0 libasound2
 
       - run: npm ci
+
+      # Deliberately narrow: the rules of hooks and unused bindings, not
+      # style. A hook called inside a condition type-checks perfectly and
+      # then corrupts React's state between renders, which is exactly the
+      # class of defect neither tsc nor the suite can see.
+      - name: Lint
+        run: npm run lint
 
       - name: Types
         run: npm run typecheck

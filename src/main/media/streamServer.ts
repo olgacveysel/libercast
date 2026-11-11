@@ -92,6 +92,17 @@ export interface OpenedSession {
 
 interface Session extends SessionSpec {
   id: string
+  /**
+   * What `open` already learned about this stream.
+   *
+   * `serveVideo` used to ask again on every video request, which on a
+   * provider with one or two connections is the difference between playing
+   * and not: the probe holds a connection, the player then asks for the
+   * video, and the account is briefly over its limit against itself. The
+   * codecs do not change between the two calls, so there was nothing to
+   * learn the second time.
+   */
+  probe: ProbeResult
   child: ChildProcess | null
   audioIndex: number
   subtitleIndex: number | null
@@ -179,16 +190,41 @@ export class StreamServer {
     const plan = planRemux(probe, this.degraded.has(streamKey(url)))
 
     const audioIndex = chooseAudio(probe.tracks.audio, spec.audioTrack, spec.preferredAudioLanguages)
-    const subtitleIndex = chooseSubtitle(
+    const requestedSubtitle = chooseSubtitle(
       probe.tracks.subtitle,
       spec.subtitleTrack,
       spec.preferredSubtitleLanguages
     )
 
-    const chosenSubtitle = subtitleIndex === null ? null : probe.tracks.subtitle[subtitleIndex] ?? null
-    // A bitmap subtitle is a picture, not text, so the only way to show it is
-    // to draw it onto the video — which forces a re-encode.
-    const burnIn = chosenSubtitle !== null && !chosenSubtitle.isTextBased
+    const chosenSubtitle =
+      requestedSubtitle === null ? null : probe.tracks.subtitle[requestedSubtitle] ?? null
+
+    /*
+     * A bitmap subtitle is dropped rather than burned in.
+     *
+     * Burn-in goes through ffmpeg's `subtitles=` filter, which is libass, and
+     * libass draws text. A PGS or DVB track is a sequence of images, and the
+     * filter renders nothing from it. The attempt is not free either: that
+     * filter opens the provider URL a second time — a connection most
+     * accounts cannot spare — and forces a full re-encode of the video,
+     * because frames can no longer be copied through.
+     *
+     * So the cost was a second connection and the CPU of a re-encode, and the
+     * result was a picture with no subtitles on it. Until this is done
+     * properly with `overlay`, the track is not offered: the track list in
+     * the player shows what it can actually display, and an honest "no
+     * subtitles" beats one that arrives after a visible quality drop.
+     */
+    const bitmapOnly = chosenSubtitle !== null && !chosenSubtitle.isTextBased
+    if (bitmapOnly) {
+      log.info(
+        `${spec.label}: subtitle track ${requestedSubtitle} is ` +
+          `${chosenSubtitle?.codec ?? 'a bitmap format'}, which cannot be rendered yet`
+      )
+    }
+
+    const subtitleIndex = bitmapOnly ? null : requestedSubtitle
+    const burnIn: boolean = false
 
     // A known duration means a file the provider can seek within — VOD. Live
     // has no duration and needs its timestamps normalised, which is the case
@@ -207,6 +243,7 @@ export class StreamServer {
       ...spec,
       url,
       id,
+      probe,
       child: null,
       audioIndex,
       subtitleIndex,
@@ -237,7 +274,17 @@ export class StreamServer {
       durationSecs: probe.durationSecs,
       codecs: probe,
       pipeline: notes.join(', '),
-      tracks: probe.tracks,
+      /*
+       * The subtitle picker only lists what can be shown.
+       *
+       * `index` is carried on each track, so dropping entries here does not
+       * shift what the remaining ones select — and a menu that offers a track
+       * which silently does nothing is worse than a shorter menu.
+       */
+      tracks: {
+        audio: probe.tracks.audio,
+        subtitle: probe.tracks.subtitle.filter((track) => track.isTextBased)
+      },
       video: probe.videoInfo,
       audioTrack: probe.tracks.audio.length > 0 ? audioIndex : null,
       subtitleTrack: subtitleIndex,
@@ -451,10 +498,8 @@ export class StreamServer {
 
     let child: ChildProcess
     try {
-      const probe = await probeStream(session.url, {
-        userAgent: session.userAgent,
-        referrer: session.referrer
-      })
+      // Reused from `open`, not asked for again. See `Session.probe`.
+      const probe = session.probe
 
       const args = buildStreamArgs(session.url, planRemux(probe, this.degraded.has(streamKey(session.url))), {
         userAgent: session.userAgent,
@@ -489,6 +534,20 @@ export class StreamServer {
     child.stdout?.pipe(response)
 
     let stderr = ''
+    /*
+     * Spawn failures arrive here, not as a throw.
+     *
+     * `spawn` resolves to a child object before the operating system has
+     * been asked for anything, so a missing binary, a bad path or a hit
+     * process limit surfaces as an `error` event. With no listener, Node
+     * treats it as an unhandled error event and brings the process down —
+     * the whole application, not the stream.
+     */
+    child.on('error', (error) => {
+      log.error(`ffmpeg could not be started for ${session.label}`, error)
+      this.kill(session)
+    })
+
     child.stderr?.on('data', (chunk: Buffer) => {
       // Keep only the tail: a failing stream can produce megabytes of warnings.
       stderr = (stderr + chunk.toString()).slice(-2000)

@@ -28,7 +28,8 @@ function isTyping(target: EventTarget | null): boolean {
 }
 
 export function App(): JSX.Element {
-  const { route, ready, bootstrap, setSyncing, setActivePlaylist, setRoute, capabilities } = useAppStore()
+  const { route, ready, bootstrap, refreshPlaylists, setSyncing, setActivePlaylist, setRoute, capabilities } =
+    useAppStore()
   const setActiveChannel = useAppStore((s) => s.setActiveChannel)
   const [showAddSource, setShowAddSource] = useState(false)
   const [showPalette, setShowPalette] = useState(false)
@@ -78,7 +79,18 @@ export function App(): JSX.Element {
    */
   // A refresh that happened in the background must not leave stale counts and
   // a stale "last synced" on screen.
-  useEffect(() => subscribe('sources:refreshed', () => void bootstrap()), [bootstrap])
+  /*
+   * A background refresh updates the data, nothing else.
+   *
+   * This used to call `bootstrap`, which also sets the route to Live and the
+   * active source to the first one — so an automatic refresh while somebody
+   * was reading the guide, or watching a channel on their second source,
+   * moved them without being asked.
+   */
+  useEffect(
+    () => subscribe('sources:refreshed', () => void refreshPlaylists()),
+    [refreshPlaylists]
+  )
 
   useEffect(() => {
     return subscribe('reminders:tune', (reminder) => {

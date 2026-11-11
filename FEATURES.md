@@ -103,6 +103,7 @@
 | 6.3 | Auto-reconnect and retry with backoff on stream drop | M1 | Built |
 | 6.4 | Multi audio track selection | — | Built |
 | 6.5 | Subtitle track selection + external .srt/.ass loading with timing offset | — | Built |
+| 6.11 | Subtitle search on OpenSubtitles | — | Built — the user supplies their own free API key; LiberCast ships none, because its source is public. Signing in is optional and raises the daily download allowance. Unverified against the live service |
 | 6.6 | Aspect ratio modes, zoom/crop | M2 | Built |
 | 6.7 | Playback speed control for VOD | M3 | Built |
 | 6.8 | Stream info overlay: codec, resolution, bitrate, fps, dropped frames | — | Built |

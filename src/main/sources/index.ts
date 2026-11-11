@@ -269,7 +269,7 @@ export async function syncPlaylist(playlistId: number, onProgress: ProgressSink)
     const message = errorMessage(error)
     log.error(`sync failed for playlist ${playlistId}`, message)
     emit('error', message, null)
-    throw new Error(message)
+    throw new Error(message, { cause: error })
   }
 }
 

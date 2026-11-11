@@ -175,7 +175,7 @@ void (async () => {
   const legacy = {
     ...payload,
     folders: undefined,
-    playlists: payload.playlists.map(({ folder, ...rest }) => rest)
+    playlists: payload.playlists.map(({ folder: _folder, ...rest }) => rest)
   }
   let legacyFailed: unknown = null
   try {

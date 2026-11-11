@@ -163,17 +163,40 @@ function bootstrap(): void {
     if (process.platform !== 'darwin') app.quit()
   })
 
-  app.on('before-quit', () => {
-    // Order matters: stop new work, let ffmpeg finalize its files, then close
-    // the database the recorder writes its final state to.
+  /*
+   * Quitting waits for the recordings.
+   *
+   * The order here was right and the timing was not. `recorder.stopAll()` only
+   * asked ffmpeg to stop; `closeDb()` ran in the next statement, microseconds
+   * later, while every recorder process was still writing. The row saying how
+   * a recording ended was then written against a closed database — so a
+   * recording stopped by quitting the application was left in the table as
+   * still recording, forever.
+   *
+   * So the quit is deferred once: the default is prevented, the work is wound
+   * down, and `app.exit` is called when the files are finished or the wait
+   * runs out. The flag matters because `app.quit()` fires this event again.
+   */
+  let quitting = false
+  app.on('before-quit', (event) => {
+    if (quitting) return
+    quitting = true
+    event.preventDefault()
+
     scheduler.stop()
     reminderScheduler.stop()
     autoRefresh.stop()
     closeAllDetached()
-    recorder.stopAll()
     downloader.stopAll()
-    streamServer.closeAll()
-    closeDb()
+
+    void recorder
+      .stopAll()
+      .catch((error) => log.error('a recording did not stop cleanly', errorMessage(error)))
+      .finally(() => {
+        streamServer.closeAll()
+        closeDb()
+        app.exit(0)
+      })
   })
 
   process.on('uncaughtException', (error) => {

@@ -162,6 +162,30 @@ class Downloader {
 
       for (const download of repo.nextQueued(slots)) {
         if (this.jobs.has(download.id)) continue
+
+        /*
+         * Claimed here, before anything can yield.
+         *
+         * `run` is launched without awaiting and does several awaits of its
+         * own — resolving the provider stream, finding the output folder,
+         * measuring a partial file — before it registers itself. The row
+         * stayed `queued` for all of that, and `this.jobs` stayed empty, so a
+         * second pass through here would pick the same download up again:
+         * two writers on one file, and more provider connections than the
+         * limit allows, which on a two-connection account means the user
+         * cannot watch anything.
+         *
+         * A placeholder in the map closes that window. `run` replaces it with
+         * the real job once it has something to abort.
+         */
+        this.jobs.set(download.id, {
+          id: download.id,
+          controller: new AbortController(),
+          filePath: download.filePath ?? '',
+          paused: false,
+          cancelled: false
+        })
+
         slots -= 1
         void this.run(download)
         if (slots <= 0) break
@@ -172,10 +196,12 @@ class Downloader {
   }
 
   private async run(download: Download): Promise<void> {
+    // `drain` has already put a placeholder in the map under this id; every
+    // exit from here has to take it out again, or the slot is never freed.
     const controller = new AbortController()
 
     let filePath = download.filePath
-    let startAt = 0
+    let startAt: number
 
     try {
       const provider = await resolveProviderStream(

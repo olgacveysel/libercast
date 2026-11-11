@@ -6,6 +6,7 @@ import { getDownload } from '@main/db/repo/downloads'
 import { getRecording } from '@main/db/repo/recordings'
 import { getEpisode } from '@main/db/repo/vod'
 import { stalkerClientFor, xtreamClientFor } from '@main/sources'
+import { isBlocked } from '@main/secure/parental'
 
 export interface ProviderStream {
   url: string
@@ -102,6 +103,12 @@ export async function resolveProviderStream(source: StreamSource): Promise<Provi
     const playlist = getPlaylist(channel.playlistId)
     if (!playlist) throw new Error('Series not found')
 
+    // The episode branch returns before the shared check below, so it makes
+    // its own. The flags live on the series, not the episode.
+    if (isBlocked({ categoryId: channel.categoryId, isAdult: channel.isAdult, name: channel.name })) {
+      throw new Error('This series is locked. Unlock parental controls to play it.')
+    }
+
     // A portal names an episode by a number out of the show's own list, and
     // plays it with the show's command plus that number. There is no
     // per-episode address to build, so the link is fetched now, as it is for
@@ -157,6 +164,23 @@ export async function resolveProviderStream(source: StreamSource): Promise<Provi
 
   const playlist = getPlaylist(channel.playlistId)
   if (!playlist) throw new Error('Playlist not found')
+
+  /*
+   * The parental lock, enforced where the content is actually fetched.
+   *
+   * It used to be applied only when a list was drawn, which hides locked
+   * channels and stops there. Anything holding a channel id — a favourite, a
+   * recent item, the resume card, a scheduled recording, a download queued
+   * before the lock was set, a number typed on the remote — went straight
+   * past it.
+   *
+   * This function is the one place playback, recording, downloading and the
+   * health scan all pass through, which is why the check belongs here rather
+   * than in four handlers that each have to remember.
+   */
+  if (isBlocked({ categoryId: channel.categoryId, isAdult: channel.isAdult, name: channel.name })) {
+    throw new Error('This channel is locked. Unlock parental controls to play it.')
+  }
 
   if (source.type === 'catchup') {
     if (channel.catchupDays <= 0) throw new Error('This channel has no catch-up archive')

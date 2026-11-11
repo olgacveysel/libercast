@@ -16,8 +16,13 @@ on:
   # Buildable without tagging, to check the workflow itself.
   workflow_dispatch:
 
+# Read-only by default. Only the job that creates the release gets the write
+# token, and it runs no project code: it downloads artifacts, checksums them
+# and calls the release API. The two jobs that *do* run project code — and
+# with it every npm dependency's own code — cannot reach a token that can
+# write to this repository.
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   # The artifacts are named from package.json, and the release is named from
@@ -31,7 +36,7 @@ jobs:
     name: Tag agrees with package.json
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - if: startsWith(github.ref, 'refs/tags/v')
         run: |
           tag="${GITHUB_REF_NAME#v}"
@@ -42,23 +47,61 @@ jobs:
           fi
           echo "both say $manifest"
 
+  # Checks does not run on tags — it ignores them, so that tagging a commit
+  # does not run the same suite twice. That leaves a tag with nothing
+  # verifying it: whatever was last pushed to the branch is what gets
+  # packaged, and a release built from a red commit is the one kind of build
+  # nobody can take back once it is downloaded.
+  #
+  # So the release runs the suite itself, before spending forty minutes on
+  # two packaging jobs. The harnesses are included: they are the tests that
+  # catch an interface laid out wrongly, which is not something the unit
+  # suite can see, and ten minutes is cheap against publishing it.
+  verify:
+    name: Suite, types and harnesses
+    needs: [version]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install the libraries Electron needs
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            xvfb libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 \
+            libatspi2.0-0 libsecret-1-0 libasound2t64 || \
+          sudo apt-get install -y --no-install-recommends \
+            xvfb libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 \
+            libatspi2.0-0 libsecret-1-0 libasound2
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run verify:all
+
   windows:
     name: Windows installer and portable
-    needs: [version]
+    needs: [verify]
     runs-on: windows-latest
     timeout-minutes: 40
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
       - run: npm ci
       # pack:win regenerates the installer notice for Windows first, which is
       # what keeps the version on the agreement page honest — it shipped the
       # wrong one for three releases because it was written by hand.
       - run: npm run pack:win
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: windows
           path: |
@@ -67,18 +110,18 @@ jobs:
 
   linux:
     name: Linux AppImage and deb
-    needs: [version]
+    needs: [verify]
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
       - run: npm ci
       - run: npm run pack:linux
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: linux
           path: |
@@ -95,8 +138,11 @@ jobs:
     name: Collect, checksum, and draft on a tag
     needs: [windows, linux]
     runs-on: ubuntu-latest
+    # The only job with a token that can write to the repository.
+    permissions:
+      contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v5
         with:
           path: artifacts
 

@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { mkdtempSync, readFileSync, statSync } from 'node:fs'
+import { mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
@@ -299,7 +299,7 @@ async function main(): Promise<void> {
 function srtFile(directory: string, tag: string, line: string): string {
   const path = join(directory, `${tag}.srt`)
   const body = `1\n00:00:01,000 --> 00:00:03,000\n${line}\n\n2\n00:00:03,500 --> 00:00:03,900\n${tag.toUpperCase()} two\n`
-  require('node:fs').writeFileSync(path, body, 'utf8')
+  writeFileSync(path, body, 'utf8')
   return path
 }
 

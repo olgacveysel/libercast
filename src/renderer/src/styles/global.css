@@ -1269,6 +1269,39 @@ select {
   font-size: 12px;
   color: var(--text-dim);
 }
+/*
+  The diagnostics report.
+
+  Monospaced and pre-wrapped because it is a table of facts aligned by padding,
+  and it is going to be pasted somewhere else. `user-select: text` is explicit:
+  the rest of the interface suppresses selection so a drag on a list does not
+  highlight it, and the one block people are meant to select would otherwise
+  inherit that.
+*/
+.settings__diagnostics {
+  margin: 4px 0 14px;
+}
+.settings__diagnosticsText {
+  margin: 0 0 8px;
+  padding: 12px 14px;
+  max-height: 320px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2, rgba(0, 0, 0, 0.18));
+  color: var(--text-dim);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11.5px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+  user-select: text;
+}
+.settings__diagnosticsActions {
+  display: flex;
+  gap: 8px;
+}
+
 .settings__note {
   margin: 0 0 12px;
   font-size: 12px;

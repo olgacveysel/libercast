@@ -1,22 +1,25 @@
 {
   "name": "libercast",
   "version": "0.9.0-beta.5",
-  "description": "LiberCast \u2014 a free, open-source IPTV player. Xtream Codes, M3U and XMLTV EPG.",
+  "description": "LiberCast — a free, open-source IPTV player. Xtream Codes, M3U and XMLTV EPG.",
   "license": "MIT",
   "author": "Veysel Olgac",
   "homepage": "https://github.com/olgacveysel/libercast",
   "main": "./out/main/index.js",
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "scripts": {
     "dev": "electron-vite dev",
+    "setup": "npm ci --ignore-scripts && node node_modules/ffmpeg-static/install.js",
     "start": "electron-vite preview",
     "build": "npm run typecheck && electron-vite build",
+    "check": "npm run lint && npm run typecheck && npm test",
     "typecheck": "npm run typecheck:node && npm run typecheck:web && npm run typecheck:test",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json",
     "test": "node test/run.mjs",
+    "lint": "eslint .",
     "pack:win": "npm run build && npm run eula && electron-builder --win --publish never",
     "pack:win:dir": "npm run build && npm run eula && electron-builder --win --dir --publish never",
     "verify:detached": "npm run build && node -e \"const{cpSync,mkdirSync,rmSync}=require('fs');const d='node_modules/.cache/verify-detached';rmSync(d,{recursive:true,force:true});mkdirSync(d+'/main',{recursive:true});cpSync('out/preload',d+'/preload',{recursive:true});cpSync('out/renderer',d+'/renderer',{recursive:true})\" && esbuild src/main/windows/detached.ts --bundle --platform=node --format=cjs --outfile=node_modules/.cache/verify-detached/main/detached.cjs --alias:@main/window=./test/browser/window-stub.cjs --alias:@main=./src/main --alias:@shared=./src/shared --external:electron --log-level=error && electron test/browser/verify-detached.cjs",
@@ -42,7 +45,6 @@
     "verify:folders": "npm run build && electron test/browser/verify-folders.cjs"
   },
   "dependencies": {
-    "@electron-toolkit/preload": "^3.0.1",
     "@electron-toolkit/utils": "^3.0.0",
     "better-sqlite3": "^13.0.3",
     "ffmpeg-static": "^5.3.0",
@@ -50,8 +52,9 @@
   },
   "devDependencies": {
     "@electron-toolkit/tsconfig": "^1.0.1",
-    "@tanstack/react-query": "^5.56.2",
+    "@eslint/js": "^10.0.1",
     "@types/better-sqlite3": "^9.6.0",
+    "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.16.5",
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
@@ -60,9 +63,14 @@
     "electron-builder": "^26.18.0",
     "electron-vite": "^2.3.0",
     "esbuild": "^0.21.5",
+    "eslint": "^10.14.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.14.0",
+    "js-yaml": "^5.5.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "typescript": "^5.6.2",
+    "typescript-eslint": "^8.72.2",
     "vite": "^5.4.5",
     "zustand": "^4.5.5"
   },

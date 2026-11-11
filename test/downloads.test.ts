@@ -92,7 +92,7 @@ function serve(filePath: string): Promise<Fixture> {
  * so the resume behaviour itself can be asserted.
  */
 async function transfer(url: string, target: string): Promise<{ status: number; bytes: number }> {
-  let startAt = 0
+  let startAt: number
   try {
     startAt = statSync(target).size
   } catch {

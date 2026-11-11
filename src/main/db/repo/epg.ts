@@ -26,6 +26,40 @@ function toProgram(row: EpgRow): EpgProgram {
 }
 
 /** Drops a playlist's guide data before a refresh writes the new set. */
+/**
+ * The highest programme id currently stored, as a watermark.
+ *
+ * The refresh used to delete the old guide before downloading the new one,
+ * which meant a provider being slow or down left the user with no guide at
+ * all until the next successful refresh. Rows cannot simply be buffered
+ * instead — a full XMLTV feed is too large to hold — so the new set is
+ * written alongside the old and one of the two is dropped at the end.
+ *
+ * The id does the work: it is autoincrement, so everything inserted after
+ * this point sorts above it, and no schema change is needed to tell the two
+ * apart.
+ */
+export function programmeWatermark(playlistId: number): number {
+  const row = getDb()
+    .prepare('SELECT COALESCE(MAX(id), 0) AS high FROM epg_programs WHERE playlist_id = ?')
+    .get(playlistId) as { high: number }
+  return row.high
+}
+
+/** Drops the guide that was there before the watermark: the refresh worked. */
+export function dropProgramsUpTo(playlistId: number, watermark: number): void {
+  getDb()
+    .prepare('DELETE FROM epg_programs WHERE playlist_id = ? AND id <= ?')
+    .run(playlistId, watermark)
+}
+
+/** Drops what this refresh inserted: it did not work, so the old guide stays. */
+export function dropProgramsAfter(playlistId: number, watermark: number): void {
+  getDb()
+    .prepare('DELETE FROM epg_programs WHERE playlist_id = ? AND id > ?')
+    .run(playlistId, watermark)
+}
+
 export function clearPrograms(playlistId: number): void {
   getDb().prepare('DELETE FROM epg_programs WHERE playlist_id = ?').run(playlistId)
 }

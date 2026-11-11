@@ -66,6 +66,22 @@ const TEXT_SUBTITLE_CODECS = new Set([
 const cache = new Map<string, { result: ProbeResult; at: number }>()
 const CACHE_TTL_MS = 5 * 60_000
 
+/*
+ * How long a failure is remembered.
+ *
+ * Failures were not cached at all, on the reasoning that they are usually
+ * transient and a five-minute block would outlast the cause. That is right
+ * about five minutes and wrong about zero: a failing URL gets probed again on
+ * every retry, and a real log shows the same dead stream probed four times in
+ * ten seconds — four connections spent on four identical answers, against an
+ * account that may only have two.
+ *
+ * Seconds rather than minutes. Long enough to collapse a burst of retries
+ * into one question, short enough that a provider coming back is noticed
+ * almost immediately.
+ */
+const FAILURE_TTL_MS = 10_000
+
 /**
  * Whether the stored answer may be used instead of asking the provider again.
  *
@@ -112,7 +128,7 @@ function failed(error: string): ProbeResult {
 export async function probeStream(url: string, options: InputOptions = {}): Promise<ProbeResult> {
   const key = keyOf(url)
   const hit = cache.get(key)
-  if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.result
+  if (hit && Date.now() - hit.at < (hit.result.ok ? CACHE_TTL_MS : FAILURE_TTL_MS)) return hit.result
 
   // Answered on a previous run. Using it saves a connection to the provider,
   // which on most accounts is the one playback is about to need.
@@ -141,11 +157,13 @@ export async function probeStream(url: string, options: InputOptions = {}): Prom
     result = await runProbe(ffprobe, url, options)
   }
 
-  // A failure is not cached: it is usually transient (a busy provider, a
-  // momentary connection limit) and caching it would keep the item unplayable
-  // for five minutes after the cause cleared.
+  cache.set(key, { result, at: Date.now() })
+
+  // Only a success is written to the database. A failure is held in memory
+  // for a few seconds to collapse a burst of retries, and is deliberately not
+  // remembered across restarts: the provider having been down is not a fact
+  // worth keeping.
   if (result.ok) {
-    cache.set(key, { result, at: Date.now() })
     // Live entries expire far sooner than VOD; the provider can change a live
     // encode at any time, whereas a film is what it is.
     writeStored(key, result, result.durationSecs === null)

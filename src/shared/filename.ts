@@ -29,6 +29,7 @@ const SEPARATORS = /[/\\:|]/g
 
 /** Characters no common filesystem accepts, and which separate nothing. */
 const ILLEGAL = /[<>"?*]/g
+// eslint-disable-next-line no-control-regex -- the control range is the point
 const CONTROL = /[\u0000-\u001f\u007f]/g
 
 /**

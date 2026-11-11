@@ -127,15 +127,36 @@ async function convertWithFfmpeg(filePath: string, encoding: string): Promise<st
 }
 
 export async function loadSubtitleFile(filePath: string): Promise<ExternalSubtitle> {
+  /*
+   * The path is checked before it is opened.
+   *
+   * This is reachable over IPC, where the argument is typed as a string and
+   * nothing more. The renderer only ever sends a path the user picked in a
+   * dialog, but "only ever" is a statement about today's renderer, and the
+   * cost of being wrong is this function reading an arbitrary file and, for
+   * an unrecognised extension, handing it to ffmpeg — which opens `concat:`
+   * and a good deal else.
+   *
+   * An extension LiberCast claims to support is the whole rule. It is not a
+   * sandbox; it is the difference between a subtitle loader and a file
+   * reader.
+   */
+  const extension = extname(filePath).toLowerCase().replace(/^\./, '')
+  if (!SUBTITLE_EXTENSIONS.includes(extension)) {
+    throw new Error(
+      `"${extension || 'that file'}" is not a subtitle format LiberCast reads. ` +
+        `Expected one of: ${SUBTITLE_EXTENSIONS.join(', ')}.`
+    )
+  }
+
   const bytes = await readFile(filePath)
   const { text, encoding } = decodeSubtitleBytes(bytes)
-  const extension = extname(filePath).toLowerCase()
 
   let vtt: string
 
   if (isWebVtt(text)) {
     vtt = text
-  } else if (NATIVE.has(extension)) {
+  } else if (NATIVE.has(`.${extension}`)) {
     vtt = srtToVtt(text).vtt
   } else {
     vtt = await convertWithFfmpeg(filePath, encoding)
@@ -152,7 +173,7 @@ export async function loadSubtitleFile(filePath: string): Promise<ExternalSubtit
   log.info(`loaded ${basename(filePath)}: ${cues} cues, ${encoding}`)
 
   return {
-    label: basename(filePath, extension),
+    label: basename(filePath, `.${extension}`),
     filePath,
     vtt,
     cues

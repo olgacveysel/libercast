@@ -8,10 +8,12 @@ import { SHORTCUTS } from '@renderer/features/player/useHotkeys'
 import { LANGUAGES, useT, type TranslationKey } from '@renderer/i18n'
 import { TOKENS, renderTemplate } from '@shared/filename'
 import { SubtitleAppearance } from './SubtitleAppearance'
+import { SubtitleSearchSection } from './SubtitleSearchSection'
 import { APP_NAME } from '@shared/app'
 import { AccountPanel } from './AccountPanel'
 import { ParentalSection } from './ParentalSection'
 import { BackupSection } from './BackupSection'
+import { DiagnosticsSection } from './DiagnosticsSection'
 
 // Teal first: it is the mark's own colour, and the default.
 const ACCENTS = ['#22b58f', '#4f8cff', '#8f6bff', '#35c46b', '#f5a623', '#ff5f57']
@@ -530,6 +532,8 @@ export function Settings({ onAddSource }: Props): JSX.Element {
 
         <SubtitleAppearance />
 
+        <SubtitleSearchSection />
+
         <section className="settings__group">
           <h3>{t('settings.playback')}</h3>
 
@@ -844,6 +848,8 @@ export function Settings({ onAddSource }: Props): JSX.Element {
               {t('settings.showLogs')}
             </button>
           </div>
+
+          <DiagnosticsSection />
         </section>
       </div>
     </>

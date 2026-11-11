@@ -16,6 +16,8 @@ interface Props {
   /** Name of a subtitle file the user opened; shown as the active entry. */
   externalLabel?: string | null
   onOpenFile?: () => void
+  /** Offered beside opening a file, when subtitle search is available. */
+  onSearch?: () => void
   onClearExternal?: () => void
   /** Seconds the external file is shifted by, and its control. */
   offsetSecs?: number
@@ -40,6 +42,7 @@ export function TrackMenu({
   note,
   externalLabel,
   onOpenFile,
+  onSearch,
   onClearExternal,
   offsetSecs = 0,
   onOffsetChange
@@ -154,6 +157,19 @@ export function TrackMenu({
                 <span className="trackmenu__tick" />
                 <span className="trackmenu__label">{t('tracks.openFile')}</span>
               </button>
+
+              {onSearch && (
+                <button
+                  className="trackmenu__item"
+                  onClick={() => {
+                    onSearch()
+                    setOpen(false)
+                  }}
+                >
+                  <span className="trackmenu__tick" />
+                  <span className="trackmenu__label">{t('player.searchSubtitles')}</span>
+                </button>
+              )}
 
               {externalLabel && onOffsetChange && (
                 <div className="trackmenu__offset">

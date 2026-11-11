@@ -62,7 +62,7 @@ export function parseCueBlocks(buffer: string): { cues: ParsedCue[]; rest: strin
     const first = lines[0]!.trim()
     if (/^WEBVTT/i.test(first) || /^(NOTE|STYLE|REGION)\b/i.test(first)) continue
 
-    let timingIndex = lines.findIndex((line) => TIMING.test(line.trim()))
+    const timingIndex = lines.findIndex((line) => TIMING.test(line.trim()))
     if (timingIndex === -1) continue
 
     const match = TIMING.exec(lines[timingIndex]!.trim())!

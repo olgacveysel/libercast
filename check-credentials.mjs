@@ -62,7 +62,7 @@ if (rows.length === 0) {
 for (const row of rows) {
   const id = row.key.slice('credential:'.length)
   const source = sources.find((s) => String(s.id) === id)
-  let shape = 'unreadable'
+  let shape
   try {
     const payload = JSON.parse(row.value)
     shape = payload.enc

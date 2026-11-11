@@ -35,6 +35,25 @@ check('basic auth is removed', redact(basic) === 'http://***:***@panel.example.c
 const twoBasic = `${basic} and http://ann:hunter2@other.example.com/x.m3u`
 check('both sets of basic auth go', !redact(twoBasic).includes('hunter2'), redact(twoBasic))
 
+console.log('\nPlay tokens')
+
+// A portal's play URL carries one, and it is logged on every open. The
+// release notes say the log is safe to attach to an issue; this is part of
+// making that true.
+const play = 'http://host/play/live.php?mac=00%3A1A%3A79%3AAA%3ABB%3ACC&stream=5&play_token=26kYBNm3Kb'
+check('a play token is hidden', !redact(play).includes('26kYBNm3Kb'), redact(play))
+check('and the MAC still is too', !redact(play).includes('1A%3A79'), redact(play))
+check('but the channel it names survives, because that is what a log is for',
+  redact(play).includes('stream=5'), redact(play))
+
+check('a bearer-style token parameter goes',
+  !redact('http://h/x?access_token=abc123def').includes('abc123def'))
+check('a signature goes', !redact('http://h/x?sig=deadbeef').includes('deadbeef'))
+
+// Things that look random but are not secrets.
+check('an ordinary id is left alone', redact('http://h/x?id=99281').includes('id=99281'))
+check('a timestamp is left alone', redact('http://h/x?start=1762800000').includes('start=1762800000'))
+
 console.log('\nWriting the log file')
 
 const log = createLogger('logtest')

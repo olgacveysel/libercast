@@ -13,6 +13,7 @@ import * as recordingsRepo from '@main/db/repo/recordings'
 import * as vodRepo from '@main/db/repo/vod'
 import * as reminders from '@main/db/repo/reminders'
 import { exportBackup, importBackup } from '@main/secure/backup'
+import * as subtitleSearch from '@main/media/subtitleSearch'
 import { rejectAlternate } from '@main/db/repo/failoverRejects'
 import { credentialStorage, deletePassword, setPassword } from '@main/secure/credentials'
 import * as parental from '@main/secure/parental'
@@ -21,6 +22,7 @@ import { autoMatch, refreshEpg, suggestionsFor } from '@main/sources/epg'
 import { movieInfo, nextEpisodeOf, previousEpisodeOf, seriesDetail } from '@main/sources/vod'
 import { binaries, hasFfmpeg, setFfmpegOverride } from '@main/media/binaries'
 import { autoRefresh } from '@main/autoRefresh'
+import { collectDiagnostics, formatDiagnostics } from '@main/diagnostics'
 import { downloader } from '@main/media/downloader'
 import { recorder } from '@main/media/recorder'
 import { loadSubtitleFile, SUBTITLE_EXTENSIONS } from '@main/media/externalSubtitles'
@@ -50,7 +52,10 @@ function handle<C extends IpcChannel>(
     } catch (error) {
       const message = errorMessage(error)
       log.error(`${channel} failed`, message)
-      throw new Error(message)
+      // Only the message survives the structured clone to the renderer, but
+      // the cause keeps the original stack attached on this side, where the
+      // log is written.
+      throw new Error(message, { cause: error })
     }
   })
 }
@@ -203,6 +208,28 @@ export function registerIpcHandlers(): void {
   })
 
   handle('subtitles:loadFile', (filePath: string) => loadSubtitleFile(filePath))
+
+  /* ---------------- subtitle search ---------------- */
+
+  handle('subtitles:searchStatus', () => subtitleSearch.searchStatus())
+  handle('subtitles:search', (search) => subtitleSearch.searchSubtitles(search))
+  handle('subtitles:fetch', (fileId: number) => subtitleSearch.fetchSubtitle(fileId))
+
+  handle('subtitles:setKey', (key: string | null) => {
+    subtitleSearch.setApiKey(key)
+    return subtitleSearch.searchStatus()
+  })
+  handle('subtitles:testKey', async (key: string | null) => {
+    await subtitleSearch.testApiKey(key ?? undefined)
+  })
+
+  handle('subtitles:setAccount', ({ username, password }) => {
+    subtitleSearch.setAccount(username, password)
+    return subtitleSearch.searchStatus()
+  })
+  handle('subtitles:testAccount', async ({ username, password }) => {
+    await subtitleSearch.testAccount(username, password)
+  })
 
   /* ---------------- downloads ---------------- */
 
@@ -406,6 +433,15 @@ export function registerIpcHandlers(): void {
   handle('sources:refreshNow', () => autoRefresh.run())
 
   handle('app:version', () => app.getVersion())
+
+  handle('app:diagnostics', () => {
+    const report = collectDiagnostics()
+    const text = formatDiagnostics(report)
+    // Written to the log as well, so the report is in the file the user is
+    // about to attach even if they never paste the text anywhere.
+    log.info(`diagnostics requested\n${text}`)
+    return { report, text }
+  })
 
   handle('app:checkUpdate', () => checkForUpdate())
 

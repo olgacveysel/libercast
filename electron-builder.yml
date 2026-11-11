@@ -23,7 +23,31 @@ electronLanguages:
 # platform, and when it silently fails on the output directory the result is a
 # build that packs the previous build's output, so every installer is larger
 # than the last. Spelled out, it cannot misfire.
+# Only `out/` and the production dependencies belong in the package.
+#
+# IMPORTANT: this list is repeated under `win:` and `linux:`, and that
+# duplication is not an oversight.
+#
+# A platform block's `files` does not add to this one — it REPLACES it, and
+# electron-builder's own defaults with it. The two platform blocks existed to
+# drop the ffprobe and better-sqlite3 binaries for platforms that are not
+# being built, four lines each, and those four lines silently became the
+# entire filter. Every Windows and Linux package since has carried the whole
+# source tree, the test suite and the `.git` directory, and a package built on
+# a working machine carried whatever else was lying in the folder — a log
+# file, scratch output. The size guard never caught it because the archive was
+# still only a few megabytes.
+#
+# So: anything that must be excluded has to appear in all three lists.
+# `test/packaging.test.ts` compares them and fails if one drifts.
+#
+# Each directory is excluded twice, as the name and as its contents. The
+# shorthand for that is `name{,/**/*}`, and electron-builder's own defaults use
+# it — but the empty first alternative in those braces does not match on every
+# platform, so it is spelled out here.
 files:
+  - '!.git'
+  - '!.git/**/*'
   - '!.vscode'
   - '!.vscode/**/*'
   - '!src'
@@ -36,33 +60,25 @@ files:
   - '!tools/**/*'
   - '!.github'
   - '!.github/**/*'
-
-  # The output directory, stated here as well as in electron-builder's defaults
-  # precisely because relying on those defaults is what went wrong.
   - '!release'
   - '!release/**/*'
-
-  - '!electron.vite.config.{js,ts,mjs,cjs}'
-  - '!{.eslintrc,.editorconfig,.gitignore,README.md,FEATURES.md,THIRD-PARTY-NOTICES.md}'
-  - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
-  - '!*.tsbuildinfo'
-  - '!package-lock.json'
-
-  # Scratch that accumulates in a working folder: files delivered into the
-  # project, and the reports written by tools/asar-report.mjs.
   - '!Claude outputs'
   - '!Claude outputs/**/*'
   - '!asar-*.txt'
-
+  - '!*.log'
+  - '!electron.vite.config.{js,ts,mjs,cjs}'
+  - '!eslint.config.{js,mjs,cjs}'
+  - '!check-credentials.mjs'
+  - '!gpu-report.cjs'
+  - '!{.eslintrc,.editorconfig,.gitignore,.gitattributes,README.md,FEATURES.md,THIRD-PARTY-NOTICES.md}'
+  - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json,tsconfig.test.json}'
+  - '!*.tsbuildinfo'
+  - '!package-lock.json'
   - '!node_modules/ffprobe-static/tests/**'
-
-  # better-sqlite3 brings the full SQLite C source and its own binding sources
-  # so it *can* be compiled. Nothing compiles it any more — the shipped binary
-  # is a Node-API prebuild — so this is 10 MB of source code in every
-  # installer, for a compile that never happens.
   - '!node_modules/better-sqlite3/deps/**'
   - '!node_modules/better-sqlite3/src/**'
   - '!node_modules/better-sqlite3/binding.gyp'
+
 # Fails the build if the package came out far larger than the application is,
 # rather than letting an oversized installer reach someone's download folder.
 afterPack: tools/after-pack.cjs
@@ -129,7 +145,42 @@ win:
   # resources/icon.ico carries every size from 16px up; Windows picks the one it
   # needs, and a missing small size is what makes a taskbar icon look smeared.
   icon: resources/icon.ico
+  # Everything from the top-level `files`, because a platform block replaces
+  # that list rather than extending it. See the note up there.
   files:
+    - '!.git'
+    - '!.git/**/*'
+    - '!.vscode'
+    - '!.vscode/**/*'
+    - '!src'
+    - '!src/**/*'
+    - '!test'
+    - '!test/**/*'
+    - '!docs'
+    - '!docs/**/*'
+    - '!tools'
+    - '!tools/**/*'
+    - '!.github'
+    - '!.github/**/*'
+    - '!release'
+    - '!release/**/*'
+    - '!Claude outputs'
+    - '!Claude outputs/**/*'
+    - '!asar-*.txt'
+    - '!*.log'
+    - '!electron.vite.config.{js,ts,mjs,cjs}'
+    - '!eslint.config.{js,mjs,cjs}'
+    - '!check-credentials.mjs'
+    - '!gpu-report.cjs'
+    - '!{.eslintrc,.editorconfig,.gitignore,.gitattributes,README.md,FEATURES.md,THIRD-PARTY-NOTICES.md}'
+    - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json,tsconfig.test.json}'
+    - '!*.tsbuildinfo'
+    - '!package-lock.json'
+    - '!node_modules/ffprobe-static/tests/**'
+    - '!node_modules/better-sqlite3/deps/**'
+    - '!node_modules/better-sqlite3/src/**'
+    - '!node_modules/better-sqlite3/binding.gyp'
+
     # ffprobe-static ships a binary for every platform it supports — around
     # 336 MB of them, of which a Windows x64 build needs 61 MB. Scoped to the
     # Windows build so a build for anything else still gets its own ffprobe.
@@ -193,7 +244,41 @@ linux:
       Name: LiberCast
       GenericName: IPTV Player
       Keywords: iptv;m3u;xtream;tv;stream;
+  # Repeated from the top-level `files` for the reason given there.
   files:
+    - '!.git'
+    - '!.git/**/*'
+    - '!.vscode'
+    - '!.vscode/**/*'
+    - '!src'
+    - '!src/**/*'
+    - '!test'
+    - '!test/**/*'
+    - '!docs'
+    - '!docs/**/*'
+    - '!tools'
+    - '!tools/**/*'
+    - '!.github'
+    - '!.github/**/*'
+    - '!release'
+    - '!release/**/*'
+    - '!Claude outputs'
+    - '!Claude outputs/**/*'
+    - '!asar-*.txt'
+    - '!*.log'
+    - '!electron.vite.config.{js,ts,mjs,cjs}'
+    - '!eslint.config.{js,mjs,cjs}'
+    - '!check-credentials.mjs'
+    - '!gpu-report.cjs'
+    - '!{.eslintrc,.editorconfig,.gitignore,.gitattributes,README.md,FEATURES.md,THIRD-PARTY-NOTICES.md}'
+    - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json,tsconfig.test.json}'
+    - '!*.tsbuildinfo'
+    - '!package-lock.json'
+    - '!node_modules/ffprobe-static/tests/**'
+    - '!node_modules/better-sqlite3/deps/**'
+    - '!node_modules/better-sqlite3/src/**'
+    - '!node_modules/better-sqlite3/binding.gyp'
+
     # Same reasoning as the Windows build: ffprobe-static ships a binary for
     # every platform it supports and a Linux x64 build needs one of them.
     - '!node_modules/ffprobe-static/bin/{darwin,win32}/**'

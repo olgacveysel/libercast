@@ -115,16 +115,37 @@ left there is marked post-1.0.
 ## Quick start
 
 ```bash
-npm install
+npm run setup
 npm run dev
 ```
 
 Then add a source from the sidebar and hit **Sync**.
 
+### Why not `npm ci`
+
+`better-sqlite3` carries a `binding.gyp` and no install script, so npm's
+default is to compile it with `node-gyp` — which needs Visual Studio with the
+"Desktop development with C++" workload on Windows, and a toolchain
+everywhere else.
+
+**That compile is thrown away.** `electron-builder.yml` sets
+`npmRebuild: false`, excludes `binding.gyp` and the C sources from the
+package, and ships only the Node-API prebuild for the target platform. The
+application loads that prebuild; nothing ever loads what `node-gyp` produced.
+
+So `npm run setup` skips install scripts, and then runs back the one that
+actually matters: `ffmpeg-static` downloads its binary in a `postinstall`, and
+without it the player starts and then cannot decode anything.
+
+CI runs plain `npm ci` and always has. GitHub's runners ship compilers, so it
+succeeds there — it simply wastes a couple of minutes building something
+nobody will load.
+
 ## Scripts
 
 | Script | Does |
 |---|---|
+| `npm run setup` | Installs dependencies without the pointless native rebuild |
 | `npm run dev` | Runs the app with hot reload |
 | `npm run typecheck` | Type-checks the main/preload and renderer projects separately |
 | `npm test` | Runs the test suite under Electron's node runtime |

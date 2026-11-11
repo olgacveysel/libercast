@@ -2,12 +2,37 @@ import type { ContentKind } from '@shared/types'
 import { normalizedKey } from '@main/sources/epgMatch'
 import type { ParsedCategory, ParsedChannel } from '@main/sources/types'
 import { fold, getDb } from '../index'
+import { createLogger } from '@main/util/logger'
+
+const log = createLogger('import')
 
 export interface ImportCounts {
   categories: number
   channels: number
   removed: number
+  /**
+   * Set when the stale-row sweep was deliberately skipped.
+   *
+   * Not an error: the catalogue that did arrive is stored either way. It
+   * means some rows the provider stopped listing are still here, and will go
+   * on the next sync that looks healthy.
+   */
+  pruneSkipped?: 'empty' | 'shrank'
 }
+
+/**
+ * Below this share of what is already stored, a sync is treated as suspect.
+ *
+ * Providers do trim their line-ups, but not by four fifths in one go. A
+ * wrong guess here costs a stale row until the next sync; a wrong prune
+ * costs the user their favourites and history, because those cascade off
+ * `channels`. The two mistakes are not the same size, so this errs towards
+ * keeping things.
+ */
+const SUSPECT_SHRINK = 0.2
+
+/** Below this, a catalogue is too small for a ratio to mean anything. */
+const SHRINK_FLOOR = 50
 
 /**
  * Replaces one content kind of a playlist's catalog in a single transaction.
@@ -71,6 +96,32 @@ export function importCatalog(
   )
 
   let removed = 0
+  let pruneSkipped: ImportCounts['pruneSkipped']
+
+  /*
+   * Whether it is safe to delete what this sync did not mention.
+   *
+   * The sweep below removes every row of this kind the provider did not
+   * return. That is correct when the provider answered properly and
+   * catastrophic when it did not: an Xtream panel having a bad minute, a
+   * playlist served as an error page, an expired account answering with an
+   * empty list — any of those deletes the whole catalogue, and favourites,
+   * history and progress go with it on the foreign key.
+   *
+   * None of that is hypothetical enough to leave to chance, and the recovery
+   * is a re-sync the user does not know they need.
+   */
+  const existing = (
+    db
+      .prepare('SELECT COUNT(*) AS n FROM channels WHERE playlist_id = ? AND kind = ?')
+      .get(playlistId, kind) as { n: number }
+  ).n
+
+  if (channels.length === 0 && existing > 0) {
+    pruneSkipped = 'empty'
+  } else if (existing >= SHRINK_FLOOR && channels.length < existing * SUSPECT_SHRINK) {
+    pruneSkipped = 'shrank'
+  }
 
   const run = db.transaction(() => {
     const categoryIds = new Map<string, number>()
@@ -157,19 +208,35 @@ export function importCatalog(
     }
 
     // Stale rows: this playlist AND this kind, not touched by this import.
-    const info = db
-      .prepare('DELETE FROM channels WHERE playlist_id = ? AND kind = ? AND seen_at < ?')
-      .run(playlistId, kind, stamp)
-    removed = info.changes
+    //
+    // Skipped when the result looks wrong. What arrived is still stored, so a
+    // genuine change is picked up; what is left behind is some rows the
+    // provider no longer lists, which the next healthy sync removes.
+    if (pruneSkipped) {
+      log.warn(
+        `not pruning ${kind} for playlist ${playlistId}: the sync returned ` +
+          `${channels.length} where ${existing} are stored. ` +
+          `Leaving the catalogue alone rather than deleting it.`
+      )
+    } else {
+      const info = db
+        .prepare('DELETE FROM channels WHERE playlist_id = ? AND kind = ? AND seen_at < ?')
+        .run(playlistId, kind, stamp)
+      removed = info.changes
+    }
 
-    db.prepare(
-      `DELETE FROM categories
-       WHERE playlist_id = ? AND kind = ?
-         AND external_id NOT IN (SELECT value FROM json_each(?))`
-    ).run(playlistId, kind, JSON.stringify(categories.map((c) => c.externalId)))
+    // Categories follow the same rule: deleting them while keeping the
+    // channels would leave every row unfiled.
+    if (!pruneSkipped) {
+      db.prepare(
+        `DELETE FROM categories
+         WHERE playlist_id = ? AND kind = ?
+           AND external_id NOT IN (SELECT value FROM json_each(?))`
+      ).run(playlistId, kind, JSON.stringify(categories.map((c) => c.externalId)))
+    }
   })
 
   run()
 
-  return { categories: categories.length, channels: channels.length, removed }
+  return { categories: categories.length, channels: channels.length, removed, pruneSkipped }
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState, type JSX } from 'react'
+import { useEffect, useRef, useState, type JSX } from 'react'
 import type { StreamState } from './useStream'
 import { useT } from '@renderer/i18n'
 import { IconClose } from '@renderer/ui/Icon'
@@ -38,14 +38,34 @@ export function SwitchedNotice({
   const [shown, setShown] = useState<StreamState['switched']>(null)
   const t = useT()
 
+  /*
+   * Keyed on the content rather than the object: a re-render that produces an
+   * equal report must not restart the countdown.
+   *
+   * Every field is in the key, including the two channel ids. They are not
+   * displayed, but `onWrongChannel` sends `shown.alternateChannelId` back —
+   * so a second failover whose name and labels happen to match the first
+   * would otherwise leave the correction pointing at the previous channel.
+   *
+   * The report itself is read through a ref so the effect does not have to
+   * depend on the object identity it is deliberately ignoring.
+   */
+  const latest = useRef(switched)
+  latest.current = switched
+
   useEffect(() => {
-    if (!switched) return
-    setShown(switched)
+    const report = latest.current
+    if (!report) return
+    setShown(report)
     const timer = setTimeout(() => setShown(null), VISIBLE_MS)
     return () => clearTimeout(timer)
-    // Keyed on the content rather than the object: a re-render that produces
-    // an equal report must not restart the countdown.
-  }, [switched?.channelName, switched?.from, switched?.to])
+  }, [
+    switched?.channelName,
+    switched?.from,
+    switched?.to,
+    switched?.requestedChannelId,
+    switched?.alternateChannelId
+  ])
 
   if (!shown) return null
 

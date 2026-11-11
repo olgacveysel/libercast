@@ -15,6 +15,16 @@ import { getDb } from '@main/db'
 const KEY_PREFIX = 'credential:'
 
 /**
+ * Secrets that belong to the application rather than to a provider.
+ *
+ * A separate prefix from the playlist credentials above, deliberately: those
+ * are keyed by playlist id and deleted with the playlist, and an API key
+ * belongs to nobody's playlist. Sharing the prefix would make a removed
+ * source take an unrelated secret with it.
+ */
+const SECRET_PREFIX = 'secret:'
+
+/**
  * What is actually protecting these passwords on this machine.
  *
  * `getSelectedStorageBackend` exists only on Linux; everywhere else the
@@ -71,6 +81,57 @@ export function getPassword(playlistId: number): string | null {
   } catch {
     return null
   }
+}
+
+/**
+ * A named secret, stored the same way a provider password is.
+ *
+ * Same encryption, same honesty about what is protecting it, same absence
+ * from the renderer. An OpenSubtitles API key is not as sensitive as a
+ * provider password, but it is still a credential that buys something, and
+ * the settings table is where the window size lives.
+ */
+export function setSecret(name: string, value: string | null): void {
+  const db = getDb()
+  const key = SECRET_PREFIX + name
+
+  if (!value) {
+    db.prepare('DELETE FROM settings WHERE key = ?').run(key)
+    return
+  }
+
+  const payload = safeStorage.isEncryptionAvailable()
+    ? { enc: true, value: safeStorage.encryptString(value).toString('base64') }
+    : { enc: false, value: Buffer.from(value, 'utf8').toString('base64') }
+
+  db.prepare(
+    'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
+  ).run(key, JSON.stringify(payload))
+}
+
+export function getSecret(name: string): string | null {
+  const row = getDb()
+    .prepare('SELECT value FROM settings WHERE key = ?')
+    .get(SECRET_PREFIX + name) as { value: string } | undefined
+
+  if (!row) return null
+
+  try {
+    const payload = JSON.parse(row.value) as { enc: boolean; value: string }
+    const buffer = Buffer.from(payload.value, 'base64')
+    return payload.enc ? safeStorage.decryptString(buffer) : buffer.toString('utf8')
+  } catch {
+    return null
+  }
+}
+
+/** Whether a secret is set, without reading it back out of the keyring. */
+export function hasSecret(name: string): boolean {
+  return (
+    getDb()
+      .prepare('SELECT 1 AS present FROM settings WHERE key = ?')
+      .get(SECRET_PREFIX + name) !== undefined
+  )
 }
 
 export function deletePassword(playlistId: number): void {

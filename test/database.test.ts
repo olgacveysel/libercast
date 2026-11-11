@@ -170,6 +170,50 @@ check(
   })()
 )
 
+console.log('\nA sync that returns nothing must not empty the catalogue')
+
+const fragile = createPlaylist({ name: 'Fragile', kind: 'xtream', url: 'http://ex.com', username: 'u' })
+const fragileCats = [{ externalId: 'f1', name: 'All' }]
+importCatalog(fragile.id, 'live', fragileCats, mk(200, 'live', 'f1', (i) => `Channel ${i}`))
+
+const fragileBefore = catalog.countChannels({ playlistId: fragile.id, kind: 'live' })
+check('the catalogue imported', fragileBefore === 200, fragileBefore)
+
+// Mark one as a favourite: favourites cascade off channels, so a wrong prune
+// does not merely lose the listing, it loses what the user chose.
+const fragileFirst = catalog.queryChannels({ playlistId: fragile.id, kind: 'live', limit: 1 })[0]!
+catalog.toggleFavorite(fragileFirst.id)
+check('and a favourite is set', catalog.countChannels({ playlistId: fragile.id, kind: 'live', favoritesOnly: true }) === 1)
+
+// The provider has a bad minute and answers with nothing.
+const empty = importCatalog(fragile.id, 'live', fragileCats, [])
+check('an empty sync deletes nothing',
+  catalog.countChannels({ playlistId: fragile.id, kind: 'live' }) === 200,
+  catalog.countChannels({ playlistId: fragile.id, kind: 'live' }))
+check('and says why it held back', empty.pruneSkipped === 'empty', empty)
+check('the favourite survived', catalog.countChannels({ playlistId: fragile.id, kind: 'live', favoritesOnly: true }) === 1)
+
+// A drastic shrink is suspect too, but the rows that did arrive are kept:
+// refusing them outright would mean a provider that really did trim its
+// line-up could never update.
+const fragileShrunk = importCatalog(fragile.id, 'live', fragileCats, mk(10, 'live', 'f1', (i) => `Channel ${i}`))
+check('a drastic shrink does not prune either', fragileShrunk.pruneSkipped === 'shrank', fragileShrunk)
+check('but what arrived is still stored',
+  catalog.countChannels({ playlistId: fragile.id, kind: 'live' }) === 200)
+
+// A healthy sync prunes as it always did.
+const healthy = importCatalog(fragile.id, 'live', fragileCats, mk(180, 'live', 'f1', (i) => `Channel ${i}`))
+check('a healthy sync still prunes', healthy.pruneSkipped === undefined, healthy)
+check('and removes what the provider dropped',
+  catalog.countChannels({ playlistId: fragile.id, kind: 'live' }) === 180,
+  catalog.countChannels({ playlistId: fragile.id, kind: 'live' }))
+
+// A small catalogue has no meaningful ratio, so the floor keeps it usable.
+const tiny = createPlaylist({ name: 'Tiny', kind: 'm3u', url: 'http://ex.com/p.m3u' })
+importCatalog(tiny.id, 'live', fragileCats, mk(8, 'live', 'f1', (i) => `Small ${i}`))
+const trimmed = importCatalog(tiny.id, 'live', fragileCats, mk(1, 'live', 'f1', (i) => `Small ${i}`))
+check('a tiny catalogue is not second-guessed', trimmed.pruneSkipped === undefined, trimmed)
+
 console.log('\nEpisodes a portal sends with the catalogue')
 
 const portalPlaylist = createPlaylist({

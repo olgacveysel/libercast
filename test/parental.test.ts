@@ -1,4 +1,4 @@
-import { mkdtempSync } from 'node:fs'
+import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { getDb } from '@main/db'
@@ -205,7 +205,37 @@ async function main(): Promise<void> {
 
   check('credentials require a passphrase', await refuses(() => exportBackup(join(work, 'x.json'), { includeCredentials: true })))
 
-  console.log('\nRestore')
+  console.log('\nGuessing the PIN costs something')
+
+// The PIN set earlier in this file is still '1234'.
+parental.lock()
+
+// scrypt already makes each guess slow. A limit is the other half: unattended,
+// a tenth of a second per try still walks all 10,000 four-digit PINs overnight.
+let refused: string | null = null
+for (let attempt = 0; attempt < 6; attempt++) {
+  try {
+    parental.unlock('0000')
+  } catch (error) {
+    refused = error instanceof Error ? error.message : String(error)
+    break
+  }
+}
+check('repeated wrong PINs stop being accepted', refused !== null, refused)
+check('and the refusal says how long to wait', refused?.includes('seconds') === true, refused)
+check('a cooldown is reported', parental.attemptCooldownMs() > 0, parental.attemptCooldownMs())
+
+// And the right PIN is refused too while the cooldown runs — otherwise the
+// limit would only slow down someone who kept guessing wrong.
+let rightPinDuringCooldown: string | null = null
+try {
+  parental.unlock('1234')
+} catch (error) {
+  rightPinDuringCooldown = error instanceof Error ? error.message : String(error)
+}
+check('even the correct PIN waits out the cooldown', rightPinDuringCooldown !== null)
+
+console.log('\nRestore')
   const payload = buildPayload(false)
   check('the payload references channels by provider id, not row id', (() => {
     const favorite = payload.favorites[0]
@@ -224,7 +254,7 @@ async function main(): Promise<void> {
 
   check('a corrupt file is rejected clearly', await refuses(async () => {
     const bad = join(work, 'bad.json')
-    require('node:fs').writeFileSync(bad, 'not json', 'utf8')
+    writeFileSync(bad, 'not json', 'utf8')
     await importBackup({ filePath: bad, mode: 'merge' })
   }))
 }

@@ -1,5 +1,6 @@
 import type { ChannelHealth } from '@shared/types'
 import { queryChannels } from '@main/db/repo/catalog'
+import { isBlocked } from '@main/secure/parental'
 import { recordHealth } from '@main/db/repo/health'
 import { resolveProviderStream } from '@main/media/resolve'
 import { inspectStream } from '@main/media/httpCheck'
@@ -43,7 +44,22 @@ export async function scanFavorites(
 ): Promise<ChannelHealth[]> {
   cancelled = false
 
-  const favorites = queryChannels({ playlistId, kind: 'live', favoritesOnly: true, limit: 500 })
+  /*
+   * Locked channels are left out rather than scanned and reported.
+   *
+   * Resolving one now refuses, which would put a failure against the
+   * provider for something this application did — and a health report full
+   * of "locked" rows tells the user nothing about their subscription.
+   */
+  const favorites = queryChannels({
+    playlistId,
+    kind: 'live',
+    favoritesOnly: true,
+    limit: 500
+  }).filter(
+    (channel) =>
+      !isBlocked({ categoryId: channel.categoryId, isAdult: channel.isAdult, name: channel.name })
+  )
   const results: ChannelHealth[] = []
 
   log.info(`scanning ${favorites.length} favorites`)

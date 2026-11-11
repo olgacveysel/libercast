@@ -85,11 +85,6 @@ export function isLocked(): boolean {
   return false
 }
 
-/** Extends the unlock window. Called whenever the user does something. */
-export function touch(): void {
-  if (unlockedAt !== null) unlockedAt = Date.now()
-}
-
 /**
  * Hashes with scrypt rather than a plain digest: a four-digit PIN has only
  * 10,000 possibilities, so the only meaningful defence is making each guess
@@ -126,9 +121,49 @@ export function verify(pin: string): boolean {
   return expected.length === actual.length && timingSafeEqual(expected, actual)
 }
 
+/*
+ * Guessing has to cost something.
+ *
+ * A four-digit PIN is 10,000 possibilities. scrypt makes each guess take
+ * roughly a tenth of a second, which is the main defence, but unattended that
+ * is still the whole space in under twenty minutes. So wrong answers also
+ * accumulate a wait.
+ *
+ * Held in memory on purpose: this is about somebody sitting at the machine,
+ * and a counter in the database would be one more thing to clear, and one
+ * more way to lock out the actual owner permanently.
+ */
+const MAX_ATTEMPTS = 5
+const COOLDOWN_MS = 60_000
+
+let failedAttempts = 0
+let lockedOutUntil = 0
+
+/** How long the next attempt must wait, in milliseconds. Zero when free. */
+export function attemptCooldownMs(now = Date.now()): number {
+  return Math.max(0, lockedOutUntil - now)
+}
+
 export function unlock(pin: string): boolean {
   if (!isEnabled()) return true
-  if (!verify(pin)) return false
+
+  const waiting = attemptCooldownMs()
+  if (waiting > 0) {
+    throw new Error(`Too many wrong attempts. Try again in ${Math.ceil(waiting / 1000)} seconds.`)
+  }
+
+  if (!verify(pin)) {
+    failedAttempts += 1
+    if (failedAttempts >= MAX_ATTEMPTS) {
+      lockedOutUntil = Date.now() + COOLDOWN_MS
+      failedAttempts = 0
+      log.warn('parental PIN locked out after repeated wrong attempts')
+    }
+    return false
+  }
+
+  failedAttempts = 0
+  lockedOutUntil = 0
   unlockedAt = Date.now()
   return true
 }

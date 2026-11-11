@@ -54,8 +54,11 @@ export function usePictureInPicture(videoRef: RefObject<HTMLVideoElement>): {
       element.removeEventListener('enterpictureinpicture', entered)
       element.removeEventListener('leavepictureinpicture', left)
     }
-    // The element is replaced when the player remounts, so this re-runs with it.
-  }, [videoRef, videoRef.current])
+    // `videoRef.current` is not listed: mutating a ref does not re-render, so
+    // it could never trigger this effect anyway. The <video> is rendered
+    // unconditionally by the player, so it exists from the first run and is
+    // replaced only when the player itself remounts.
+  }, [videoRef])
 
   const toggle = useCallback(async () => {
     const element = videoRef.current

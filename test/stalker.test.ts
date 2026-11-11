@@ -278,7 +278,7 @@ async function main(): Promise<void> {
   console.warn = (...args: unknown[]) => {
     warnings.push(args.map((a) => String(a)).join(' '))
   }
-  let oddCount = -1
+  let oddCount: number
   try {
     oddCount = (await client(odd).liveCatalog()).channels.length
   } catch {

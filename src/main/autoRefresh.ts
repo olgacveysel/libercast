@@ -63,6 +63,13 @@ class AutoRefresh {
 
   /** Runs a refresh now, whatever the schedule says. Used by the manual button. */
   async run(): Promise<AutoRefreshReport> {
+    // `tick` checks this before calling in; the manual button calls straight
+    // here and did not, so pressing Refresh during an automatic run started a
+    // second one over the top of it — two syncs writing the same catalogue.
+    if (this.running) {
+      throw new Error('A refresh is already running.')
+    }
+
     this.running = true
     const started = Date.now()
 
@@ -102,16 +109,33 @@ class AutoRefresh {
       }
 
       if (getSettings().autoRefreshEpg) {
-        const active = listPlaylists()[0]
-        if (active) {
+        /*
+         * Every source, not just the first.
+         *
+         * Each playlist has its own guide, so refreshing `[0]` left everyone
+         * with more than one source looking at a guide that stopped updating
+         * — and looking at it on whichever source they actually watch, which
+         * is not reliably the first.
+         *
+         * One failing guide does not stop the others: they come from
+         * different providers and fail independently.
+         */
+        let programmes = 0
+        const guideErrors: string[] = []
+
+        for (const playlist of listPlaylists()) {
           try {
-            const epg = await refreshEpg(active.id)
-            report.programmes = epg.programmes
+            const epg = await refreshEpg(playlist.id)
+            programmes += epg.programmes
           } catch (error) {
-            report.epgError = errorMessage(error)
-            log.warn('guide refresh failed', report.epgError)
+            const message = errorMessage(error)
+            guideErrors.push(`${playlist.name}: ${message}`)
+            log.warn(`guide refresh failed for ${playlist.name}`, message)
           }
         }
+
+        report.programmes = programmes
+        report.epgError = guideErrors.length > 0 ? guideErrors.join('; ') : null
       }
     } finally {
       this.running = false
