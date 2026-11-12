@@ -1,4 +1,4 @@
-<img src="resources/wordmark.png" alt="LiberCast" width="340">
+<img src="resources/wordmark.png" alt="LiberCast" width="540">
 
 A free, open-source IPTV player for Windows and Linux. Built with Electron, React and TypeScript.
 
