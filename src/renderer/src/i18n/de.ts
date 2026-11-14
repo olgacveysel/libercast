@@ -678,6 +678,9 @@ export const de: Record<TranslationKey, string> = {
   'stats.frameRate': 'Bildrate',
   'stats.dropped': 'Verloren',
   'stats.codec': 'Codec',
+  'stats.source': 'Quelle',
+  'stats.interlaced': 'Halbbilder — Softwaredekodierung',
+  'stats.progressive': 'Vollbilder',
   'stats.pipeline': 'Verarbeitung',
   'stats.declaredFps': '{fps} angegeben',
 

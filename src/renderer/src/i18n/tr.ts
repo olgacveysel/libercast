@@ -649,6 +649,9 @@ export const tr: Record<TranslationKey, string> = {
   'stats.frameRate': 'Kare hızı',
   'stats.dropped': 'Düşen kare',
   'stats.codec': 'Codec',
+  'stats.source': 'Kaynak',
+  'stats.interlaced': 'geçmeli — yazılımla çözülüyor',
+  'stats.progressive': 'ilerlemeli',
   'stats.pipeline': 'İşlem hattı',
   'stats.declaredFps': '{fps} bildirilmiş',
 

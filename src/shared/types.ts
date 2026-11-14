@@ -834,6 +834,30 @@ export interface VideoInfo {
   fps: number | null
   /** Bits per second, when the container states one. */
   bitrate: number | null
+  /*
+   * The four properties that decide whether the GPU will take the picture.
+   *
+   * A controlled test settled that LiberCast's fragmented-MP4 muxing is not
+   * what costs the player hardware decoding: the same clip muxed the plain way
+   * and the LiberCast way both got `D3D11VideoDecoder`. So the difference is
+   * in the stream itself, and these are the properties that usually account
+   * for it — an interlaced source above all, which broadcast IPTV very often
+   * is and which Chromium's D3D11 decoder declines outright.
+   *
+   * Read rather than acted on. The player does not change its behaviour from
+   * these; they are here to be shown, so that the next time this question is
+   * asked it costs a glance.
+   */
+  /** "High", "Main", "High 10"… as the container declares it. */
+  profile: string | null
+  /** 40 means level 4.0. */
+  level: number | null
+  /** "yuv420p", "yuv420p10le"… */
+  pixelFormat: string | null
+  /** 'progressive', 'tt', 'bb', 'tb', 'bt' — or null when nothing is declared. */
+  fieldOrder: string | null
+  /** null when the stream declares no field order, which is not a claim either way. */
+  interlaced: boolean | null
 }
 
 /** A subtitle file the user opened themselves, already converted to WebVTT. */

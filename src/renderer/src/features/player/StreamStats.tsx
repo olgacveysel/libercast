@@ -139,6 +139,40 @@ export function StreamStats({ videoRef, declared, pipeline, visible }: Props): J
         </span>
       </span>
 
+      {/*
+        What decides whether the GPU takes the picture.
+
+        A controlled test settled that the fragmented-MP4 muxing is not the
+        reason this application decodes in software on a machine that offers
+        hardware decoding — the same clip muxed both ways got the hardware
+        decoder. The difference is in the stream, and this is the line that
+        says which stream it is. An interlaced source is called out because
+        Chromium's D3D11 decoder refuses interlaced H.264 outright, and
+        broadcast IPTV is interlaced far more often than not.
+      */}
+      {(declared?.profile || declared?.pixelFormat || declared?.fieldOrder) && (
+        <span className="stats__row">
+          <span className="stats__key">{t('stats.source')}</span>
+          <span className={`stats__value ${declared.interlaced === true ? 'stats__value--warn' : ''}`}>
+            {[declared.profile, declared.level ? `L${(declared.level / 10).toFixed(1)}` : null]
+              .filter(Boolean)
+              .join(' ') || '—'}
+            <span className="stats__note">
+              {[
+                declared.pixelFormat,
+                declared.interlaced === true
+                  ? t('stats.interlaced')
+                  : declared.interlaced === false
+                    ? t('stats.progressive')
+                    : null
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </span>
+          </span>
+        </span>
+      )}
+
       {pipeline && (
         <span className="stats__row">
           <span className="stats__key">{t('stats.pipeline')}</span>

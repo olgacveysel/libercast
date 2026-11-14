@@ -660,6 +660,9 @@ export const en = {
   'stats.frameRate': 'Frame rate',
   'stats.dropped': 'Dropped',
   'stats.codec': 'Codec',
+  'stats.source': 'Source',
+  'stats.interlaced': 'interlaced — decoded in software',
+  'stats.progressive': 'progressive',
   'stats.pipeline': 'Pipeline',
   'stats.declaredFps': '{fps} declared',
 

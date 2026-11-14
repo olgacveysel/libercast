@@ -20,6 +20,21 @@ interface FfprobeStream {
   avg_frame_rate?: string
   r_frame_rate?: string
   bit_rate?: string
+  /*
+   * What decides whether the GPU will take the picture.
+   *
+   * ffprobe reports all four from `-show_streams`, which was already being
+   * asked for; they were simply not being read. They matter because a machine
+   * can report hardware decoding as available and still decode a particular
+   * stream in software, and these are the properties that usually explain it:
+   * an interlaced stream, a profile above what the decoder supports, or a
+   * pixel format it was never built for.
+   */
+  profile?: string
+  level?: number
+  pix_fmt?: string
+  /** 'progressive', 'tt', 'bb', 'tb', 'bt', or 'unknown'. */
+  field_order?: string
   tags?: { language?: string; title?: string; LANGUAGE?: string; TITLE?: string }
   disposition?: { default?: number; forced?: number }
 }
@@ -241,12 +256,22 @@ function toVideoInfo(stream: FfprobeStream, formatBitrate: string | undefined): 
   const fps = parseFrameRate(stream.avg_frame_rate) ?? parseFrameRate(stream.r_frame_rate)
   const bitrate = Number(stream.bit_rate ?? formatBitrate ?? '')
 
+  // ffprobe says 'unknown' when the stream does not declare one, which is not
+  // the same as knowing it is progressive — so it is kept as null rather than
+  // being flattened into a claim.
+  const fieldOrder = stream.field_order && stream.field_order !== 'unknown' ? stream.field_order : null
+
   return {
     codec: stream.codec_name ?? null,
     width: stream.width ?? null,
     height: stream.height ?? null,
     fps,
-    bitrate: Number.isFinite(bitrate) && bitrate > 0 ? bitrate : null
+    bitrate: Number.isFinite(bitrate) && bitrate > 0 ? bitrate : null,
+    profile: stream.profile ?? null,
+    level: typeof stream.level === 'number' && stream.level > 0 ? stream.level : null,
+    pixelFormat: stream.pix_fmt ?? null,
+    fieldOrder,
+    interlaced: fieldOrder === null ? null : fieldOrder !== 'progressive'
   }
 }
 

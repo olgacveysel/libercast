@@ -113,7 +113,11 @@ async function main(): Promise<void> {
         height: 1080,
         avg_frame_rate: '50/1',
         r_frame_rate: '90000/1',
-        bit_rate: '4500000'
+        bit_rate: '4500000',
+        profile: 'High',
+        level: 40,
+        pix_fmt: 'yuv420p',
+        field_order: 'tt'
       },
       { codec_type: 'audio', codec_name: 'aac', channels: 6, tags: { language: 'ger' } }
     ],
@@ -130,6 +134,36 @@ async function main(): Promise<void> {
   check('reads the bitrate', probe.videoInfo?.bitrate === 4_500_000)
   check('reads the codec', probe.videoInfo?.codec === 'h264')
   check('still reads tracks alongside', probe.tracks.audio[0]?.label === 'German (5.1)', probe.tracks.audio[0]?.label)
+
+  /*
+   * The four properties that say whether the GPU will take the picture.
+   *
+   * ffprobe has always reported them and nothing read them. They are here
+   * because a controlled test showed this application decoding in software on
+   * a machine that offers hardware decoding, and the muxing — the obvious
+   * suspect — was ruled out: the same clip muxed plainly and muxed the
+   * LiberCast way both got the hardware decoder. What is left is the stream
+   * itself, and an interlaced one is the leading explanation.
+   */
+  check('reads the profile', probe.videoInfo?.profile === 'High', probe.videoInfo?.profile)
+  check('reads the level', probe.videoInfo?.level === 40, probe.videoInfo?.level)
+  check('reads the pixel format', probe.videoInfo?.pixelFormat === 'yuv420p', probe.videoInfo?.pixelFormat)
+  check('reads the field order', probe.videoInfo?.fieldOrder === 'tt', probe.videoInfo?.fieldOrder)
+  check('and calls top-field-first interlaced', probe.videoInfo?.interlaced === true)
+
+  const progressive = parseProbeOutput(
+    JSON.stringify({ streams: [{ codec_type: 'video', codec_name: 'h264', field_order: 'progressive' }] })
+  )
+  check('progressive is not interlaced', progressive.videoInfo?.interlaced === false)
+
+  // 'unknown' is ffprobe saying the stream declares nothing, which is not the
+  // same as knowing it is progressive. Flattening it would turn an absence of
+  // information into a claim, on the one line someone reads to answer this.
+  const silent = parseProbeOutput(
+    JSON.stringify({ streams: [{ codec_type: 'video', codec_name: 'h264', field_order: 'unknown' }] })
+  )
+  check('an undeclared field order stays unknown', silent.videoInfo?.interlaced === null, silent.videoInfo?.interlaced)
+  check('and is not reported as a field order', silent.videoInfo?.fieldOrder === null)
 
   const noVideo = parseProbeOutput(JSON.stringify({ streams: [{ codec_type: 'audio', codec_name: 'aac' }] }))
   check('a radio stream has no video info', noVideo.videoInfo === null)
