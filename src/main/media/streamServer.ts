@@ -546,6 +546,19 @@ export class StreamServer {
     child.on('error', (error) => {
       log.error(`ffmpeg could not be started for ${session.label}`, error)
       this.kill(session)
+
+      /*
+       * And tell the player, rather than leaving it holding an open socket.
+       *
+       * `exit` is where the response is normally ended, and `exit` may never
+       * fire for a process that failed to start — there was no process. The
+       * headers have already gone out, `stdout` was piped to the response and
+       * `pipe` does not end its destination when the source is destroyed, so
+       * the player sat on a connection that would never produce another byte
+       * until its own stall detector gave up twenty seconds later. The
+       * failure was known immediately; only the spinner was slow.
+       */
+      if (!response.writableEnded) response.end()
     })
 
     child.stderr?.on('data', (chunk: Buffer) => {

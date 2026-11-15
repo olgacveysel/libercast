@@ -55,38 +55,7 @@ export function createWindow(): BrowserWindow {
     mainWindow = null
   })
 
-  /*
-   * External links open in the user's browser, never inside the app shell —
-   * and only if they are web links.
-   *
-   * `shell.openExternal` hands the string to the operating system, which will
-   * happily act on far more than http: a `file:` URL opens a file, and on
-   * Windows the scheme table reaches a good deal further than that. Nothing
-   * in this application needs to open anything but a web page, and the
-   * strings reaching here are not all ours — a playlist, a guide and a
-   * subtitle file are all somebody else's text.
-   */
-  window.webContents.setWindowOpenHandler(({ url }) => {
-    if (isWebLink(url)) void shell.openExternal(url)
-    else log.warn(`refused to open a non-web link: ${url.slice(0, 80)}`)
-    return { action: 'deny' }
-  })
-
-  /*
-   * The window itself never navigates.
-   *
-   * It loads the renderer once and stays there; every other destination is a
-   * link, handled above. Without this, anything that can set `location` —
-   * including a bug in our own code — replaces the application with a remote
-   * page that then inherits the preload bridge.
-   */
-  window.webContents.on('will-navigate', (event, url) => {
-    const here = window.webContents.getURL()
-    if (url === here) return
-    event.preventDefault()
-    log.warn(`blocked navigation to ${url.slice(0, 80)}`)
-    if (isWebLink(url)) void shell.openExternal(url)
-  })
+  guardWindow(window)
 
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     void window.loadURL(process.env['ELECTRON_RENDERER_URL'])
@@ -95,6 +64,42 @@ export function createWindow(): BrowserWindow {
   }
 
   return window
+}
+
+/**
+ * The shell rules every window in this application must have.
+ *
+ * Written once and exported because the pop-out player did not have them. The
+ * main window was hardened and `windows/detached.ts` kept its own copy of the
+ * original — `shell.openExternal` on any URL at all, and no navigation
+ * handler — so the window with the smallest chrome had the weakest guards.
+ * Two copies of a security rule is one copy too many.
+ *
+ * Both rules exist because the strings arriving here are not all ours. A
+ * playlist, a guide and a subtitle file are somebody else's text.
+ *
+ * - `shell.openExternal` hands a string to the operating system, which acts on
+ *   far more than http: a `file:` URL opens a file, and on Windows the scheme
+ *   table reaches a good deal further. Only web links are passed on.
+ * - A window loads the renderer once and stays there. Without the navigation
+ *   block, anything that can set `location` — a bug in our own code included
+ *   — replaces the application with a remote page that then inherits the
+ *   preload bridge.
+ */
+export function guardWindow(window: BrowserWindow): void {
+  window.webContents.setWindowOpenHandler(({ url }) => {
+    if (isWebLink(url)) void shell.openExternal(url)
+    else log.warn(`refused to open a non-web link: ${url.slice(0, 80)}`)
+    return { action: 'deny' }
+  })
+
+  window.webContents.on('will-navigate', (event, url) => {
+    const here = window.webContents.getURL()
+    if (url === here) return
+    event.preventDefault()
+    log.warn(`blocked navigation to ${url.slice(0, 80)}`)
+    if (isWebLink(url)) void shell.openExternal(url)
+  })
 }
 
 /**

@@ -27,7 +27,10 @@ const TICK_MS = 10 * 60_000
  */
 class AutoRefresh {
   private timer: ReturnType<typeof setInterval> | null = null
-  private running = false
+  /** When the in-flight run began, or null when nothing is running. */
+  private runningSince: number | null = null
+  /** Identifies the in-flight run, so a late finisher cannot clear a newer one. */
+  private runId = 0
   private isBusy: () => boolean = () => false
 
   /** Lets the stream server veto a refresh while a session is open. */
@@ -48,7 +51,7 @@ class AutoRefresh {
   }
 
   private async tick(): Promise<void> {
-    if (this.running) return
+    if (!runIsStale(this.runningSince, Date.now())) return
 
     const verdict = refreshVerdict(getSettings(), Date.now())
     if (verdict !== 'due') return
@@ -63,15 +66,33 @@ class AutoRefresh {
 
   /** Runs a refresh now, whatever the schedule says. Used by the manual button. */
   async run(): Promise<AutoRefreshReport> {
-    // `tick` checks this before calling in; the manual button calls straight
-    // here and did not, so pressing Refresh during an automatic run started a
-    // second one over the top of it — two syncs writing the same catalogue.
-    if (this.running) {
+    /*
+     * One refresh at a time — but not forever.
+     *
+     * `tick` checked this before calling in; the manual button called straight
+     * here and did not, so pressing Refresh during an automatic run started a
+     * second one over the top of it — two syncs writing the same catalogue.
+     *
+     * The flag was then a latch. It is cleared in a `finally`, which runs when
+     * the run *settles*; a run that hangs settles never, so one stalled guide
+     * feed left the flag set and refused every later refresh, manual button
+     * included, until the application was restarted. The guide download now
+     * has a deadline of its own, which should make that unreachable — but the
+     * guard is here to prevent two syncs, not to disable the feature if
+     * something else ever hangs, so it expires.
+     */
+    const started = Date.now()
+    if (!runIsStale(this.runningSince, started)) {
       throw new Error('A refresh is already running.')
     }
 
-    this.running = true
-    const started = Date.now()
+    if (this.runningSince !== null) {
+      const minutes = Math.round((started - this.runningSince) / 60_000)
+      log.warn(`the refresh started ${minutes} minutes ago never finished; starting another`)
+    }
+
+    this.runningSince = started
+    const id = ++this.runId
 
     const report: AutoRefreshReport = { at: started, sources: [], programmes: null, epgError: null }
 
@@ -138,13 +159,36 @@ class AutoRefresh {
         report.epgError = guideErrors.length > 0 ? guideErrors.join('; ') : null
       }
     } finally {
-      this.running = false
+      // Only if this is still the current run: a hung predecessor that wakes
+      // up long afterwards must not clear the flag out from under its
+      // replacement.
+      if (this.runId === id) this.runningSince = null
     }
 
     setSettings({ lastAutoRefresh: report })
     getMainWindow()?.webContents.send('sources:refreshed', report)
     return report
   }
+}
+
+/**
+ * How long a run may be in flight before another is allowed to start.
+ *
+ * Long enough that no honest refresh reaches it — a large guide on a slow
+ * provider is minutes, not half an hour — and short enough that a user who
+ * presses Refresh after lunch is not still being told no.
+ */
+export const STALE_RUN_MS = 30 * 60_000
+
+/**
+ * Whether a new run may start, given when the current one began.
+ *
+ * Pulled out as a pure function so the interesting case can be tested without
+ * hanging a real refresh for thirty minutes.
+ */
+export function runIsStale(runningSince: number | null, now: number): boolean {
+  if (runningSince === null) return true
+  return now - runningSince >= STALE_RUN_MS
 }
 
 export type RefreshVerdict = 'off' | 'not-yet' | 'due'

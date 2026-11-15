@@ -1,7 +1,7 @@
 import { createGunzip } from 'node:zlib'
 import { Readable } from 'node:stream'
 import type { ParsedProgramme } from './types'
-import { request, type FetchOptions } from '@main/util/http'
+import { request, withIdleDeadline, type FetchOptions } from '@main/util/http'
 
 /**
  * XMLTV reader.
@@ -133,7 +133,12 @@ export function parseChannelBlock(block: string): XmltvChannel | null {
   }
 }
 
+/** How long a guide download may go silent before it is given up on. */
+const IDLE_MS = 60_000
+
 export interface XmltvOptions extends FetchOptions {
+  /** Overrides the silence a guide download is allowed. Used by the tests. */
+  idleMs?: number
   /** Minutes added to every timestamp, correcting provider timezone drift. */
   offsetMinutes?: number
   /** Programmes ending before this are dropped during parsing. */
@@ -238,7 +243,19 @@ export async function loadXmltv(url: string, options: XmltvOptions): Promise<num
   const response = await request(url, { ...options, timeoutMs: options.timeoutMs ?? 300_000 })
   if (!response.body) throw new Error('EPG source returned an empty response')
 
-  const raw = Readable.fromWeb(response.body as never) as unknown as AsyncIterable<Buffer>
+  /*
+   * A gap, not a total, is what says the feed is dead.
+   *
+   * A real guide can take minutes; a provider that stops sending partway
+   * cannot be distinguished from a slow one by elapsed time alone. The clock
+   * restarts on every chunk, so a large feed is never penalised for being
+   * large and a silent one fails in a minute instead of never.
+   */
+  const raw = withIdleDeadline(
+    Readable.fromWeb(response.body as never) as unknown as AsyncIterable<Buffer>,
+    options.idleMs ?? IDLE_MS,
+    url
+  )
 
   // Content-type and file extension both lie regularly here: xmltv.php usually
   // serves gzip with a text/html header. Sniff the magic bytes instead.
@@ -258,8 +275,18 @@ export async function loadXmltv(url: string, options: XmltvOptions): Promise<num
     }
   }
 
-  let stream: NodeJS.ReadableStream = Readable.from(replay())
-  if (gzipped) stream = stream.pipe(createGunzip())
+  const source = Readable.from(replay())
+  let stream: NodeJS.ReadableStream = source
+
+  if (gzipped) {
+    const gunzip = createGunzip()
+    // `pipe` does not forward an error to its destination, so without this a
+    // stalled source would reject on `source` while the consumer sat waiting
+    // on `gunzip` — the same hang the deadline above exists to end, one pipe
+    // further along.
+    source.on('error', (error) => gunzip.destroy(error))
+    stream = source.pipe(gunzip)
+  }
   stream.setEncoding('utf8')
 
   return scanXmltv(stream as unknown as AsyncIterable<string>, options)

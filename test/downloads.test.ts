@@ -6,8 +6,11 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
-import { extensionFor, safeFileName } from '@main/media/downloader'
+import { downloader, extensionFor, safeFileName } from '@main/media/downloader'
 import * as repo from '@main/db/repo/downloads'
+import { importCatalog } from '@main/db/repo/import'
+import { createPlaylist } from '@main/db/repo/playlists'
+import * as catalog from '@main/db/repo/catalog'
 import { getDb } from '@main/db'
 
 let failures = 0
@@ -91,6 +94,36 @@ function serve(filePath: string): Promise<Fixture> {
  * The transfer half of the downloader, isolated from Electron and the database
  * so the resume behaviour itself can be asserted.
  */
+/**
+ * The watchdog half of `Downloader.transfer`, in isolation.
+ *
+ * Same shape as the real one — a timer reset by every chunk, destroying the
+ * source on silence — exercised here against a server that sends one buffer
+ * and then stops. The real one cannot be reached without Electron, a queue
+ * and a provider; this is the part with the behaviour in it.
+ */
+async function transferWithWatchdog(url: string, target: string, stallMs: number): Promise<void> {
+  const response = await fetch(url)
+  if (!response.body) throw new Error('no body')
+
+  const source = Readable.fromWeb(response.body as never)
+  const sink = createWriteStream(target)
+
+  let idle: ReturnType<typeof setTimeout> | undefined
+  const bump = (): void => {
+    clearTimeout(idle)
+    idle = setTimeout(() => source.destroy(new Error('The provider stopped sending')), stallMs)
+  }
+  bump()
+  source.on('data', bump)
+
+  try {
+    await pipeline(source, sink)
+  } finally {
+    clearTimeout(idle)
+  }
+}
+
 async function transfer(url: string, target: string): Promise<{ status: number; bytes: number }> {
   let startAt: number
   try {
@@ -250,6 +283,106 @@ async function main(): Promise<void> {
   )
   check('the restarted file is still byte-identical', sha(target2) === expected)
 
+  /*
+   * Cancelling in the first moments.
+   *
+   * `drain` claims the slot with a placeholder job before `run` is launched,
+   * and `run` used to replace that placeholder with a freshly built object.
+   * `pause` and `cancel` find the job by id and set their flag on whatever is
+   * in the map at that instant — so a cancel during the first second, while
+   * the provider was still being asked for a URL, set it on an object `run`
+   * was about to discard. The transfer carried on to the end, and the row
+   * said cancelled.
+   *
+   * The resolve has to succeed for this to test anything: it is the step the
+   * cancel arrives during, and only a download that gets past it reaches the
+   * transfer the cancel was supposed to stop. With the flags lost, this
+   * download runs to completion and the row says `completed` — the user
+   * pressed cancel and got the file anyway.
+   */
+  console.log('\nCancelling a download before it starts')
+
+  // M3U, so the channel's own URL is the stream and resolving it needs no
+  // provider round trip — the resolve has to *succeed* for this to test
+  // anything. Pointed at the fixture server, which is a real 3 MB file.
+  const playlist = createPlaylist({ name: 'Provider', kind: 'm3u', url: 'http://x/list.m3u' })
+  importCatalog(
+    playlist.id,
+    'live',
+    [{ externalId: 'c', name: 'Films' }],
+    [
+      {
+        externalId: '1',
+        name: 'A Film',
+        categoryExternalId: 'c',
+        number: null,
+        logoUrl: null,
+        epgChannelId: null,
+        streamUrl: fixture.url,
+        containerExtension: 'ts',
+        isAdult: false
+      }
+    ]
+  )
+
+  const channel = catalog.queryChannels({ playlistId: playlist.id, limit: 1 })[0]!
+  const queued = downloader.enqueue({
+    itemType: 'movie',
+    itemId: channel.id,
+    channelId: channel.id,
+    title: 'A Film'
+  })
+
+  // Same tick: `run` has not had a chance to get past its first await.
+  downloader.cancel(queued.id)
+
+  // Long enough for the resolve to fail and the row to be written.
+  await new Promise((resolve) => setTimeout(resolve, 300))
+
+  const settled = repo.getDownload(queued.id)
+  check(
+    'a download cancelled at once does not run to completion',
+    settled?.status !== 'completed',
+    settled?.status
+  )
+  check('and is reported as cancelled', settled?.status === 'cancelled', settled?.status)
+  check('with no leftover error', settled?.error == null, settled?.error)
+
+  /*
+   * A provider that goes quiet partway.
+   *
+   * `pipeline` waits on the source, the source waits on a socket the provider
+   * has abandoned, and nothing timed it out: the row said `downloading` for
+   * ever, the slot was never freed, and everything queued behind it waited
+   * with it. The watchdog is reset by every chunk, so only a silence trips it
+   * — a slow download is not a stalled one.
+   */
+  console.log('\nA transfer that stops receiving')
+
+  const stalling = createServer((_req, res) => {
+    res.writeHead(200, { 'Content-Type': 'application/octet-stream' })
+    res.write(Buffer.alloc(64 * 1024))
+    // ...and then nothing. The socket stays open.
+  })
+  await new Promise<void>((resolve) => stalling.listen(0, '127.0.0.1', resolve))
+  const stallingUrl = `http://127.0.0.1:${(stalling.address() as AddressInfo).port}/x.ts`
+
+  const stallTarget = join(work, 'stalled.bin')
+  let stallError: string | null = null
+  const stallStarted = Date.now()
+  try {
+    await transferWithWatchdog(stallingUrl, stallTarget, 400)
+  } catch (error) {
+    stallError = error instanceof Error ? error.message : String(error)
+  }
+  const stallElapsed = Date.now() - stallStarted
+
+  check('a silent provider is given up on', stallError !== null, stallError)
+  check('and it says what happened', stallError?.includes('stopped sending') === true, stallError)
+  check('without waiting out a whole download', stallElapsed < 5000, stallElapsed)
+  check('the partial file is kept, so it can resume', statSync(stallTarget).size > 0)
+
+  stalling.close()
   fixture.server.close()
 }
 

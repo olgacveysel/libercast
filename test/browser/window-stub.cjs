@@ -16,3 +16,17 @@ const fake = {
 
 exports.getMainWindow = () => fake
 exports.createWindow = () => fake
+
+/**
+ * The real one attaches the shell rules every window must have. The harness
+ * runs a real BrowserWindow, so this records the call and leaves the window
+ * alone — what matters here is that `openDetached` asks for it at all, which
+ * `test/shellguards.test.ts` checks against the source, and that the manager
+ * still works with it in place.
+ */
+globalThis.__guarded = []
+exports.guardWindow = (window) => {
+  globalThis.__guarded.push(window)
+}
+
+exports.isWebLink = (value) => /^https?:\/\//i.test(value)

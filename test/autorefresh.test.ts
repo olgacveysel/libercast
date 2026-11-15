@@ -1,4 +1,4 @@
-import { refreshVerdict } from '@main/autoRefresh'
+import { refreshVerdict, runIsStale, STALE_RUN_MS } from '@main/autoRefresh'
 import type { AutoRefreshReport } from '@shared/types'
 
 let failures = 0
@@ -64,6 +64,24 @@ check(
   'lengthening the interval postpones it',
   refreshVerdict({ autoRefreshHours: 48, lastAutoRefresh: ran(now - 12 * HOUR) }, now) === 'not-yet'
 )
+
+/*
+ * The guard that stops two syncs must not become a latch.
+ *
+ * It is cleared in a `finally`, which runs when the run settles — and a run
+ * that hangs settles never. One stalled guide feed used to leave the flag set
+ * and refuse every later refresh, the manual button included, until the
+ * application was restarted. The guide download has a deadline of its own now;
+ * this is the second line, so that anything else that ever hangs costs half an
+ * hour rather than the feature.
+ */
+console.log('\nWhen a refresh is already in flight')
+check('nothing running means go ahead', runIsStale(null, now))
+check('a run that just started blocks another', !runIsStale(now, now))
+check('and still blocks it a minute later', !runIsStale(now - 60_000, now))
+check('and most of the way through the window', !runIsStale(now - (STALE_RUN_MS - 1000), now))
+check('but one that has outlived the window does not', runIsStale(now - STALE_RUN_MS, now))
+check('nor one far past it', runIsStale(now - 4 * STALE_RUN_MS, now))
 
 console.log(failures === 0 ? '\nautorefresh: all passed' : `\nautorefresh: ${failures} failed`)
 if (failures > 0) process.exitCode = 1

@@ -102,6 +102,69 @@ async function withBodyDeadline<T>(url: string, ms: number, work: Promise<T>): P
   }
 }
 
+/**
+ * A deadline on the *gaps*, for a body read in pieces.
+ *
+ * `withBodyDeadline` suits a body read in one go: one clock for the whole
+ * thing. A guide is different — a large XMLTV feed legitimately takes minutes,
+ * so a total deadline is either too short for a real feed or too long to catch
+ * a dead one. What is never legitimate is a long silence partway through.
+ *
+ * So the clock is restarted on every chunk, and only a gap trips it. The
+ * source is closed on the way out, which matters: abandoning a pending read
+ * would leave the socket open with nothing left to notice it.
+ *
+ * This exists because `loadXmltv` consumes `response.body` itself and so had
+ * no deadline of any kind. A provider that answered 200 and then stopped
+ * sending left the refresh awaiting a chunk that never came — and because
+ * nothing settles, the `finally` that clears the "a refresh is running" flag
+ * never ran either, so every later refresh was refused until the application
+ * was restarted. One stalled feed disabled the feature.
+ */
+export async function* withIdleDeadline<T>(
+  source: AsyncIterable<T>,
+  ms: number,
+  label: string
+): AsyncGenerator<T> {
+  const iterator = source[Symbol.asyncIterator]()
+
+  try {
+    for (;;) {
+      let timer: NodeJS.Timeout | undefined
+      const deadline = new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error(`Nothing received for ${Math.round(ms / 1000)}s: ${redact(label)}`)),
+          ms
+        )
+      })
+
+      let step: IteratorResult<T>
+      try {
+        step = await Promise.race([iterator.next(), deadline])
+      } finally {
+        clearTimeout(timer)
+      }
+
+      if (step.done) return
+      yield step.value
+    }
+  } finally {
+    /*
+     * Started, not awaited.
+     *
+     * `return()` on an async generator suspended at an `await` does not settle
+     * until that await does — and the generator this exists for is suspended
+     * on a read that will never complete. Awaiting the cleanup therefore hung
+     * on exactly the stall it had just detected, swallowing the error it was
+     * about to throw. Found by the test for it, which reported nothing at all
+     * and exited zero.
+     *
+     * Calling it is still worth doing: for a stream it destroys the socket.
+     */
+    void Promise.resolve(iterator.return?.()).catch(() => undefined)
+  }
+}
+
 export async function requestJson<T>(url: string, options: FetchOptions = {}): Promise<T> {
   const response = await request(url, options)
   const text = await withBodyDeadline(url, options.timeoutMs ?? 30_000, response.text())

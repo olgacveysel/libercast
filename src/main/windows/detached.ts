@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { BrowserWindow, screen, shell } from 'electron'
+import { BrowserWindow, screen } from 'electron'
 import { is } from '@electron-toolkit/utils'
 import {
   centeredIn,
@@ -9,7 +9,7 @@ import {
   type DisplayInfo
 } from '@shared/detached'
 import { createLogger } from '@main/util/logger'
-import { getMainWindow } from '@main/window'
+import { getMainWindow, guardWindow } from '@main/window'
 
 const log = createLogger('detached')
 
@@ -95,10 +95,10 @@ export function openDetached(channelId: number, tile: number): void {
   windows.set(tile, window)
 
   window.on('ready-to-show', () => window.show())
-  window.webContents.setWindowOpenHandler(({ url }) => {
-    void shell.openExternal(url)
-    return { action: 'deny' }
-  })
+
+  // The same rules as the main window, from the same function. This window
+  // used to keep its own copy of the unhardened original.
+  guardWindow(window)
 
   window.on('closed', () => {
     windows.delete(tile)

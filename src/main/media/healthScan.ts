@@ -90,7 +90,10 @@ async function check(channelId: number, name: string): Promise<ChannelHealth> {
     // Resolving can fail on its own — a channel whose playlist was removed, an
     // Xtream account that no longer authenticates, or a portal that will not
     // hand out a link for this channel.
-    stream = await resolveProviderStream({ type: 'channel', id: channelId })
+    // The scan opens a stream and shows nobody anything, so the lock does not
+    // apply — and a scan that reported every locked channel as broken would
+    // be worse than useless.
+    stream = await resolveProviderStream({ type: 'channel', id: channelId }, 'scan')
   } catch (error) {
     return { channelId, name, ok: false, reason: errorMessage(error), checkedAt: Date.now() }
   }

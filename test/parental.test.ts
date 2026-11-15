@@ -6,6 +6,7 @@ import { importCatalog } from '@main/db/repo/import'
 import { createPlaylist } from '@main/db/repo/playlists'
 import * as catalog from '@main/db/repo/catalog'
 import * as parental from '@main/secure/parental'
+import { resolveProviderStream } from '@main/media/resolve'
 import { buildPayload, decryptPayload, encryptPayload, exportBackup, importBackup, isEncrypted } from '@main/secure/backup'
 import { readFileSync } from 'node:fs'
 
@@ -36,7 +37,11 @@ async function main(): Promise<void> {
     mk('2', 'Kids Movies', 'kids', false),
     mk('3', 'Late Night XXX', 'adult', true),
     mk('4', 'Civic News', 'news', false),
-    mk('5', 'Poker Central', 'news', false)
+    mk('5', 'Poker Central', 'news', false),
+    // Accents and punctuation, which is where the two halves of the lock used
+    // to disagree: the list filter matches the folded name, the play-time
+    // check used the raw one.
+    mk('6', 'Pôker-Gecesi!', 'news', false)
   ]
 
   importCatalog(playlist.id, 'live', categories, channels)
@@ -46,7 +51,7 @@ async function main(): Promise<void> {
   console.log('\nWith no PIN set')
   check('parental controls start off', !parental.isEnabled())
   check('nothing is locked', !parental.isLocked())
-  check('every channel is visible', all() === 5, all())
+  check('every channel is visible', all() === 6, all())
 
   console.log('\nSetting a PIN')
   parental.setPin(null, '1234')
@@ -88,7 +93,7 @@ async function main(): Promise<void> {
     autoLockMinutes: 0
   })
   parental.lock()
-  check('locking hides adult-flagged channels', all() === 4, all())
+  check('locking hides adult-flagged channels', all() === 5, all())
   check(
     'the adult channel is gone from queries',
     !catalog.queryChannels({ playlistId: playlist.id, limit: 50 }).some((c) => c.name.includes('XXX'))
@@ -109,7 +114,7 @@ async function main(): Promise<void> {
   })
   parental.lock()
 
-  check('a locked category hides its channels', all() === 2, all())
+  check('a locked category hides its channels', all() === 3, all())
   check(
     'and the category disappears from the sidebar',
     !catalog.listCategories(playlist.id, 'live').some((c) => c.name === 'Kids')
@@ -128,6 +133,83 @@ async function main(): Promise<void> {
     'and only the matching one',
     !catalog.queryChannels({ playlistId: playlist.id, limit: 50 }).some((c) => c.name === 'Poker Central')
   )
+
+  /*
+   * Hidden and playable was the worst of both.
+   *
+   * Lists filter on `name_folded` — accents stripped, punctuation collapsed —
+   * while the check that decides whether something actually plays used a
+   * plain `toLowerCase()`. "Pôker-Gecesi!" folds to "poker gecesi" and so
+   * disappeared from every list under the keyword "poker", then played
+   * perfectly when opened from a favourite or typed on the remote.
+   *
+   * The invariant is the point, not either half: anything a list hides must
+   * refuse to play, and anything it shows must play. Checked across the whole
+   * catalogue so a future divergence of any kind is caught, not just this one.
+   */
+  console.log('\nWhat the lists hide and what will play')
+  check(
+    'an accented name is hidden too',
+    !catalog.queryChannels({ playlistId: playlist.id, limit: 50 }).some((c) => c.name === 'Pôker-Gecesi!')
+  )
+
+  const visible = new Set(
+    catalog.queryChannels({ playlistId: playlist.id, limit: 100 }).map((c) => c.id)
+  )
+  parental.unlock('1234')
+  const everything = catalog.queryChannels({ playlistId: playlist.id, limit: 100 })
+  parental.lock()
+
+  const disagreements = everything.filter((channel) => {
+    const blocked = parental.isBlocked({
+      categoryId: channel.categoryId,
+      isAdult: channel.isAdult,
+      name: channel.name
+    })
+    return blocked === visible.has(channel.id)
+  })
+
+  check(
+    'every hidden channel also refuses to play, and no shown one does',
+    disagreements.length === 0,
+    disagreements.map((c) => c.name)
+  )
+
+  /*
+   * The lock is on watching, not on acquiring.
+   *
+   * The first version of this checked wherever a stream was fetched, which
+   * swept up the recorder — so a recording a parent scheduled while unlocked
+   * was refused at two in the morning when the auto-lock had re-engaged on
+   * its own. A decision already made, undone by a timer, silently.
+   *
+   * Writing a locked channel to disk shows a child nothing; playing the file
+   * back shows them everything, and that is where the check now sits.
+   *
+   * The assertion is about which refusal, not whether there is one: resolving
+   * for real needs a provider, and this catalogue has none. A 'record' that
+   * fails for some other reason is fine. A 'record' that fails because the
+   * channel is locked is the regression.
+   */
+  console.log('\nWhy the stream is being fetched')
+
+  const locked = everything.find((c) =>
+    parental.isBlocked({ categoryId: c.categoryId, isAdult: c.isAdult, name: c.name })
+  )!
+
+  async function refusalFor(purpose: 'play' | 'record' | 'download' | 'scan'): Promise<string> {
+    try {
+      await resolveProviderStream({ type: 'channel', id: locked.id }, purpose)
+      return ''
+    } catch (error) {
+      return error instanceof Error ? error.message : String(error)
+    }
+  }
+
+  check('a locked channel will not play', /locked/i.test(await refusalFor('play')))
+  check('but recording it is not refused for being locked', !/locked/i.test(await refusalFor('record')))
+  check('nor is downloading it', !/locked/i.test(await refusalFor('download')))
+  check('nor is the health scan', !/locked/i.test(await refusalFor('scan')))
 
   console.log('\nFiltering reaches every screen, not just the list')
   const newsChannel = catalog
@@ -159,7 +241,7 @@ async function main(): Promise<void> {
   console.log('\nUnlocking and auto-lock')
   check('the wrong PIN does not unlock', !parental.unlock('0000'))
   check('the right PIN does', parental.unlock('1234'))
-  check('everything is visible again', all() === 5, all())
+  check('everything is visible again', all() === 6, all())
 
   parental.setRules({ lockedCategoryIds: [], keywords: [], lockAdult: true, autoLockMinutes: 0 })
   check('rules cannot be changed while locked', (() => {
@@ -235,6 +317,43 @@ try {
 }
 check('even the correct PIN waits out the cooldown', rightPinDuringCooldown !== null)
 
+/*
+ * The cooldown has to cover every door that takes the PIN.
+ *
+ * It used to live inside `unlock`, which left two others with no counting at
+ * all: `setPin` takes the current PIN, and `disable` takes the PIN. An
+ * attacker sitting at the machine could walk the whole four-digit space
+ * through the "change PIN" dialog without ever being made to wait — through
+ * the form whose entire purpose is to require the PIN.
+ *
+ * Checked while the cooldown from above is still running, so this needs no
+ * second lockout of its own.
+ */
+let setPinDuringCooldown: string | null = null
+try {
+  parental.setPin('1234', '5678')
+} catch (error) {
+  setPinDuringCooldown = error instanceof Error ? error.message : String(error)
+}
+check(
+  'changing the PIN waits out the cooldown too',
+  setPinDuringCooldown?.includes('Too many wrong attempts') === true,
+  setPinDuringCooldown
+)
+
+let disableDuringCooldown: string | null = null
+try {
+  parental.disable('1234')
+} catch (error) {
+  disableDuringCooldown = error instanceof Error ? error.message : String(error)
+}
+check(
+  'and so does turning parental controls off',
+  disableDuringCooldown?.includes('Too many wrong attempts') === true,
+  disableDuringCooldown
+)
+check('which are still on', parental.isEnabled())
+
 console.log('\nRestore')
   const payload = buildPayload(false)
   check('the payload references channels by provider id, not row id', (() => {
@@ -280,6 +399,7 @@ function mk(externalId: string, name: string, category: string, isAdult: boolean
     containerExtension: 'ts',
     isAdult
   }
+
 }
 
 void main().then(

@@ -62,10 +62,49 @@ function withOtherExtensions(url: string, extension: string): string[] {
  * works for the next few minutes. There is no version of that which is not a
  * network round trip at the moment of pressing play.
  */
-export async function resolveProviderStream(source: StreamSource): Promise<ProviderStream> {
+/**
+ * Why a stream is being resolved.
+ *
+ * `play` means a person is about to watch it, and the parental lock applies.
+ * `record` and `download` write a file for later; the lock is applied when
+ * that file is played instead. `scan` is the health check, which opens a
+ * stream and reads nothing a person sees.
+ */
+export type ResolvePurpose = 'play' | 'record' | 'download' | 'scan'
+
+/** The lock check used by the two branches that return a file from disk. */
+function assertPlayable(channelId: number, kind: 'recording' | 'download'): void {
+  const channel = getChannel(channelId)
+  // A channel removed by a later sync leaves the file with nothing to check
+  // against. Refusing would strand files a parent recorded deliberately, so
+  // an unknown channel is treated as it was when the file was made.
+  if (!channel) return
+
+  if (isBlocked({ categoryId: channel.categoryId, isAdult: channel.isAdult, name: channel.name })) {
+    throw new Error(
+      kind === 'recording'
+        ? 'This recording is of a locked channel. Unlock parental controls to play it.'
+        : 'This download is of a locked channel. Unlock parental controls to play it.'
+    )
+  }
+}
+
+export async function resolveProviderStream(
+  source: StreamSource,
+  purpose: ResolvePurpose = 'play'
+): Promise<ProviderStream> {
+  const locked = purpose === 'play'
+
   if (source.type === 'recording') {
     const recording = getRecording(source.id)
     if (!recording?.filePath) throw new Error('Recording file is missing')
+
+    // A file on disk is still the channel it came from. This branch returned
+    // before the check below, so a locked channel recorded earlier played
+    // back with no PIN at all — which is the one case parental controls most
+    // obviously exist for.
+    if (locked && recording.channelId !== null) assertPlayable(recording.channelId, 'recording')
+
     return {
       url: recording.filePath,
       userAgent: null,
@@ -82,6 +121,10 @@ export async function resolveProviderStream(source: StreamSource): Promise<Provi
     if (!download?.filePath || download.status !== 'completed') {
       throw new Error('That download is not finished yet')
     }
+
+    // Same reasoning as a recording: the file is the channel it came from.
+    if (locked && download.channelId !== null) assertPlayable(download.channelId, 'download')
+
     return {
       url: download.filePath,
       userAgent: null,
@@ -105,7 +148,10 @@ export async function resolveProviderStream(source: StreamSource): Promise<Provi
 
     // The episode branch returns before the shared check below, so it makes
     // its own. The flags live on the series, not the episode.
-    if (isBlocked({ categoryId: channel.categoryId, isAdult: channel.isAdult, name: channel.name })) {
+    if (
+      locked &&
+      isBlocked({ categoryId: channel.categoryId, isAdult: channel.isAdult, name: channel.name })
+    ) {
       throw new Error('This series is locked. Unlock parental controls to play it.')
     }
 
@@ -170,15 +216,29 @@ export async function resolveProviderStream(source: StreamSource): Promise<Provi
    *
    * It used to be applied only when a list was drawn, which hides locked
    * channels and stops there. Anything holding a channel id — a favourite, a
-   * recent item, the resume card, a scheduled recording, a download queued
-   * before the lock was set, a number typed on the remote — went straight
-   * past it.
+   * recent item, the resume card, a number typed on the remote — went
+   * straight past it. This function is the one place every one of those ends
+   * up, which is why the check belongs here rather than in four handlers that
+   * each have to remember.
    *
-   * This function is the one place playback, recording, downloading and the
-   * health scan all pass through, which is why the check belongs here rather
-   * than in four handlers that each have to remember.
+   * But only for `play`. The first version of this gated acquisition too, and
+   * that was the wrong line to draw: writing a locked channel to disk shows a
+   * child nothing, while playing the file back shows them everything — and
+   * the file branches above returned before any check at all.
+   *
+   * It also broke something that worked. A parent schedules a recording while
+   * unlocked; the lock re-engages half an hour later, on its own, by design;
+   * at two in the morning the recorder asks for the stream and is refused. A
+   * decision the parent had already made, undone by a timer, silently.
+   *
+   * So the gate is on watching: `play` is checked, `record` and `download`
+   * are not, and the recording or download that results is checked when
+   * somebody tries to watch it.
    */
-  if (isBlocked({ categoryId: channel.categoryId, isAdult: channel.isAdult, name: channel.name })) {
+  if (
+    locked &&
+    isBlocked({ categoryId: channel.categoryId, isAdult: channel.isAdult, name: channel.name })
+  ) {
     throw new Error('This channel is locked. Unlock parental controls to play it.')
   }
 

@@ -1,6 +1,6 @@
 import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto'
 import type { ParentalRules, ParentalStatus } from '@shared/types'
-import { getDb } from '@main/db'
+import { fold, getDb } from '@main/db'
 import { createLogger } from '@main/util/logger'
 
 const log = createLogger('parental')
@@ -109,7 +109,13 @@ export function setPin(currentPin: string | null, newPin: string): void {
   log.info('parental PIN set')
 }
 
-export function verify(pin: string): boolean {
+/**
+ * The comparison itself, with no counting.
+ *
+ * Private, because every caller should be paying the cooldown; `verify` is
+ * the one to use.
+ */
+function matches(pin: string): boolean {
   const storedHash = read<string>(KEY_HASH)
   const storedSalt = read<string>(KEY_SALT)
   if (!storedHash || !storedSalt) return false
@@ -144,15 +150,26 @@ export function attemptCooldownMs(now = Date.now()): number {
   return Math.max(0, lockedOutUntil - now)
 }
 
-export function unlock(pin: string): boolean {
-  if (!isEnabled()) return true
-
+/**
+ * Checks a PIN, and makes a wrong one cost something.
+ *
+ * The counting used to live in `unlock`, which left two other doors with no
+ * lock on them at all: `setPin` takes the current PIN, and `disable` takes
+ * the PIN, and both called the raw comparison directly. An attacker with the
+ * machine in front of them could walk the whole four-digit space through the
+ * "change PIN" dialog without ever meeting a cooldown — through the form
+ * whose purpose is to require the PIN.
+ *
+ * So the counter sits here, in the one function that answers whether a PIN is
+ * right, and every caller pays it.
+ */
+export function verify(pin: string): boolean {
   const waiting = attemptCooldownMs()
   if (waiting > 0) {
     throw new Error(`Too many wrong attempts. Try again in ${Math.ceil(waiting / 1000)} seconds.`)
   }
 
-  if (!verify(pin)) {
+  if (!matches(pin)) {
     failedAttempts += 1
     if (failedAttempts >= MAX_ATTEMPTS) {
       lockedOutUntil = Date.now() + COOLDOWN_MS
@@ -164,6 +181,13 @@ export function unlock(pin: string): boolean {
 
   failedAttempts = 0
   lockedOutUntil = 0
+  return true
+}
+
+export function unlock(pin: string): boolean {
+  if (!isEnabled()) return true
+  if (!verify(pin)) return false
+
   unlockedAt = Date.now()
   return true
 }
@@ -185,12 +209,17 @@ export function setRules(rules: ParentalRules): ParentalRules {
 
   const clean: ParentalRules = {
     lockedCategoryIds: [...new Set(rules.lockedCategoryIds.filter(Number.isFinite))],
+    /*
+     * Folded, not merely lowercased.
+     *
+     * `fold` is what the stored `name_folded` column holds: accents stripped,
+     * punctuation collapsed to spaces. The list filter matches keywords
+     * against that column, so a keyword kept in any other shape matches in
+     * one place and not the other — and the place it fails is the one that
+     * decides whether something plays.
+     */
     keywords: [
-      ...new Set(
-        rules.keywords
-          .map((word) => word.trim().toLowerCase())
-          .filter((word) => word.length >= 2)
-      )
+      ...new Set(rules.keywords.map((word) => fold(word)).filter((word) => word.length >= 2))
     ],
     lockAdult: rules.lockAdult,
     autoLockMinutes: Math.max(0, Math.min(720, Math.round(rules.autoLockMinutes)))
@@ -255,6 +284,15 @@ export function isBlocked(channel: {
   if (rules.lockAdult && channel.isAdult) return true
   if (channel.categoryId !== null && rules.lockedCategoryIds.includes(channel.categoryId)) return true
 
-  const folded = channel.name.toLowerCase()
+  /*
+   * Folded the same way the query folds it.
+   *
+   * `lockClause` matches `name_folded NOT LIKE '%keyword%'`, and this used
+   * plain `toLowerCase()`. The two disagree the moment a name carries an
+   * accent or punctuation: "Hâber TV" folds to "haber tv" and is hidden from
+   * every list by the keyword "haber", while this read "hâber tv", found no
+   * match, and let it play. Hidden and playable is the worst of both.
+   */
+  const folded = fold(channel.name)
   return rules.keywords.some((keyword) => folded.includes(keyword))
 }

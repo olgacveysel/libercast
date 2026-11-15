@@ -208,7 +208,10 @@ class Recorder {
   private async spawn(recording: Recording): Promise<void> {
     if (recording.channelId === null) throw new Error('Recording has no channel')
 
-    const provider = await resolveProviderStream({ type: 'channel', id: recording.channelId })
+    // 'record', not 'play': a recording scheduled while unlocked must still
+    // run after the lock re-engages on its own. The file it writes is checked
+    // when somebody tries to watch it.
+    const provider = await resolveProviderStream({ type: 'channel', id: recording.channelId }, 'record')
     const codecs = await probeStream(provider.url, {
       userAgent: provider.userAgent,
       referrer: provider.referrer

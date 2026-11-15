@@ -24,6 +24,17 @@ const PROGRESS_INTERVAL_MS = 700
 /** Rows are persisted less often than the UI updates, to spare the disk. */
 const PERSIST_INTERVAL_MS = 4000
 
+/**
+ * How long a transfer may receive nothing before it is given up on.
+ *
+ * A gap rather than a total, because a download is legitimately long: a film
+ * on a slow line is an hour, and no total that allows for that would ever
+ * catch a provider that simply stopped. Two minutes is generous for a server
+ * that is still there — and the partial file is kept, so resuming picks up
+ * from where it stopped rather than starting again.
+ */
+const STALL_MS = 120_000
+
 interface ActiveJob {
   id: number
   controller: AbortController
@@ -196,18 +207,37 @@ class Downloader {
   }
 
   private async run(download: Download): Promise<void> {
-    // `drain` has already put a placeholder in the map under this id; every
-    // exit from here has to take it out again, or the slot is never freed.
-    const controller = new AbortController()
+    /*
+     * The placeholder `drain` left is the job — it is filled in, not replaced.
+     *
+     * It used to be replaced with a freshly built object, and the flags went
+     * with it. `pause` and `cancel` find the job by id and set `paused` or
+     * `cancelled` on whatever is in the map at that moment, so a user who
+     * pressed cancel during the first second — while the provider was being
+     * asked for a URL, which is the slowest part — set it on an object this
+     * function was about to throw away. The download carried on to the end,
+     * and the row said cancelled.
+     *
+     * The controller goes the same way. `drain` made one so `cancel` would
+     * have something to abort; aborting it did nothing, because the request
+     * was made with a different one.
+     */
+    const job = this.jobs.get(download.id)
+    if (!job) return
+    const controller = job.controller
 
     let filePath = download.filePath
     let startAt: number
 
     try {
+      // 'download', not 'play': a download queued while unlocked finishes
+      // even if the lock re-engages partway through. Playing the file back
+      // goes through the check.
       const provider = await resolveProviderStream(
         download.itemType === 'episode'
           ? { type: 'episode', id: download.itemId }
-          : { type: 'channel', id: download.itemId }
+          : { type: 'channel', id: download.itemId },
+        'download'
       )
 
       if (!filePath) {
@@ -218,8 +248,11 @@ class Downloader {
       // A partial file from an earlier attempt is the resume point.
       startAt = await sizeOf(filePath)
 
-      const job: ActiveJob = { id: download.id, controller, filePath, paused: false, cancelled: false }
-      this.jobs.set(download.id, job)
+      // Whoever asked to stop while this was being worked out has already set
+      // their flag on `job`; honour it rather than starting the transfer.
+      if (job.cancelled || job.paused) throw new Error('Stopped before it began')
+
+      job.filePath = filePath
 
       this.emit(
         repo.updateDownload(download.id, {
@@ -264,10 +297,11 @@ class Downloader {
       )
       log.info(`download ${download.id} completed, ${(finalSize / 1_048_576).toFixed(1)} MB`)
     } catch (error) {
-      const job = this.jobs.get(download.id)
+      // `job` is the same object throughout now, so a flag set at any point —
+      // including before the transfer started — is still here.
       const done = filePath ? await sizeOf(filePath) : 0
 
-      if (job?.cancelled) {
+      if (job.cancelled) {
         if (filePath) await rm(filePath, { force: true })
         this.emit(
           repo.updateDownload(download.id, {
@@ -276,7 +310,7 @@ class Downloader {
             finishedAt: Date.now()
           })
         )
-      } else if (job?.paused) {
+      } else if (job.paused) {
         // The partial file stays; resuming picks up from its length.
         this.emit(repo.updateDownload(download.id, { status: 'paused', bytesDone: done }))
       } else {
@@ -314,7 +348,27 @@ class Downloader {
 
     const source = Readable.fromWeb(body as never)
 
+    /*
+     * A provider that stops sending used to stop the download for good.
+     *
+     * `pipeline` waits on the source, the source waits on a socket the
+     * provider has quietly abandoned, and nothing times it out: the row says
+     * `downloading` for ever, the slot is never freed, and the queue behind
+     * it never moves. The watchdog below is reset by every chunk, so only a
+     * silence trips it.
+     */
+    let idle: ReturnType<typeof setTimeout> | undefined
+    const bump = (): void => {
+      clearTimeout(idle)
+      idle = setTimeout(() => {
+        log.warn(`download ${job.id} received nothing for ${STALL_MS / 1000}s; giving up`)
+        source.destroy(new Error('The provider stopped sending'))
+      }, STALL_MS)
+    }
+    bump()
+
     source.on('data', (chunk: Buffer) => {
+      bump()
       done += chunk.length
       windowBytes += chunk.length
 
@@ -339,7 +393,11 @@ class Downloader {
       this.emit(row, speed)
     })
 
-    await pipeline(source, sink)
+    try {
+      await pipeline(source, sink)
+    } finally {
+      clearTimeout(idle)
+    }
   }
 }
 
