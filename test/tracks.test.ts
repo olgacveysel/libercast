@@ -7,7 +7,7 @@ import { buildStreamArgs, escapeFilterPath, planRemux } from '@main/media/args'
 import { binaries, resetBinaryCache, setFfmpegOverride } from '@main/media/binaries'
 import { languageName, normalizeLanguage, sameLanguage } from '@main/media/languages'
 import { clearProbeCache, probeStream } from '@main/media/probe'
-import { StreamServer, chooseAudio, chooseSubtitle } from '@main/media/streamServer'
+import { StreamServer, chooseAudio, chooseSubtitle, planForSelection } from '@main/media/streamServer'
 import { parseCueBlocks, parseTimestamp } from '../src/renderer/src/features/player/subtitles'
 
 const run = promisify(execFile)
@@ -208,6 +208,53 @@ async function main(): Promise<void> {
     probe.tracks.audio.map((t) => t.language).join(',') === 'eng,ger,tur',
     probe.tracks.audio.map((t) => t.language)
   )
+
+  /*
+   * The plan has to be made for the track that will be played.
+   *
+   * `probe.audio` is the first audio stream's codec, and the copy decision
+   * was taken from it. A title with AAC first and AC-3 second was therefore
+   * planned as "audio: copy", and choosing the AC-3 track copied AC-3 into
+   * MP4 — which Chromium cannot decode. Picture, no sound, no explanation,
+   * and the same file playing fine in any other player.
+   */
+  console.log('\nPlanning for the chosen audio track')
+
+  const mixed = join(work, 'mixed-audio.mkv')
+  await run(working.ffmpeg, [
+    '-hide_banner', '-loglevel', 'error', '-y',
+    '-f', 'lavfi', '-i', 'testsrc2=size=320x240:rate=15:duration=2',
+    '-f', 'lavfi', '-i', 'sine=frequency=440:duration=2',
+    '-f', 'lavfi', '-i', 'sine=frequency=660:duration=2',
+    '-map', '0:v', '-map', '1:a', '-map', '2:a',
+    '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p',
+    // First track AAC, second AC-3: the shape that broke.
+    '-c:a:0', 'aac', '-c:a:1', 'ac3',
+    '-metadata:s:a:0', 'language=tur', '-metadata:s:a:1', 'language=eng',
+    mixed
+  ])
+
+  clearProbeCache()
+  const mixedProbe = await probeStream(mixed)
+  check('built a fixture with two audio codecs', mixedProbe.tracks.audio.length === 2, mixedProbe.tracks.audio.length)
+  check(
+    'the first is aac and the second ac3',
+    mixedProbe.tracks.audio[0]?.codec === 'aac' && mixedProbe.tracks.audio[1]?.codec === 'ac3',
+    mixedProbe.tracks.audio.map((t) => t.codec)
+  )
+
+  check('the aac track is copied', planForSelection(mixedProbe, 0, false).audioCopy)
+  check(
+    'and the ac3 track is re-encoded rather than copied into MP4',
+    !planForSelection(mixedProbe, 1, false).audioCopy,
+    planForSelection(mixedProbe, 1, false).reason
+  )
+  check(
+    'the reason says so',
+    planForSelection(mixedProbe, 1, false).reason.includes('ac3'),
+    planForSelection(mixedProbe, 1, false).reason
+  )
+
   check(
     'labels are human readable',
     probe.tracks.audio[1]?.label.startsWith('German') === true,

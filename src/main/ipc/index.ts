@@ -22,6 +22,7 @@ import { autoMatch, refreshEpg, suggestionsFor } from '@main/sources/epg'
 import { movieInfo, nextEpisodeOf, previousEpisodeOf, seriesDetail } from '@main/sources/vod'
 import { binaries, hasFfmpeg, setFfmpegOverride } from '@main/media/binaries'
 import { autoRefresh } from '@main/autoRefresh'
+import { checkPathSetting, checkPathSettings } from './paths'
 import { collectDiagnostics, formatDiagnostics } from '@main/diagnostics'
 import { downloader } from '@main/media/downloader'
 import { recorder } from '@main/media/recorder'
@@ -207,7 +208,12 @@ export function registerIpcHandlers(): void {
     return picked ? loadSubtitleFile(picked) : null
   })
 
-  handle('subtitles:loadFile', (filePath: string) => loadSubtitleFile(filePath))
+  handle('subtitles:loadFile', (filePath: string) => {
+    // The extension is checked inside; this is about the argument being a
+    // path at all.
+    checkPathSetting('The subtitle file', filePath)
+    return loadSubtitleFile(filePath)
+  })
 
   /* ---------------- subtitle search ---------------- */
 
@@ -366,12 +372,18 @@ export function registerIpcHandlers(): void {
     return result.canceled ? null : result.filePaths[0] ?? null
   })
 
-  handle('backup:import', (options) => importBackup(options))
+  handle('backup:import', (options) => {
+    checkPathSetting('The backup file', options.filePath)
+    return importBackup(options)
+  })
 
   /* ---------------- settings & dialogs ---------------- */
 
   handle('settings:get', () => settings.getSettings())
   handle('settings:set', (patch) => {
+    // Three of these become a spawned process or a directory written into.
+    checkPathSettings(patch as Record<string, unknown>)
+
     const updated = settings.setSettings(patch)
     // Re-resolve immediately so the Settings screen reflects the new path.
     if (patch.ffmpegPath !== undefined) setFfmpegOverride(updated.ffmpegPath)

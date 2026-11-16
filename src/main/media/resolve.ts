@@ -89,9 +89,88 @@ function assertPlayable(channelId: number, kind: 'recording' | 'download'): void
   }
 }
 
+/**
+ * The protocols a provider's stream may use.
+ *
+ * ffmpeg opens a great deal more than this. `file:` reads any file the
+ * application can; `concat:` reads a list of them; `data:` and `pipe:` are
+ * stranger still. The strings reaching here are not ours — an M3U playlist is
+ * somebody else's text file, and its `#EXTINF` lines decide what gets opened
+ * — so what may be opened is named rather than guessed at.
+ *
+ * The list is the protocols IPTV actually uses, not just the obvious two. A
+ * good number of real playlists carry `rtmp` for a legacy panel, `rtsp` for a
+ * camera, or `udp`/`rtp` for a multicast feed on a local network, and an
+ * allowlist of http alone would quietly break all of them.
+ */
+const STREAM_PROTOCOLS = new Set([
+  'http',
+  'https',
+  'rtmp',
+  'rtmpe',
+  'rtmps',
+  'rtmpt',
+  'rtmpts',
+  'rtsp',
+  'rtsps',
+  'rtspu',
+  'udp',
+  'rtp',
+  'srt',
+  'mms',
+  'mmsh',
+  'mmst',
+  'ftp',
+  'ftps'
+])
+
+/**
+ * Refuses anything that is not a network stream.
+ *
+ * Parsed by hand rather than with `new URL`, for two reasons: `udp://@239.0.0.1:1234`
+ * is a shape `URL` dislikes and ffmpeg is happy with, and `C:\clips\x.ts`
+ * parses as the scheme `c:` — so a Windows path would otherwise arrive
+ * looking like a protocol.
+ */
+export function assertNetworkStream(url: string): void {
+  const match = /^([a-z][a-z0-9+.-]*):/i.exec(url.trim())
+
+  // No scheme at all is a local path, whatever else it is.
+  if (!match) throw new Error('That source has no stream address, only a file path.')
+
+  const scheme = match[1]!.toLowerCase()
+
+  // A single letter is a drive, not a protocol.
+  if (scheme.length === 1 || !STREAM_PROTOCOLS.has(scheme)) {
+    throw new Error(`LiberCast will not open "${scheme}:" sources — only network streams.`)
+  }
+}
+
 export async function resolveProviderStream(
   source: StreamSource,
   purpose: ResolvePurpose = 'play'
+): Promise<ProviderStream> {
+  const resolved = await resolveSource(source, purpose)
+
+  /*
+   * Checked here, once, rather than in each branch.
+   *
+   * There are eight places below that produce a URL and more will be added;
+   * a check per branch is a check somebody forgets. A recording and a
+   * download are the two exceptions, and they are exceptions by construction
+   * — those paths were written by this application, into a folder it chose.
+   */
+  if (source.type !== 'recording' && source.type !== 'download') {
+    assertNetworkStream(resolved.url)
+    for (const alternate of resolved.alternates) assertNetworkStream(alternate)
+  }
+
+  return resolved
+}
+
+async function resolveSource(
+  source: StreamSource,
+  purpose: ResolvePurpose
 ): Promise<ProviderStream> {
   const locked = purpose === 'play'
 

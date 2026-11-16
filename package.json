@@ -11,7 +11,7 @@
   },
   "scripts": {
     "dev": "electron-vite dev",
-    "setup": "npm ci --ignore-scripts && node node_modules/ffmpeg-static/install.js",
+    "setup": "npm ci --ignore-scripts && node node_modules/electron/install.js && node node_modules/ffmpeg-static/install.js",
     "start": "electron-vite preview",
     "build": "npm run typecheck && electron-vite build",
     "check": "npm run lint && npm run typecheck && npm test",

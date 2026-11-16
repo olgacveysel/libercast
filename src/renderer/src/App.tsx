@@ -13,6 +13,7 @@ import { MultiView } from '@renderer/features/multiview/MultiView'
 import { CommandPalette } from '@renderer/features/search/CommandPalette'
 import { LiveTv, type LiveDisplay } from '@renderer/features/live/LiveTv'
 import { VodBrowser } from '@renderer/features/vod/VodBrowser'
+import { Favorites } from '@renderer/features/favorites/Favorites'
 import { AddSourceDialog } from '@renderer/features/onboarding/AddSourceDialog'
 import { Settings } from '@renderer/features/settings/Settings'
 import { UpdateBanner } from '@renderer/features/settings/UpdateBanner'
@@ -154,7 +155,7 @@ export function App(): JSX.Element {
               )}
               {route === 'guide' && <Guide onAddSource={openAddSource} capabilities={capabilities} />}
               {route === 'multiview' && <MultiView onAddSource={openAddSource} />}
-              {route === 'favorites' && <LiveTv mode="favorites" onAddSource={openAddSource} />}
+              {route === 'favorites' && <Favorites onAddSource={openAddSource} />}
               {route === 'movies' && <VodBrowser kind="movie" onAddSource={openAddSource} />}
               {route === 'series' && <VodBrowser kind="series" onAddSource={openAddSource} />}
               {route === 'library' && (

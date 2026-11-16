@@ -19,6 +19,17 @@ export type Route =
 
 interface AppState {
   route: Route
+  /**
+   * Bumped when the current section is chosen again from the sidebar.
+   *
+   * Switching sections unmounts the old one, so its state goes with it. What
+   * has no answer otherwise is pressing Films while already inside a film:
+   * the route does not change, nothing re-renders, and the detail view sits
+   * there — so the one control that should obviously mean "back to the list"
+   * did nothing at all. Sections watch this and close whatever they have
+   * open.
+   */
+  routeTick: number
   settings: AppSettings
   playlists: Playlist[]
   /** Source folders, in display order. Empty until somebody makes one. */
@@ -59,6 +70,7 @@ interface AppState {
 
 export const useAppStore = create<AppState>((set, get) => ({
   route: 'home',
+  routeTick: 0,
   settings: DEFAULT_SETTINGS,
   playlists: [],
   folders: [],
@@ -70,7 +82,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   ready: false,
   sleepAt: null,
 
-  setRoute: (route) => set({ route }),
+  setRoute: (next) =>
+    set((state) => ({
+      route: next,
+      // Only when it is already the current section: a real change unmounts
+      // the old one anyway.
+      routeTick: state.route === next ? state.routeTick + 1 : state.routeTick
+    })),
   setActivePlaylist: (activePlaylistId) => set({ activePlaylistId, allSources: false }),
   setAllSources: () => set({ allSources: true }),
   setActiveChannel: (activeChannel) => set({ activeChannel }),

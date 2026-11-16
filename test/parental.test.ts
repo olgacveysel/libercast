@@ -6,7 +6,7 @@ import { importCatalog } from '@main/db/repo/import'
 import { createPlaylist } from '@main/db/repo/playlists'
 import * as catalog from '@main/db/repo/catalog'
 import * as parental from '@main/secure/parental'
-import { resolveProviderStream } from '@main/media/resolve'
+import { assertNetworkStream, resolveProviderStream } from '@main/media/resolve'
 import { buildPayload, decryptPayload, encryptPayload, exportBackup, importBackup, isEncrypted } from '@main/secure/backup'
 import { readFileSync } from 'node:fs'
 
@@ -191,6 +191,55 @@ async function main(): Promise<void> {
    * fails for some other reason is fine. A 'record' that fails because the
    * channel is locked is the regression.
    */
+  /*
+   * What a playlist is allowed to point at.
+   *
+   * An M3U is somebody else's text file, and the address on its `#EXTINF`
+   * line goes to ffmpeg — which opens far more than http. `file:` reads any
+   * file this application can read, `concat:` reads a list of them, and a
+   * bare path needs no scheme at all. The protocols a stream may actually
+   * use are named instead.
+   */
+  console.log('\nWhat a source may point at')
+
+  function refusesUrl(url: string): boolean {
+    try {
+      assertNetworkStream(url)
+      return false
+    } catch {
+      return true
+    }
+  }
+
+  for (const allowed of [
+    'http://example.test/live/1.ts',
+    'https://example.test/live/1.m3u8',
+    'rtmp://example.test/live/1',
+    'rtsp://camera.test:554/stream',
+    // The shape a multicast feed arrives in, which `new URL` will not parse —
+    // one reason this is not written with `new URL`.
+    'udp://@239.0.0.1:1234',
+    'srt://example.test:9000'
+  ]) {
+    check(`"${allowed.slice(0, 28)}" plays`, !refusesUrl(allowed))
+  }
+
+  for (const refused of [
+    'file:///etc/passwd',
+    'concat:/etc/passwd|/etc/shadow',
+    'data:video/mp4;base64,AAAA',
+    'pipe:0',
+    'subfile,,start,0,end,100,,:/etc/passwd',
+    '/etc/passwd',
+    './relative.ts',
+    // A Windows drive letter parses as a scheme, which is exactly how a local
+    // path would have slipped through a naive check.
+    'C:\\Windows\\win.ini',
+    ''
+  ]) {
+    check(`"${refused.slice(0, 28)}" does not`, refusesUrl(refused))
+  }
+
   console.log('\nWhy the stream is being fetched')
 
   const locked = everything.find((c) =>

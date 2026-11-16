@@ -12,6 +12,7 @@ import {
   planRemux,
   redactArgs,
   rejectOption,
+  type RemuxPlan,
   type StreamCodecs
 } from './args'
 import { ffmpegPath } from './binaries'
@@ -187,9 +188,24 @@ export class StreamServer {
     const resolved = await this.resolveUrl(spec)
     const url = resolved.url
     const probe = resolved.probe
-    const plan = planRemux(probe, this.degraded.has(streamKey(url)))
 
     const audioIndex = chooseAudio(probe.tracks.audio, spec.audioTrack, spec.preferredAudioLanguages)
+
+    /*
+     * The plan is made for the track that will be played, not the first one.
+     *
+     * `probe.audio` is the codec of the container's first audio stream, and
+     * the copy-or-re-encode decision was taken from it. On a file with more
+     * than one language that is simply the wrong stream: a title with Turkish
+     * AAC first and English AC-3 second was planned as "audio: copy", and
+     * selecting English copied AC-3 into MP4 — which Chromium has no decoder
+     * for. The picture played and the sound was silent, with nothing in the
+     * interface to say why.
+     *
+     * Switching track reopens the session, so the plan is recomputed with
+     * whichever track is now chosen.
+     */
+    const plan = planForSelection(probe, audioIndex, this.degraded.has(streamKey(url)))
     const requestedSubtitle = chooseSubtitle(
       probe.tracks.subtitle,
       spec.subtitleTrack,
@@ -768,6 +784,29 @@ export class StreamServer {
  * language; otherwise whatever the container marks default; otherwise the
  * first track.
  */
+/**
+ * The remux plan for the track that will actually be played.
+ *
+ * `probe.audio` is the codec of the container's *first* audio stream, and the
+ * copy-or-re-encode decision used to be taken from it. On a file with more
+ * than one language that is the wrong stream to ask: a title carrying Turkish
+ * AAC first and English AC-3 second was planned as "audio: copy", and
+ * choosing English copied AC-3 into MP4 — a codec Chromium has no decoder
+ * for. The picture played and the sound was silent, with nothing in the
+ * interface to say why, and the same title played fine in any other player.
+ *
+ * Switching track reopens the session, so the plan is recomputed against
+ * whichever track is chosen then.
+ */
+export function planForSelection(
+  probe: ProbeResult,
+  audioIndex: number,
+  degraded: boolean
+): RemuxPlan {
+  const chosen = probe.tracks.audio[audioIndex] ?? null
+  return planRemux(chosen?.codec ? { ...probe, audio: chosen.codec } : probe, degraded)
+}
+
 export function chooseAudio(
   tracks: MediaTrack[],
   explicit: number | undefined,

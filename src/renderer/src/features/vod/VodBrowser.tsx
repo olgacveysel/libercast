@@ -12,6 +12,8 @@ import { VodPlayer, type VodTarget } from './VodPlayer'
 interface Props {
   kind: Extract<ContentKind, 'movie' | 'series'>
   onAddSource: () => void
+  /** Shows only what has been favourited. Used by the Favourites screen. */
+  favoritesOnly?: boolean
 }
 
 /** Poster grids get heavy fast; this caps one page of results. */
@@ -33,8 +35,9 @@ const DECADES = (() => {
   return list
 })()
 
-export function VodBrowser({ kind, onAddSource }: Props): JSX.Element {
+export function VodBrowser({ kind, onAddSource, favoritesOnly = false }: Props): JSX.Element {
   const { activePlaylistId, playlists } = useAppStore()
+  const routeTick = useAppStore((s) => s.routeTick)
   const t = useT()
 
   const [categories, setCategories] = useState<Category[]>([])
@@ -60,6 +63,18 @@ export function VodBrowser({ kind, onAddSource }: Props): JSX.Element {
    * has shown it has the data.
    */
   const [hasMetadata, setHasMetadata] = useState({ rating: false, year: false })
+
+  /*
+   * Choosing this section again means "back to the list".
+   *
+   * Only the two views stacked on top of it are closed. The search, the
+   * category and the filters are where the user put them, and throwing those
+   * away as well would turn one obvious gesture into a second piece of work.
+   */
+  useEffect(() => {
+    setSelected(null)
+    setPlaying(null)
+  }, [routeTick])
 
   const playlist = useMemo(
     () => playlists.find((p) => p.id === activePlaylistId) ?? null,
@@ -103,6 +118,7 @@ export function VodBrowser({ kind, onAddSource }: Props): JSX.Element {
       categoryId,
       search: debounced || undefined,
       sort,
+      favoritesOnly: favoritesOnly || undefined,
       minRating: minRating > 0 ? minRating : undefined,
       yearFrom: decade ?? undefined,
       yearTo: decade == null ? undefined : decade + 9,
@@ -129,7 +145,7 @@ export function VodBrowser({ kind, onAddSource }: Props): JSX.Element {
     } finally {
       setLoading(false)
     }
-  }, [activePlaylistId, categoryId, debounced, kind, sort, minRating, decade])
+  }, [activePlaylistId, categoryId, debounced, kind, sort, minRating, decade, favoritesOnly])
 
   useEffect(() => {
     void load()
