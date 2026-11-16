@@ -62,21 +62,31 @@ export function Sidebar({ onAddSource, collapsed }: Props): JSX.Element {
   const t = useT()
 
   /**
-   * Clicking a navigation item you are already on folds that screen's lists
-   * away, leaving the picture. Clicking again brings them back.
+   * What a second click on the section you are already in means.
    *
-   * Only Live TV and Favorites have lists to fold, and they are the two
-   * screens built around watching something. Everywhere else a second click
-   * stays what it has always been: nothing.
+   * On Live TV and Favorites it folds that screen's lists away, leaving the
+   * picture, and folds them back on the click after. Those are the two
+   * screens built around watching something.
+   *
+   * Everywhere else it means "back to the top of this section", which is
+   * what the control looks like it should do. It used to mean nothing at
+   * all: the handler returned early when the route had not changed, so
+   * pressing Films while inside a film did not even reach the store, and the
+   * only way back to the grid was the player's close button. Routing it
+   * through `setRoute` is what lets the store notice a repeat.
    */
   const onNavClick = (next: Route): void => {
     if (route !== next) {
       setRoute(next)
       return
     }
+
     if (next === 'live' || next === 'favorites') {
       void updateSettings({ liveListsCollapsed: !settings.liveListsCollapsed })
+      return
     }
+
+    setRoute(next)
   }
 
   /**
