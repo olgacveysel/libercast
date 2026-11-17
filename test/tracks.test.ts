@@ -125,6 +125,34 @@ async function main(): Promise<void> {
 
   check('filter paths escape colons', escapeFilterPath('C:/x/y.mkv').includes('\\:'))
 
+  /*
+   * And only one place may answer "copy or re-encode".
+   *
+   * The first fix for the silent second language taught `open` to plan for
+   * the chosen track — and the call that actually starts ffmpeg went on
+   * asking `planRemux` for a plan built from the container's first audio
+   * stream. The overlay said "audio eac3 → aac" while ffmpeg was told
+   * `-c:a copy`, so the report and the behaviour disagreed and the report was
+   * the one being read. Nothing in a unit test on either function could see
+   * that, because each was right on its own.
+   *
+   * So: `planRemux` is reachable from exactly one place in this file, and
+   * that place is `planForSelection`.
+   */
+  console.log('\nOne answer to copy-or-re-encode')
+
+  const serverSource = readFileSync(join(process.cwd(), 'src', 'main', 'media', 'streamServer.ts'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/(^|[^:])\/\/[^\n]*/g, '$1')
+
+  const direct = [...serverSource.matchAll(/planRemux\s*\(/g)].length
+  check('planRemux is called once in the stream server', direct === 1, direct)
+  check(
+    'and buildStreamArgs is always given a plan for the chosen track',
+    [...serverSource.matchAll(/buildStreamArgs\s*\(/g)].length > 0 &&
+      !/buildStreamArgs\s*\([^)]*planRemux/.test(serverSource)
+  )
+
   console.log('\nArgument mapping')
   const plan = planRemux({ video: 'h264', audio: 'aac', durationSecs: 100 })
   const german = buildStreamArgs('/x.mkv', plan, { audioIndex: 1 })
@@ -254,6 +282,55 @@ async function main(): Promise<void> {
     planForSelection(mixedProbe, 1, false).reason.includes('ac3'),
     planForSelection(mixedProbe, 1, false).reason
   )
+
+  /*
+   * And the decision has to survive the whole chain.
+   *
+   * Deciding correctly and then emitting the wrong arguments would look
+   * identical from outside — silence either way — so the plan is run through
+   * ffmpeg and the output is probed. E-AC-3 in particular, because that is
+   * what a second language on a real series turns out to be, and it is a
+   * codec no browser will decode.
+   */
+  const eac3Fixture = join(work, 'mixed-eac3.mkv')
+  await run(working.ffmpeg, [
+    '-hide_banner', '-loglevel', 'error', '-y',
+    '-f', 'lavfi', '-i', 'testsrc2=size=320x240:rate=15:duration=3',
+    '-f', 'lavfi', '-i', 'sine=frequency=440:duration=3',
+    '-f', 'lavfi', '-i', 'sine=frequency=660:duration=3',
+    '-map', '0:v', '-map', '1:a', '-map', '2:a',
+    '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p',
+    '-c:a:0', 'aac', '-c:a:1', 'eac3',
+    '-metadata:s:a:0', 'language=tur', '-metadata:s:a:1', 'language=eng',
+    eac3Fixture
+  ])
+
+  clearProbeCache()
+  const eac3Probe = await probeStream(eac3Fixture)
+  check(
+    'the second language really is e-ac-3',
+    eac3Probe.tracks.audio[1]?.codec === 'eac3',
+    eac3Probe.tracks.audio.map((t) => t.codec)
+  )
+
+  for (const index of [0, 1]) {
+    const plan = planForSelection(eac3Probe, index, false)
+    const out = join(work, `selected-audio-${index}.mp4`)
+    // The last argument is the output target; swap it for a file.
+    await run(working.ffmpeg, [
+      ...buildStreamArgs(eac3Fixture, plan, { audioIndex: index }).slice(0, -1),
+      '-t', '2', '-y', out
+    ])
+    const probed = await run(working.ffprobe, [
+      '-hide_banner', '-loglevel', 'error', '-select_streams', 'a',
+      '-show_entries', 'stream=codec_name', '-of', 'default=nw=1', out
+    ])
+    check(
+      `choosing track ${index} produces audio a browser can play`,
+      probed.stdout.includes('aac'),
+      `${plan.reason} -> ${probed.stdout.trim()}`
+    )
+  }
 
   check(
     'labels are human readable',

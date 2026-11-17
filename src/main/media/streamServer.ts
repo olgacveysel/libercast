@@ -517,7 +517,22 @@ export class StreamServer {
       // Reused from `open`, not asked for again. See `Session.probe`.
       const probe = session.probe
 
-      const args = buildStreamArgs(session.url, planRemux(probe, this.degraded.has(streamKey(session.url))), {
+      /*
+       * Planned for the chosen track here too, not only in `open`.
+       *
+       * `open` was taught to plan for the track that will be played, and this
+       * — the call that actually starts ffmpeg — kept asking `planRemux` for a
+       * plan built from the container's *first* audio stream. So the interface
+       * reported "audio eac3 → aac" while ffmpeg was told `-c:a copy`, and
+       * E-AC-3 went into the MP4 untouched for a browser with no decoder for
+       * it: picture, silence, and an overlay stating the opposite of what was
+       * happening.
+       *
+       * One function answers the question in both places now.
+       */
+      const plan = planForSelection(probe, session.audioIndex, this.degraded.has(streamKey(session.url)))
+
+      const args = buildStreamArgs(session.url, plan, {
         userAgent: session.userAgent,
         referrer: session.referrer,
         seekSecs: session.seekSecs,
