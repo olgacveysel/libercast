@@ -47,6 +47,31 @@ jobs:
           fi
           echo "both say $manifest"
 
+      # The tag has to be the tip of the branch it came from.
+      #
+      # beta.6 shipped without the fix it was released for: the version bump
+      # was committed first and the fix after it, so the tag sat one commit
+      # behind and the release notes described work that was not in the
+      # build. Nothing noticed — the versions agreed, every job was green,
+      # and the artifacts were correct for the commit they were built from.
+      #
+      # Checked with a warning rather than a failure, because tagging an
+      # older commit is sometimes deliberate. What it must never be is
+      # unnoticed.
+      - name: The tag is the tip of main
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          git fetch --depth=1 origin main
+          tagged=$(git rev-parse HEAD)
+          tip=$(git rev-parse FETCH_HEAD)
+          if [ "$tagged" = "$tip" ]; then
+            echo "the tag is main's tip"
+            exit 0
+          fi
+          behind=$(git rev-list --count "$tagged..$tip" 2>/dev/null || echo '?')
+          echo "::warning::this tag is $behind commit(s) behind main — the release will not contain them"
+          git log --oneline "$tagged..$tip" 2>/dev/null | head -20 || true
+
   # Checks does not run on tags — it ignores them, so that tagging a commit
   # does not run the same suite twice. That leaves a tag with nothing
   # verifying it: whatever was last pushed to the branch is what gets
