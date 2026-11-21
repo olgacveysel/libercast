@@ -337,6 +337,19 @@ export const en = {
     'What the application recorded, with passwords removed. Attach it to a bug report.',
   'settings.showLogs': 'Show log file',
   'settings.logsNone': 'Nothing has been logged yet.',
+  'settings.metadata': 'Film and series information',
+  'settings.metadataBody':
+    'Plenty of providers send a title and nothing else. With your own TMDB key, LiberCast fills in the plot, year, cast and artwork that are missing — and never replaces anything your provider did send.',
+  'settings.metaNotConfigured': 'No key yet, so nothing is looked up.',
+  'settings.metaKey': 'TMDB API key',
+  'settings.metaKeyHelp': 'Free for personal use. Sign in at TMDB, open Settings, then API.',
+  'settings.metaKeyLink': 'Get a key',
+  'settings.metaTest': 'Test key',
+  'settings.metaTestOk': 'That key works.',
+  'settings.metaSave': 'Save',
+  'settings.metaForget': 'Remove',
+  'settings.metaAttribution':
+    'This product uses the TMDB API but is not endorsed or certified by TMDB.',
   'settings.diagnostics': 'Diagnostics',
   'settings.diagnosticsBody':
     'Collects what this machine is running — graphics status, the ffmpeg it found, versions — and writes it to the log. Paste it into a bug report.',

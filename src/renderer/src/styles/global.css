@@ -1270,6 +1270,31 @@ select {
   color: var(--text-dim);
 }
 /*
+  The TMDB credit.
+
+  Their terms require their logo to be "less prominent than the logo or mark
+  that primarily describes the application". The LiberCast mark in the sidebar
+  is 22px; this is capped at 13px and sits inline with the sentence, which is
+  what "less prominent" has to mean in a layout that has only one other mark
+  in it. Opacity is left alone: dimming it would be altering the logo, which
+  their terms do not allow.
+*/
+.tmdb-credit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 2px 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+.tmdb-credit__logo {
+  height: 13px;
+  width: auto;
+  flex: none;
+}
+
+/*
   Favourites, which is three screens behind one set of tabs.
 
   The body fills what is left so the list inside scrolls on its own rather

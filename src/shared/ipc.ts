@@ -4,6 +4,7 @@ import type {
   AppSettings,
   AutoRefreshReport,
   DiagnosticsReport,
+  TmdbStatus,
   BackupOptions,
   BackupSummary,
   Category,
@@ -216,6 +217,17 @@ export interface IpcContract {
   /** Runs the scheduled refresh immediately. */
   'sources:refreshNow': { req: void; res: AutoRefreshReport }
 
+  /**
+   * Metadata enrichment for titles a provider described poorly.
+   *
+   * Off until the user supplies their own key, for the same reason subtitle
+   * search is: this source is public, so a key shipped inside it is a key
+   * anybody can extract.
+   */
+  'tmdb:status': { req: void; res: TmdbStatus }
+  'tmdb:setKey': { req: string | null; res: TmdbStatus }
+  'tmdb:testKey': { req: string | null; res: void }
+
   'app:version': { req: void; res: string }
 
   /**
@@ -391,6 +403,9 @@ export const IPC_CHANNELS: IpcChannel[] = [
   'reminders:remove',
   'reminders:find',
   'sources:refreshNow',
+  'tmdb:status',
+  'tmdb:setKey',
+  'tmdb:testKey',
   'app:version',
   'app:diagnostics',
   'app:showLogs',

@@ -1070,6 +1070,36 @@ export interface Result<T> {
 }
 
 /**
+ * What TMDB knows about a title.
+ *
+ * Kept apart from the provider's own fields rather than merged into them, so
+ * that what the provider said and what was looked up stay distinguishable —
+ * which matters the day a match turns out to be wrong.
+ */
+export interface TmdbMeta {
+  tmdbId: number
+  title: string | null
+  plot: string | null
+  posterUrl: string | null
+  backdropUrl: string | null
+  year: number | null
+  /** Out of 10, to one decimal. */
+  rating: number | null
+  genres: string[]
+  /** The top of the billing, not the whole cast. */
+  cast: string[]
+  director: string | null
+  runtimeSecs: number | null
+}
+
+/** Whether metadata lookup is set up, for the Settings screen. */
+export interface TmdbStatus {
+  hasKey: boolean
+  /** Off entirely until the user supplies a key. */
+  enabled: boolean
+}
+
+/**
  * A snapshot of the installation, for a bug report.
  *
  * Deliberately all facts and no conclusions: which binaries were resolved and

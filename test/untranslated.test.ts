@@ -41,7 +41,15 @@ const ALLOWED = new Set<string>([
   'Xtream Codes',
   // Codec and container names are not words.
   'MPEG-TS',
-  'WebVTT'
+  'WebVTT',
+  /*
+   * Required by TMDB's terms, which say their service must be referred to as
+   * "TMDB" or "The Movie Database" and that "any other name is not
+   * acceptable". Translating it is exactly what their terms forbid, so this
+   * is a name rather than a sentence — same reason the notice beside it is
+   * identical in every locale.
+   */
+  'The Movie Database'
 ])
 
 function sourceFiles(dir: string, found: string[] = []): string[] {

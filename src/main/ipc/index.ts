@@ -23,6 +23,7 @@ import { movieInfo, nextEpisodeOf, previousEpisodeOf, seriesDetail } from '@main
 import { binaries, hasFfmpeg, setFfmpegOverride } from '@main/media/binaries'
 import { autoRefresh } from '@main/autoRefresh'
 import { checkPathSetting, checkPathSettings } from './paths'
+import * as tmdb from '@main/sources/tmdbMeta'
 import { collectDiagnostics, formatDiagnostics } from '@main/diagnostics'
 import { downloader } from '@main/media/downloader'
 import { recorder } from '@main/media/recorder'
@@ -443,6 +444,13 @@ export function registerIpcHandlers(): void {
   handle('playlists:account', (id: number) => accountFor(id))
 
   handle('sources:refreshNow', () => autoRefresh.run())
+
+  handle('tmdb:status', () => tmdb.status())
+  handle('tmdb:setKey', (key: string | null) => {
+    tmdb.setApiKey(key)
+    return tmdb.status()
+  })
+  handle('tmdb:testKey', (key: string | null) => tmdb.testApiKey(key ?? undefined))
 
   handle('app:version', () => app.getVersion())
 

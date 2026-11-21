@@ -9,6 +9,7 @@ import { LANGUAGES, useT, type TranslationKey } from '@renderer/i18n'
 import { TOKENS, renderTemplate } from '@shared/filename'
 import { SubtitleAppearance } from './SubtitleAppearance'
 import { SubtitleSearchSection } from './SubtitleSearchSection'
+import { MetadataSection } from './MetadataSection'
 import { APP_NAME } from '@shared/app'
 import { AccountPanel } from './AccountPanel'
 import { ParentalSection } from './ParentalSection'
@@ -533,6 +534,8 @@ export function Settings({ onAddSource }: Props): JSX.Element {
         <SubtitleAppearance />
 
         <SubtitleSearchSection />
+
+          <MetadataSection />
 
         <section className="settings__group">
           <h3>{t('settings.playback')}</h3>

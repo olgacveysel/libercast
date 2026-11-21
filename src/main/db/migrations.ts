@@ -462,6 +462,42 @@ export const MIGRATIONS: Migration[] = [
 
       CREATE INDEX idx_playlists_folder ON playlists(folder_id, sort_order);
     `
+  },
+  {
+    version: 14,
+    name: 'tmdb-metadata',
+    up: `
+      -- What TMDB said about a title, kept apart from what the provider said.
+      --
+      -- A separate table rather than more columns on the channels table, for two
+      -- reasons. The provider's own values must stay untouched: the whole
+      -- point of this feature is filling gaps, and a merged row makes "the
+      -- provider sent no plot" and "TMDB supplied one" the same state, which
+      -- is exactly the distinction needed the day a match turns out to be
+      -- wrong. And a sync rewrites channel rows; metadata that survived a
+      -- re-sync only by luck would be fetched again every time.
+      CREATE TABLE tmdb_meta (
+        channel_id    INTEGER PRIMARY KEY REFERENCES channels(id) ON DELETE CASCADE,
+        -- Null means "looked up and found nothing", which is a real answer
+        -- and has to be distinguishable from "not looked up yet" — otherwise
+        -- every 24/7 channel in a VOD category is searched for on every
+        -- visit, for ever.
+        tmdb_id       INTEGER,
+        title         TEXT,
+        plot          TEXT,
+        poster_url    TEXT,
+        backdrop_url  TEXT,
+        year          INTEGER,
+        rating        REAL,
+        genres        TEXT,
+        cast_names    TEXT,
+        director      TEXT,
+        runtime_secs  INTEGER,
+        fetched_at    INTEGER NOT NULL
+      );
+
+      CREATE INDEX idx_tmdb_fetched ON tmdb_meta(fetched_at);
+    `
   }
 ]
 

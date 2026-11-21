@@ -327,6 +327,19 @@ export const de: Record<TranslationKey, string> = {
     'Was die Anwendung aufgezeichnet hat, ohne Passwörter. Einer Fehlermeldung beilegen.',
   'settings.showLogs': 'Protokolldatei anzeigen',
   'settings.logsNone': 'Es wurde noch nichts protokolliert.',
+  'settings.metadata': 'Film- und Serieninformationen',
+  'settings.metadataBody':
+    'Viele Anbieter senden nur einen Titel. Mit Ihrem eigenen TMDB-Schlüssel ergänzt LiberCast fehlende Inhaltsangaben, Jahreszahlen, Besetzung und Bilder — und ersetzt nie etwas, das Ihr Anbieter mitgeliefert hat.',
+  'settings.metaNotConfigured': 'Noch kein Schlüssel, daher wird nichts nachgeschlagen.',
+  'settings.metaKey': 'TMDB-API-Schlüssel',
+  'settings.metaKeyHelp': 'Für private Nutzung kostenlos. Bei TMDB anmelden, Einstellungen öffnen, dann API.',
+  'settings.metaKeyLink': 'Schlüssel holen',
+  'settings.metaTest': 'Schlüssel prüfen',
+  'settings.metaTestOk': 'Dieser Schlüssel funktioniert.',
+  'settings.metaSave': 'Speichern',
+  'settings.metaForget': 'Entfernen',
+  'settings.metaAttribution':
+    'This product uses the TMDB API but is not endorsed or certified by TMDB.',
   'settings.diagnostics': 'Diagnose',
   'settings.diagnosticsBody':
     'Erfasst, was auf diesem Rechner läuft — Grafikstatus, das gefundene ffmpeg, Versionen — und schreibt es ins Protokoll. Für einen Fehlerbericht einfügen.',

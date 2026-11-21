@@ -326,6 +326,19 @@ export const tr: Record<TranslationKey, string> = {
     'Uygulamanın kaydettikleri; şifreler çıkarılmış olarak. Hata bildirimine ekleyebilirsin.',
   'settings.showLogs': 'Günlük dosyasını göster',
   'settings.logsNone': 'Henüz bir kayıt yok.',
+  'settings.metadata': 'Film ve dizi bilgileri',
+  'settings.metadataBody':
+    'Pek çok sağlayıcı yalnızca bir başlık gönderir. Kendi TMDB anahtarınızla LiberCast eksik olan konu, yıl, oyuncu ve görselleri tamamlar; sağlayıcınızın gönderdiği hiçbir bilgiyi değiştirmez.',
+  'settings.metaNotConfigured': 'Henüz anahtar yok, bu yüzden hiçbir şey aranmıyor.',
+  'settings.metaKey': 'TMDB API anahtarı',
+  'settings.metaKeyHelp': 'Kişisel kullanım için ücretsiz. TMDB’de oturum açın, Ayarlar’ı ve ardından API’yi açın.',
+  'settings.metaKeyLink': 'Anahtar al',
+  'settings.metaTest': 'Anahtarı sına',
+  'settings.metaTestOk': 'Bu anahtar çalışıyor.',
+  'settings.metaSave': 'Kaydet',
+  'settings.metaForget': 'Kaldır',
+  'settings.metaAttribution':
+    'This product uses the TMDB API but is not endorsed or certified by TMDB.',
   'settings.diagnostics': 'Tanılama',
   'settings.diagnosticsBody':
     'Bu bilgisayarda nelerin çalıştığını toplar — ekran kartı durumu, bulunan ffmpeg, sürümler — ve günlüğe yazar. Hata bildirimine yapıştırın.',
