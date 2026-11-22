@@ -321,6 +321,41 @@ function buildLabel(
   return rest.length > 0 ? `${name} (${rest.join(', ')})` : name!
 }
 
+/**
+ * What is already known about a stream, without opening one.
+ *
+ * For the case where a probe is deliberately not run: a live channel on an
+ * account that allows a single connection. The answer from an earlier play is
+ * as good as a fresh one and costs nothing, so it is worth asking before
+ * falling back to assuming what the stream is.
+ */
+export function knownProbe(url: string): ProbeResult | null {
+  const key = keyOf(url)
+  const hit = cache.get(key)
+  if (hit?.result.ok && Date.now() - hit.at < CACHE_TTL_MS) return hit.result
+  if (!useStoredProbes) return null
+  const stored = readStored(key)
+  if (stored?.ok) {
+    cache.set(key, { result: stored, at: Date.now() })
+    return stored
+  }
+  return null
+}
+
+/**
+ * Files away an identification that came from somewhere other than ffprobe.
+ *
+ * Used for what ffmpeg prints about a stream it has opened for playback: the
+ * same facts, already paid for. Stored under the same key a probe would use,
+ * so the next play finds it whichever way it was learned.
+ */
+export function rememberProbe(url: string, result: ProbeResult, isLive: boolean): void {
+  if (!result.ok) return
+  const key = keyOf(url)
+  cache.set(key, { result, at: Date.now() })
+  writeStored(key, result, isLive)
+}
+
 export function clearProbeCache(): void {
   cache.clear()
 }

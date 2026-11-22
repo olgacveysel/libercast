@@ -17,7 +17,8 @@ import {
 } from './args'
 import { ffmpegPath } from './binaries'
 import { sameLanguage } from './languages'
-import { probeStream, type ProbeResult } from './probe'
+import { knownProbe, probeStream, rememberProbe, type ProbeResult } from './probe'
+import { readInputBanner } from './banner'
 import { inspectStream } from './httpCheck'
 import { createLogger, errorMessage } from '@main/util/logger'
 
@@ -354,6 +355,19 @@ export class StreamServer {
     // ffmpeg says so within a second or two and the retry comes back
     // re-encoding, which is the same recovery an unexpected codec already gets.
     if (spec.frugal && spec.isLive) {
+      /*
+        An earlier play already found out what this channel is — from ffprobe
+        on a run when connections were not scarce, or from ffmpeg's own banner
+        during the last play. Either way it is known, and knowing it costs
+        nothing here: the plan is right on the first attempt instead of
+        failing at the muxer and coming back re-encoding.
+      */
+      const known = knownProbe(spec.url)
+      if (known) {
+        log.info(`${spec.label}: playing on what the last open found out, without re-identifying it`)
+        return { url: spec.url, probe: known, corrected: false, warning: null, refused: false }
+      }
+
       log.info(`${spec.label}: playing without identifying it first, to spend one connection`)
       return { url: spec.url, probe: assumedLiveCodecs(), corrected: false, warning: null, refused: false }
     }
@@ -566,6 +580,17 @@ export class StreamServer {
 
     let stderr = ''
     /*
+      The first words ffmpeg says about what it opened.
+      
+      Kept apart from `stderr`, which holds the tail for diagnosing a failure,
+      because the identification is at the very start and a channel that
+      complains for a while would push it out. Capped for the same reason the
+      tail is: a stream can produce warnings without end.
+    */
+    let banner = ''
+    let learned = false
+
+    /*
      * Spawn failures arrive here, not as a throw.
      *
      * `spawn` resolves to a child object before the operating system has
@@ -593,8 +618,33 @@ export class StreamServer {
     })
 
     child.stderr?.on('data', (chunk: Buffer) => {
+      const text = chunk.toString()
       // Keep only the tail: a failing stream can produce megabytes of warnings.
-      stderr = (stderr + chunk.toString()).slice(-2000)
+      stderr = (stderr + text).slice(-2000)
+
+      /*
+        Read what ffmpeg says this stream is, and remember it.
+
+        This is the identification that was deliberately not paid for: on a
+        single-connection account a live channel is played on a guess, because
+        probing first would spend the connection playback needs. ffmpeg prints
+        the answer anyway, over the connection already open — so the guess has
+        to be made once per channel rather than once per play.
+
+        Only once, and only when nothing better is stored: a probe knows more
+        (the level, an exact bitrate) and should not be overwritten by this.
+      */
+      if (!learned && banner.length < 16_000) {
+        banner += text
+        if (/\n(?:Output #|Stream mapping:)/.test(banner)) {
+          learned = true
+          const read = readInputBanner(banner)
+          if (read && !knownProbe(session.url)) {
+            rememberProbe(session.url, read, session.isLive === true)
+            log.debug(`${session.label}: noted what it is from the stream already open`)
+          }
+        }
+      }
     })
 
     const startedAt = Date.now()
