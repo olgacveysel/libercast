@@ -435,6 +435,20 @@ export interface AppSettings {
    * nobody finds.
    */
   liveListsCollapsed: boolean
+  /**
+   * Widths of the Live TV category and channel lists, in pixels.
+   *
+   * Channel names arrive from the provider and are as long as the provider
+   * felt like making them, so no default fits every account: a list that
+   * reads perfectly against one playlist is all ellipses against the next.
+   * Dragging the separator is the only answer that does not guess.
+   *
+   * Clamped on the way in as well as while dragging, because a width is a
+   * number in a file somebody can edit, and a restore from a wider screen
+   * should not leave the picture with nowhere to go.
+   */
+  liveCategoryWidth: number
+  liveChannelWidth: number
   /** Channel ids pinned to the multi-view tiles, by position. */
   multiViewChannels: (number | null)[]
   /** Tiles across and down in multi-view. */
@@ -508,6 +522,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   uiScale: 1,
   sidebarCollapsed: false,
   liveListsCollapsed: false,
+  liveCategoryWidth: 210,
+  liveChannelWidth: 320,
   multiViewChannels: [null, null, null, null],
   multiViewColumns: 2,
   multiViewRows: 2,

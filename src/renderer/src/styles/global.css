@@ -544,7 +544,9 @@ select {
 
 .live {
   display: grid;
-  grid-template-columns: 210px 320px 1fr;
+  /* Set from settings on the element itself; the fallbacks are what a fresh
+     install gets and what the folded states animate back to. */
+  grid-template-columns: var(--live-cat-w, 210px) var(--live-chan-w, 320px) 1fr;
   flex: 1;
   min-height: 0;
   /* Animating the columns rather than each pane's width keeps the player,
@@ -667,7 +669,7 @@ select {
    render land in the 210px and 320px columns and the player is squeezed into
    320px with the 1fr column standing empty. */
 .live--nocats {
-  grid-template-columns: 320px 1fr;
+  grid-template-columns: var(--live-chan-w, 320px) 1fr;
 }
 
 /* Folded: the lists keep their place in the grid at zero width, so the
@@ -682,10 +684,27 @@ select {
   border-right: none;
 }
 
+/*
+  While a separator is being dragged.
+
+  The columns are animated so that folding the lists slides rather than jumps,
+  and that same animation applied to a drag makes the pane lag a frame or two
+  behind the pointer, which reads as the drag not working. Selection is killed
+  for the length of the gesture because dragging across two lists of text
+  otherwise highlights all of it.
+*/
+.live--dragging {
+  transition: none;
+  user-select: none;
+  cursor: col-resize;
+}
+
 .pane {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  /* Anchors the separator to this pane's right edge. */
+  position: relative;
   border-right: 1px solid var(--border);
   /* A grid column at zero width does not clip its contents on its own; without
      this the folded lists spill across the picture. */
@@ -693,6 +712,41 @@ select {
 }
 .pane--last {
   border-right: none;
+}
+
+/*
+  The drag handle, lying along the pane's right border.
+
+  Six pixels wide and transparent until pointed at: a visible gutter between
+  every pane would be more furniture than the screen can afford, and the
+  cursor already announces what the strip does.
+*/
+.paneresize {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 6px;
+  z-index: 3;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: col-resize;
+  transition: background 0.12s var(--ease);
+}
+.paneresize:hover,
+.paneresize:active {
+  background: var(--accent-soft);
+}
+.paneresize:focus-visible {
+  outline: none;
+  background: var(--accent);
+}
+
+/* Folded, the panes are zero wide and their handles would sit on top of each
+   other over the picture, resizing something nobody can see. */
+.live--collapsed .paneresize {
+  display: none;
 }
 
 .pane__head {

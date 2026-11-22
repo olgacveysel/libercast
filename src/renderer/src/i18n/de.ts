@@ -122,6 +122,8 @@ export const de: Record<TranslationKey, string> = {
   'live.syncNow': 'Jetzt synchronisieren',
   'live.hideLists': 'Kategorien und Senderliste ausblenden',
   'live.showLists': 'Kategorien und Senderliste einblenden',
+  'live.resizeCategories': 'Ziehen, um die Kategorieliste zu verbreitern',
+  'live.resizeChannels': 'Ziehen, um die Senderliste zu verbreitern',
 
   'sleep.label': 'Sleeptimer',
   'sleep.title': 'Wiedergabe nach einer Weile beenden',

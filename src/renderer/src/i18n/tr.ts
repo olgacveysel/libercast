@@ -121,6 +121,8 @@ export const tr: Record<TranslationKey, string> = {
   'live.syncNow': 'Şimdi eşitle',
   'live.hideLists': 'Kategorileri ve kanal listesini gizle',
   'live.showLists': 'Kategorileri ve kanal listesini göster',
+  'live.resizeCategories': 'Kategori listesini yeniden boyutlandırmak için sürükleyin',
+  'live.resizeChannels': 'Kanal listesini yeniden boyutlandırmak için sürükleyin',
 
   'sleep.label': 'Uyku',
   'sleep.title': 'Bir süre sonra oynatmayı durdur',

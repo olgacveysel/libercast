@@ -86,6 +86,7 @@ const HARNESSES = [
   'verify-failover',
   'verify-vodfilters',
   'verify-vodnav',
+  'verify-paneresize',
   'verify-pip',
   'verify-mini',
   'verify-tvnav',

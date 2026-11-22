@@ -125,6 +125,8 @@ export const en = {
   'live.syncNow': 'Sync now',
   'live.hideLists': 'Hide the categories and channel list',
   'live.showLists': 'Show the categories and channel list',
+  'live.resizeCategories': 'Drag to resize the category list',
+  'live.resizeChannels': 'Drag to resize the channel list',
 
   'sleep.label': 'Sleep',
   'sleep.title': 'Stop playback after a while',

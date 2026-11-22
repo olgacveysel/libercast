@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState, type JSX } from 'react'
+import { useCallback, useEffect, useMemo, useState, type CSSProperties, type JSX } from 'react'
 import type { Category, ChannelQuery, ChannelWithState } from '@shared/types'
+import { clampPaneWidth } from '@shared/panes'
 import { invoke, messageOf } from '@renderer/lib/api'
 import { formatCount } from '@renderer/lib/format'
 import { useAppStore } from '@renderer/store/useAppStore'
@@ -7,6 +8,7 @@ import { Empty } from '@renderer/ui/Empty'
 import { IconEye, IconRefresh, IconSearch, IconSidebar } from '@renderer/ui/Icon'
 import { ListSkeleton } from '@renderer/ui/Skeletons'
 import { VirtualList } from '@renderer/ui/VirtualList'
+import { PaneResizer } from '@renderer/ui/PaneResizer'
 import { Player } from '@renderer/features/player/Player'
 import { CHANNEL_ROW_HEIGHT, ChannelRow } from './ChannelRow'
 import { useNumberEntry } from './useNumberEntry'
@@ -49,6 +51,28 @@ export function LiveTv({ mode, onAddSource, display = 'full', onExpand, onClose 
   const settings = useAppStore((state) => state.settings)
   const updateSettings = useAppStore((state) => state.updateSettings)
   const listsCollapsed = settings.liveListsCollapsed
+
+  /*
+    Pane widths.
+
+    Held here as well as in settings because a drag updates on every frame and
+    a settings write goes through IPC to SQLite. The local copy is what the
+    grid reads; the stored one is what a restart reads, written once the
+    pointer is released. Settings stays the source of truth on arrival, so a
+    width changed in another window still lands.
+  */
+  const [catWidth, setCatWidth] = useState(() =>
+    clampPaneWidth('category', settings.liveCategoryWidth)
+  )
+  const [chanWidth, setChanWidth] = useState(() =>
+    clampPaneWidth('channel', settings.liveChannelWidth)
+  )
+  const [dragging, setDragging] = useState(false)
+  useEffect(() => {
+    if (dragging) return
+    setCatWidth(clampPaneWidth('category', settings.liveCategoryWidth))
+    setChanWidth(clampPaneWidth('channel', settings.liveChannelWidth))
+  }, [dragging, settings.liveCategoryWidth, settings.liveChannelWidth])
 
   const [categories, setCategories] = useState<Category[]>([])
   const [categoryId, setCategoryId] = useState<number | null>(null)
@@ -331,7 +355,13 @@ export function LiveTv({ mode, onAddSource, display = 'full', onExpand, onClose 
       <div
         className={`live live--${display} ${
           mode === 'favorites' || allSources ? 'live--nocats' : ''
-        } ${listsCollapsed ? 'live--collapsed' : ''}`}
+        } ${listsCollapsed ? 'live--collapsed' : ''} ${dragging ? 'live--dragging' : ''}`}
+        style={
+          {
+            '--live-cat-w': `${catWidth}px`,
+            '--live-chan-w': `${chanWidth}px`
+          } as CSSProperties
+        }
       >
         {mode === 'live' && !allSources && (
           <div className="pane">
@@ -355,6 +385,15 @@ export function LiveTv({ mode, onAddSource, display = 'full', onExpand, onClose 
                 </button>
               ))}
             </div>
+            <PaneResizer
+              kind="category"
+              width={catWidth}
+              label={t('live.resizeCategories')}
+              onResize={setCatWidth}
+              onCommit={(w) => void updateSettings({ liveCategoryWidth: w })}
+              onDragStart={() => setDragging(true)}
+              onDragEnd={() => setDragging(false)}
+            />
           </div>
         )}
 
@@ -402,6 +441,15 @@ export function LiveTv({ mode, onAddSource, display = 'full', onExpand, onClose 
               )}
             />
           )}
+          <PaneResizer
+            kind="channel"
+            width={chanWidth}
+            label={t('live.resizeChannels')}
+            onResize={setChanWidth}
+            onCommit={(w) => void updateSettings({ liveChannelWidth: w })}
+            onDragStart={() => setDragging(true)}
+            onDragEnd={() => setDragging(false)}
+          />
         </div>
 
         {display === 'mini' && (
