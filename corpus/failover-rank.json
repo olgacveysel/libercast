@@ -1,0 +1,263 @@
+{
+  "function": "failover.rank",
+  "about": "Which channel from another provider may be played when this one fails, in the order to try them.",
+  "notes": [
+    "Arguments are the failing channel's name, the candidates from other providers, and the ids already tried.",
+    "Returns `accepted` — what may be played, best first — and `nearMisses`, which are reported to the user and never played. The near misses exist so that a threshold nobody can tune from a desk can be judged against real pairs of lists.",
+    "0.86 and above is playable. 0.70 to 0.86 is a near miss.",
+    "Certainty comes before score. An exact match scoring 1.00 and a regional variant scoring 0.95 are not two points on one scale, and the caller plays the first thing it is allowed to play.",
+    "Ties break by playlist id and then channel id, so the same provider is tried first every time rather than shuffling between attempts. A failover that picks a different alternate on each retry is one nobody can diagnose."
+  ],
+  "cases": [
+    {
+      "name": "an exact match is offered before a regional variant",
+      "why": "Both are above the threshold and the variant scores well, but it is another country's feed. It stays on the list, below, because sometimes it is the only thing working.",
+      "args": [
+        "Alto Sports 2",
+        [
+          {
+            "channelId": 10,
+            "playlistId": 1,
+            "playlistName": "P1",
+            "name": "Alto Sports 2 HD"
+          },
+          {
+            "channelId": 11,
+            "playlistId": 2,
+            "playlistName": "P2",
+            "name": "Alto Sports 4"
+          },
+          {
+            "channelId": 12,
+            "playlistId": 3,
+            "playlistName": "P3",
+            "name": "Alto Sports 2 Turkey"
+          },
+          {
+            "channelId": 13,
+            "playlistId": 4,
+            "playlistName": "P4",
+            "name": "Harbour News"
+          }
+        ],
+        []
+      ],
+      "expect": {
+        "accepted": [
+          {
+            "channelId": 10,
+            "playlistId": 1,
+            "playlistName": "P1",
+            "name": "Alto Sports 2 HD",
+            "score": 1,
+            "confidence": "exact"
+          },
+          {
+            "channelId": 12,
+            "playlistId": 3,
+            "playlistName": "P3",
+            "name": "Alto Sports 2 Turkey",
+            "score": 0.95,
+            "confidence": "likely"
+          }
+        ],
+        "nearMisses": []
+      }
+    },
+    {
+      "name": "a channel differing only by its number is not offered at all",
+      "why": "The whole reason the digit rule is absolute. Landing on the wrong match of the same competition is worse than no picture: it looks like it worked.",
+      "args": [
+        "Alto Sports 2",
+        [
+          {
+            "channelId": 11,
+            "playlistId": 2,
+            "playlistName": "P2",
+            "name": "Alto Sports 4"
+          }
+        ],
+        []
+      ],
+      "expect": {
+        "accepted": [],
+        "nearMisses": []
+      }
+    },
+    {
+      "name": "an alternate already tried is skipped",
+      "why": "A second failover must not return to the stream that just failed.",
+      "args": [
+        "Alto Sports 2",
+        [
+          {
+            "channelId": 10,
+            "playlistId": 1,
+            "playlistName": "P1",
+            "name": "Alto Sports 2 HD"
+          },
+          {
+            "channelId": 14,
+            "playlistId": 5,
+            "playlistName": "P5",
+            "name": "ALTO SPORTS 2"
+          }
+        ],
+        [
+          10
+        ]
+      ],
+      "expect": {
+        "accepted": [
+          {
+            "channelId": 14,
+            "playlistId": 5,
+            "playlistName": "P5",
+            "name": "ALTO SPORTS 2",
+            "score": 1,
+            "confidence": "exact"
+          }
+        ],
+        "nearMisses": []
+      }
+    },
+    {
+      "name": "equal candidates come out in a stable order",
+      "why": "Lowest playlist id first, then lowest channel id. Not cosmetic: an order that varies between attempts makes a failover impossible to reason about from a log.",
+      "args": [
+        "Alto Sports 2",
+        [
+          {
+            "channelId": 20,
+            "playlistId": 9,
+            "playlistName": "P9",
+            "name": "Alto Sports 2"
+          },
+          {
+            "channelId": 21,
+            "playlistId": 2,
+            "playlistName": "P2",
+            "name": "Alto Sports 2"
+          },
+          {
+            "channelId": 22,
+            "playlistId": 2,
+            "playlistName": "P2",
+            "name": "Alto Sports 2"
+          }
+        ],
+        []
+      ],
+      "expect": {
+        "accepted": [
+          {
+            "channelId": 21,
+            "playlistId": 2,
+            "playlistName": "P2",
+            "name": "Alto Sports 2",
+            "score": 1,
+            "confidence": "exact"
+          },
+          {
+            "channelId": 22,
+            "playlistId": 2,
+            "playlistName": "P2",
+            "name": "Alto Sports 2",
+            "score": 1,
+            "confidence": "exact"
+          },
+          {
+            "channelId": 20,
+            "playlistId": 9,
+            "playlistName": "P9",
+            "name": "Alto Sports 2",
+            "score": 1,
+            "confidence": "exact"
+          }
+        ],
+        "nearMisses": []
+      }
+    },
+    {
+      "name": "a close name is reported but never played",
+      "args": [
+        "Alto Sports",
+        [
+          {
+            "channelId": 30,
+            "playlistId": 1,
+            "playlistName": "P1",
+            "name": "Alto Sport"
+          }
+        ],
+        []
+      ],
+      "expect": {
+        "accepted": [],
+        "nearMisses": [
+          {
+            "channelId": 30,
+            "playlistId": 1,
+            "playlistName": "P1",
+            "name": "Alto Sport",
+            "score": 0.8471,
+            "confidence": "likely"
+          }
+        ]
+      }
+    },
+    {
+      "name": "an unrelated name is not even a near miss",
+      "args": [
+        "Alto Sports",
+        [
+          {
+            "channelId": 31,
+            "playlistId": 1,
+            "playlistName": "P1",
+            "name": "Harbour News"
+          }
+        ],
+        []
+      ],
+      "expect": {
+        "accepted": [],
+        "nearMisses": []
+      }
+    },
+    {
+      "name": "no candidates, nothing to offer",
+      "args": [
+        "Alto Sports 2",
+        [],
+        []
+      ],
+      "expect": {
+        "accepted": [],
+        "nearMisses": []
+      }
+    },
+    {
+      "name": "every candidate excluded leaves nothing",
+      "why": "What the end of a failover chain looks like. The caller has to tell this apart from having found nothing in the first place.",
+      "args": [
+        "Alto Sports 2",
+        [
+          {
+            "channelId": 10,
+            "playlistId": 1,
+            "playlistName": "P1",
+            "name": "Alto Sports 2"
+          }
+        ],
+        [
+          10
+        ]
+      ],
+      "expect": {
+        "accepted": [],
+        "nearMisses": []
+      }
+    }
+  ]
+}

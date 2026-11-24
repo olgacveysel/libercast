@@ -88,6 +88,8 @@ the time-zone decisions and the deliberate boundaries are written down.
 | `catchup.window` | How far back an archive reaches |
 | `catchup.replay` | Whether a programme can be replayed now |
 | `catchup.start` | The start stamp a panel's archive URL carries |
+| `failover.rank` | Which channel from another provider may be played when this one fails |
+| `xtream.fields` | The coercions that turn a panel's JSON into catalogue fields |
 
 ## Things worth knowing before you implement any of it
 
@@ -126,3 +128,10 @@ first run. Three were arithmetic mistakes in the expectation; one was a
 boundary that turned out to be right for a reason worth writing down; and one
 was a real bug — `xmltv.programme` read only double-quoted attributes, so a
 feed using single quotes produced a guide with nothing in it.
+
+Some cases record a limitation rather than endorse it, and say so in `why`.
+`names.fold` leaves German ß alone, so `Straße` and `Strasse` do not fold
+alike; `xtream.fields` does not look past an empty first image. Both are
+pinned because a second implementation differing there would disagree about
+what is hidden and what has artwork — the point is that the two agree, not
+that either is ideal.

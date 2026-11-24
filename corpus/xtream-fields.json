@@ -1,0 +1,337 @@
+{
+  "function": "xtream.fields",
+  "about": "The small coercions that turn a panel's JSON into catalogue fields.",
+  "notes": [
+    "Arguments are the coercion's name and the raw value, so one suite covers all of them.",
+    "`str`, `toInt` and `num` treat an empty string as absent, not as zero. Panels send \"\" for a missing number constantly, and an implementation reading that as 0 fills a catalogue with channel number zero and a rating of nought without failing anywhere.",
+    "`catchupDays` is the only one with a judgement in it: panels disagree about whether the flag or the duration says there is an archive, so a duration alone is believed and a flag alone is taken as one day — erring towards asking the provider rather than hiding a feature the account has paid for."
+  ],
+  "cases": [
+    {
+      "name": "str keeps a string",
+      "args": [
+        "str",
+        "42"
+      ],
+      "expect": "42"
+    },
+    {
+      "name": "str stringifies a number",
+      "why": "Panels send stream_id as a number on some endpoints and a string on others; the id must come out the same either way or the two syncs disagree about which channel is which.",
+      "args": [
+        "str",
+        42
+      ],
+      "expect": "42"
+    },
+    {
+      "name": "str treats an empty string as absent",
+      "args": [
+        "str",
+        ""
+      ],
+      "expect": null
+    },
+    {
+      "name": "str treats null as absent",
+      "args": [
+        "str",
+        null
+      ],
+      "expect": null
+    },
+    {
+      "name": "str keeps zero, which is a real id",
+      "args": [
+        "str",
+        0
+      ],
+      "expect": "0"
+    },
+    {
+      "name": "toInt reads a numeric string",
+      "args": [
+        "toInt",
+        "401"
+      ],
+      "expect": 401
+    },
+    {
+      "name": "toInt keeps a number",
+      "args": [
+        "toInt",
+        401
+      ],
+      "expect": 401
+    },
+    {
+      "name": "toInt treats an empty string as absent, not as zero",
+      "args": [
+        "toInt",
+        ""
+      ],
+      "expect": null
+    },
+    {
+      "name": "toInt treats a non-number as absent",
+      "args": [
+        "toInt",
+        "n/a"
+      ],
+      "expect": null
+    },
+    {
+      "name": "toInt truncates rather than rounding",
+      "args": [
+        "toInt",
+        "401.9"
+      ],
+      "expect": 401
+    },
+    {
+      "name": "toInt reads a leading number",
+      "why": "parseInt stops at the first non-digit. Recorded because it is a real difference from a strict parse: a second implementation refusing this would drop channel numbers that currently work.",
+      "args": [
+        "toInt",
+        "401 HD"
+      ],
+      "expect": 401
+    },
+    {
+      "name": "toInt keeps zero",
+      "args": [
+        "toInt",
+        "0"
+      ],
+      "expect": 0
+    },
+    {
+      "name": "num reads a decimal",
+      "args": [
+        "num",
+        "8.5"
+      ],
+      "expect": 8.5
+    },
+    {
+      "name": "num treats an empty string as absent",
+      "args": [
+        "num",
+        ""
+      ],
+      "expect": null
+    },
+    {
+      "name": "num refuses a number with text after it",
+      "why": "Unlike toInt. The difference is deliberate: a rating is either a number or it is missing, and half-reading one invents a score.",
+      "args": [
+        "num",
+        "8.5 of 10"
+      ],
+      "expect": null
+    },
+    {
+      "name": "num keeps zero",
+      "args": [
+        "num",
+        0
+      ],
+      "expect": 0
+    },
+    {
+      "name": "num treats null as absent",
+      "args": [
+        "num",
+        null
+      ],
+      "expect": null
+    },
+    {
+      "name": "text trims",
+      "args": [
+        "text",
+        "  A plot.  "
+      ],
+      "expect": "A plot."
+    },
+    {
+      "name": "text treats whitespace alone as absent",
+      "args": [
+        "text",
+        "   "
+      ],
+      "expect": null
+    },
+    {
+      "name": "text stringifies a number",
+      "args": [
+        "text",
+        2021
+      ],
+      "expect": "2021"
+    },
+    {
+      "name": "text treats anything else as absent",
+      "args": [
+        "text",
+        true
+      ],
+      "expect": null
+    },
+    {
+      "name": "text treats an object as absent rather than stringifying it",
+      "why": "Otherwise a plot reads `[object Object]`, which is worse than an empty one because it looks like data.",
+      "args": [
+        "text",
+        {
+          "a": 1
+        }
+      ],
+      "expect": null
+    },
+    {
+      "name": "firstImage takes the first of an array",
+      "args": [
+        "firstImage",
+        [
+          "http://p.invalid/a.jpg",
+          "http://p.invalid/b.jpg"
+        ]
+      ],
+      "expect": "http://p.invalid/a.jpg"
+    },
+    {
+      "name": "firstImage accepts a bare string",
+      "why": "backdrop_path is an array on most panels and a single string on some.",
+      "args": [
+        "firstImage",
+        "http://p.invalid/a.jpg"
+      ],
+      "expect": "http://p.invalid/a.jpg"
+    },
+    {
+      "name": "firstImage of an empty array is absent",
+      "args": [
+        "firstImage",
+        []
+      ],
+      "expect": null
+    },
+    {
+      "name": "firstImage does not look past an empty first entry",
+      "args": [
+        "firstImage",
+        [
+          "",
+          "http://p.invalid/b.jpg"
+        ]
+      ],
+      "expect": null,
+      "why": "A limitation, recorded rather than endorsed: a panel sending an empty string before a real URL loses the image. Harmless enough that changing it is not worth the risk of changing what a catalogue looks like, but a second implementation must match it, or the two disagree about which films have artwork."
+    },
+    {
+      "name": "parseDuration reads hours, minutes and seconds",
+      "args": [
+        "parseDuration",
+        "01:42:00"
+      ],
+      "expect": 6120
+    },
+    {
+      "name": "parseDuration reads minutes and seconds",
+      "args": [
+        "parseDuration",
+        "42:30"
+      ],
+      "expect": 2550
+    },
+    {
+      "name": "parseDuration refuses a bare number",
+      "why": "`90` could be minutes or seconds and guessing wrong puts the seek bar an hour out.",
+      "args": [
+        "parseDuration",
+        "90"
+      ],
+      "expect": null
+    },
+    {
+      "name": "parseDuration refuses text",
+      "args": [
+        "parseDuration",
+        "1h42"
+      ],
+      "expect": null
+    },
+    {
+      "name": "parseDuration of nothing is nothing",
+      "args": [
+        "parseDuration",
+        null
+      ],
+      "expect": null
+    },
+    {
+      "name": "catchupDays believes a duration on its own",
+      "args": [
+        "catchupDays",
+        {
+          "tv_archive": 0,
+          "tv_archive_duration": 7
+        }
+      ],
+      "expect": 7
+    },
+    {
+      "name": "catchupDays takes a flag on its own as one day",
+      "args": [
+        "catchupDays",
+        {
+          "tv_archive": 1,
+          "tv_archive_duration": 0
+        }
+      ],
+      "expect": 1
+    },
+    {
+      "name": "catchupDays prefers the duration when both are set",
+      "args": [
+        "catchupDays",
+        {
+          "tv_archive": 1,
+          "tv_archive_duration": 14
+        }
+      ],
+      "expect": 14
+    },
+    {
+      "name": "catchupDays of neither is no archive",
+      "args": [
+        "catchupDays",
+        {
+          "tv_archive": 0,
+          "tv_archive_duration": 0
+        }
+      ],
+      "expect": 0
+    },
+    {
+      "name": "catchupDays reads them as strings too",
+      "args": [
+        "catchupDays",
+        {
+          "tv_archive": "1",
+          "tv_archive_duration": "7"
+        }
+      ],
+      "expect": 7
+    },
+    {
+      "name": "catchupDays of an empty row is no archive",
+      "args": [
+        "catchupDays",
+        {}
+      ],
+      "expect": 0
+    }
+  ]
+}

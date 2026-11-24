@@ -3,18 +3,80 @@
   "description": "Behaviour LiberCast's parsers and matchers must have, written as data so an implementation in any language can be held to it.",
   "rounding": 4,
   "suites": [
-    { "file": "m3u.json", "function": "m3u.parse", "about": "A provider playlist to a catalogue." },
-    { "file": "xmltv-time.json", "function": "xmltv.time", "about": "An XMLTV timestamp to Unix milliseconds." },
-    { "file": "xmltv-entities.json", "function": "xmltv.entities", "about": "XML entity decoding, as the guide needs it." },
-    { "file": "xmltv-programme.json", "function": "xmltv.programme", "about": "One <programme> block to a guide entry." },
-    { "file": "xmltv-channel.json", "function": "xmltv.channel", "about": "One <channel> block to a guide channel." },
-    { "file": "names-fold.json", "function": "names.fold", "about": "The folded form used for search, filtering and the parental check." },
-    { "file": "names-normalize.json", "function": "names.normalize", "about": "A channel name to its identifying words." },
-    { "file": "names-same.json", "function": "names.same", "about": "Whether two names are the same channel beyond doubt." },
-    { "file": "names-similarity.json", "function": "names.similarity", "about": "How alike two channel names are, 0 to 1." },
-    { "file": "names-best.json", "function": "names.best", "about": "Choosing a guide channel for a playlist channel, or refusing to." },
-    { "file": "catchup-window.json", "function": "catchup.window", "about": "How far back an archive reaches." },
-    { "file": "catchup-replay.json", "function": "catchup.replay", "about": "Whether a programme can be replayed now." },
-    { "file": "catchup-start.json", "function": "catchup.start", "about": "The start stamp a panel's archive URL carries." }
+    {
+      "file": "m3u.json",
+      "function": "m3u.parse",
+      "about": "A provider playlist to a catalogue."
+    },
+    {
+      "file": "xmltv-time.json",
+      "function": "xmltv.time",
+      "about": "An XMLTV timestamp to Unix milliseconds."
+    },
+    {
+      "file": "xmltv-entities.json",
+      "function": "xmltv.entities",
+      "about": "XML entity decoding, as the guide needs it."
+    },
+    {
+      "file": "xmltv-programme.json",
+      "function": "xmltv.programme",
+      "about": "One <programme> block to a guide entry."
+    },
+    {
+      "file": "xmltv-channel.json",
+      "function": "xmltv.channel",
+      "about": "One <channel> block to a guide channel."
+    },
+    {
+      "file": "names-fold.json",
+      "function": "names.fold",
+      "about": "The folded form used for search, filtering and the parental check."
+    },
+    {
+      "file": "names-normalize.json",
+      "function": "names.normalize",
+      "about": "A channel name to its identifying words."
+    },
+    {
+      "file": "names-same.json",
+      "function": "names.same",
+      "about": "Whether two names are the same channel beyond doubt."
+    },
+    {
+      "file": "names-similarity.json",
+      "function": "names.similarity",
+      "about": "How alike two channel names are, 0 to 1."
+    },
+    {
+      "file": "names-best.json",
+      "function": "names.best",
+      "about": "Choosing a guide channel for a playlist channel, or refusing to."
+    },
+    {
+      "file": "catchup-window.json",
+      "function": "catchup.window",
+      "about": "How far back an archive reaches."
+    },
+    {
+      "file": "catchup-replay.json",
+      "function": "catchup.replay",
+      "about": "Whether a programme can be replayed now."
+    },
+    {
+      "file": "catchup-start.json",
+      "function": "catchup.start",
+      "about": "The start stamp a panel's archive URL carries."
+    },
+    {
+      "file": "failover-rank.json",
+      "function": "failover.rank",
+      "about": "Which channel from another provider may be played when this one fails."
+    },
+    {
+      "file": "xtream-fields.json",
+      "function": "xtream.fields",
+      "about": "The coercions that turn a panel's JSON into catalogue fields."
+    }
   ]
 }

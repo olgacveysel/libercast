@@ -395,16 +395,26 @@ function mapCategories(raw: unknown): ParsedCategory[] {
   })
 }
 
+/*
+  The small coercions below are exported for the corpus.
+
+  They look like nothing and they are where two implementations of this client
+  would quietly disagree. Panels send a number as a string, a missing value as
+  an empty string, a flag as "0", and an image as either a string or an array
+  of them — and a second implementation that reads an empty string as 0 rather
+  than as "absent" fills a catalogue with channel number zero without failing
+  anywhere. `corpus/xtream-fields.json` pins each of these.
+*/
 function asArray<T>(value: unknown): T[] {
   return Array.isArray(value) ? (value as T[]) : []
 }
 
-function str(value: string | number | null | undefined): string | null {
+export function str(value: string | number | null | undefined): string | null {
   if (value === null || value === undefined || value === '') return null
   return String(value)
 }
 
-function toInt(value: string | number | null | undefined): number | null {
+export function toInt(value: string | number | null | undefined): number | null {
   if (value === null || value === undefined || value === '') return null
   const parsed = Number.parseInt(String(value), 10)
   return Number.isFinite(parsed) ? parsed : null
@@ -424,7 +434,7 @@ function encode(value: string): string {
  * window worth offering and errs towards asking the provider rather than
  * hiding a feature the account has paid for.
  */
-function catchupDays(stream: RawLiveStream): number {
+export function catchupDays(stream: RawLiveStream): number {
   const duration = toInt(stream.tv_archive_duration) ?? 0
   if (duration > 0) return duration
 
@@ -432,14 +442,14 @@ function catchupDays(stream: RawLiveStream): number {
   return flag > 0 ? 1 : 0
 }
 
-function text(value: unknown): string | null {
+export function text(value: unknown): string | null {
   if (typeof value === 'number') return String(value)
   if (typeof value !== 'string') return null
   const trimmed = value.trim()
   return trimmed === '' ? null : trimmed
 }
 
-function num(value: unknown): number | null {
+export function num(value: unknown): number | null {
   if (value === null || value === undefined || value === '') return null
   const parsed = Number(value)
   return Number.isFinite(parsed) ? parsed : null
@@ -447,13 +457,13 @@ function num(value: unknown): number | null {
 
 
 /** `backdrop_path` is an array of URLs on most panels and a bare string on some. */
-function firstImage(value: unknown): string | null {
+export function firstImage(value: unknown): string | null {
   if (Array.isArray(value)) return text(value[0])
   return text(value)
 }
 
 /** Xtream durations arrive as `01:42:00`. */
-function parseDuration(value: string | null): number | null {
+export function parseDuration(value: string | null): number | null {
   if (!value) return null
   const parts = value.split(':').map((part) => Number.parseInt(part, 10))
   if (parts.some((part) => !Number.isFinite(part))) return null

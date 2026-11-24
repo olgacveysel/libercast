@@ -26,6 +26,8 @@ import { parseM3u } from '@main/sources/m3u'
 import { decodeEntities, parseChannelBlock, parseProgrammeBlock, parseXmltvTime } from '@main/sources/xmltv'
 import { bestMatch, normalizeName, sameChannelName, similarity } from '@main/sources/epgMatch'
 import { canReplay, catchupWindowMs, formatStart } from '@shared/catchup'
+import { rankAlternatesDetailed, type AlternateCandidate } from '@main/sources/failover'
+import * as xtream from '@main/sources/xtream'
 import { fold } from '@main/db'
 
 let failures = 0
@@ -85,7 +87,28 @@ const FUNCTIONS: Record<string, (...args: never[]) => unknown> = {
     days: number,
     now: number
   ) => canReplay(programme, days, now),
-  'catchup.start': (at: number, timeZone: string | null) => formatStart(at, timeZone)
+  'catchup.start': (at: number, timeZone: string | null) => formatStart(at, timeZone),
+  'failover.rank': (name: string, candidates: AlternateCandidate[], exclude: number[]) =>
+    rankAlternatesDetailed(name, candidates, exclude),
+  /*
+    One suite for the small coercions, named by their own names. They are a
+    family rather than one function, and a case per file would be ten files
+    describing one page of code.
+  */
+  'xtream.fields': (which: string, value: unknown) => {
+    const table: Record<string, (v: never) => unknown> = {
+      str: xtream.str,
+      toInt: xtream.toInt,
+      num: xtream.num,
+      text: xtream.text,
+      firstImage: xtream.firstImage,
+      parseDuration: xtream.parseDuration,
+      catchupDays: xtream.catchupDays
+    }
+    const fn = table[which]
+    if (!fn) throw new Error(`no coercion named ${which}`)
+    return fn(value as never)
+  }
 }
 
 /**
