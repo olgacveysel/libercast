@@ -19,7 +19,12 @@ const BASE_SETTINGS = {
   volume: 0.8, muted: false, singleConnection: true, sourceFailover: 'ask',
   autoCheckUpdates: true, lastUpdateCheck: now - HOUR, knownUpdateVersion: null,
   knownUpdateUrl: null, dismissedUpdate: null,
-  autoRefreshHours: 12, autoRefreshEpg: true, lastAutoRefresh: now - 6 * HOUR,
+  autoRefreshHours: 12, autoRefreshEpg: true,
+  /* An object, not a timestamp: a report of what the last refresh did. */
+  lastAutoRefresh: { at: now - 6 * HOUR, sources: [
+    { playlistId: 1, name: 'Main panel', added: 12, removed: 3, error: null },
+    { playlistId: 2, name: 'Backup list', added: 0, removed: 0, error: 'The provider did not answer' }
+  ] },
   hardwareAcceleration: true, tvNavigation: false, showStreamStats: false,
   resumeLastChannel: true, preferredAudioLanguages: ['eng'], preferredSubtitleLanguages: [],
   recordingsPath: 'C:\\Users\\Example\\Videos\\LiberCast', recordingTemplate: '{channel} - {title} ({date} {time})',
@@ -101,15 +106,15 @@ const programmes = (channelId) =>
   }))
 
 const recordings = [
-  { id: 1, channelId: 3, channelName: 'Crest Sport 1 FHD', title: 'Match of the Day', filePath: 'C:\\Users\\Example\\Videos\\LiberCast\\Crest Sport 1 - Match of the Day.mp4', state: 'completed', startsAt: now - 30 * HOUR, endsAt: now - 28 * HOUR, bytes: 2_400_000_000, error: null },
-  { id: 2, channelId: 1, channelName: 'Vale News HD', title: 'The News at Six', filePath: 'C:\\Users\\Example\\Videos\\LiberCast\\Vale News - The News at Six.mp4', state: 'recording', startsAt: now - 20 * 60_000, endsAt: now + 40 * 60_000, bytes: 180_000_000, error: null },
-  { id: 3, channelId: 5, channelName: 'Harbour Cinema', title: 'Afternoon Film', filePath: null, state: 'scheduled', startsAt: now + 4 * HOUR, endsAt: now + 6 * HOUR, bytes: 0, error: null },
-  { id: 4, channelId: 9, channelName: 'Vale Documentary', title: 'Documentary Hour', filePath: null, state: 'failed', startsAt: now - 50 * HOUR, endsAt: now - 49 * HOUR, bytes: 0, error: 'The file did not open afterwards' }
+  { id: 1, channelId: 3, channelName: 'Crest Sport 1 FHD', title: 'Match of the Day', filePath: 'C:\\Users\\Example\\Videos\\LiberCast\\Crest Sport 1 - Match of the Day.mp4', status: 'completed', startsAt: now - 30 * HOUR, endsAt: now - 28 * HOUR, bytes: 2_400_000_000, error: null },
+  { id: 2, channelId: 1, channelName: 'Vale News HD', title: 'The News at Six', filePath: 'C:\\Users\\Example\\Videos\\LiberCast\\Vale News - The News at Six.mp4', status: 'recording', startsAt: now - 20 * 60_000, endsAt: now + 40 * 60_000, bytes: 180_000_000, error: null },
+  { id: 3, channelId: 5, channelName: 'Harbour Cinema', title: 'Afternoon Film', filePath: null, status: 'scheduled', startsAt: now + 4 * HOUR, endsAt: now + 6 * HOUR, bytes: 0, error: null },
+  { id: 4, channelId: 9, channelName: 'Vale Documentary', title: 'Documentary Hour', filePath: null, status: 'failed', startsAt: now - 50 * HOUR, endsAt: now - 49 * HOUR, bytes: 0, error: 'The file did not open afterwards' }
 ]
 
 const downloads = [
   { id: 1, channelId: 103, name: 'Lumen', state: 'downloading', bytes: 820_000_000, totalBytes: 2_100_000_000, filePath: 'C:\\Users\\Example\\Downloads\\Lumen.mp4', error: null, addedAt: now - HOUR },
-  { id: 2, channelId: 101, name: 'The Quiet Harbour', state: 'completed', bytes: 1_600_000_000, totalBytes: 1_600_000_000, filePath: 'C:\\Users\\Example\\Downloads\\The Quiet Harbour.mp4', error: null, addedAt: now - 20 * HOUR },
+  { id: 2, channelId: 101, name: 'The Quiet Harbour', status: 'completed', bytes: 1_600_000_000, totalBytes: 1_600_000_000, filePath: 'C:\\Users\\Example\\Downloads\\The Quiet Harbour.mp4', error: null, addedAt: now - 20 * HOUR },
   { id: 3, channelId: 105, name: 'Vale of Shadows', state: 'paused', bytes: 240_000_000, totalBytes: 1_900_000_000, filePath: null, error: null, addedAt: now - 2 * HOUR }
 ]
 
@@ -155,7 +160,7 @@ const answers = {
   'app:credentialStorage': () => ({ available: true, backend: 'DPAPI' }),
   'app:checkUpdate': () => ({ version: null, url: null }),
   'app:diagnostics': () => ({ report: 'Diagnostics would appear here.' }),
-  'parental:status': () => ({ configured: true, locked: false, rules: { lockAdult: true, lockedCategoryIds: [4], keywords: ['poker'] } }),
+  'parental:status': () => ({ enabled: true, unlocked: true, lockedCategoryIds: [4], keywords: ['poker'], lockAdult: true, autoLockMinutes: 30 }),
   'subtitles:searchStatus': () => ({ hasKey: false, hasAccount: false, remaining: null }),
   'tmdb:status': () => ({ hasKey: false }),
   'vod:movieInfo': () => ({ plot: 'A longer plot, fetched when the sheet opens.', cast: 'A Name, Another Name', director: 'A Director', genre: 'Drama', runtimeSecs: 6900 }),

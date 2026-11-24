@@ -257,6 +257,17 @@ export function LiveTv({ mode, onAddSource, display = 'full', onExpand, onClose 
 
   return (
     <>
+      {/*
+        The toolbar belongs to this screen and only to it.
+
+        This component is rendered on every route, because the player inside
+        it is mounted once and kept alive so that watching survives walking
+        around the application — `display` says how to draw it, and 'hidden'
+        hides the lists and the picture. The toolbar sat outside that, so
+        every other screen had a channel search, a sort and a Sync button
+        pinned under its content, belonging to a screen that was not showing.
+      */}
+      {display === 'full' && (
       <div className="toolbar">
         <h1 className="toolbar__title">{mode === 'favorites' ? t('live.favoritesTitle') : t('live.title')}</h1>
 
@@ -330,6 +341,7 @@ export function LiveTv({ mode, onAddSource, display = 'full', onExpand, onClose 
           </button>
         )}
       </div>
+      )}
 
       {error && (
         <div className="notice notice--error" style={{ margin: '10px 14px 0' }}>

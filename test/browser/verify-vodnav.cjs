@@ -38,6 +38,14 @@ const nav = (label) => `(() => {
 
 const view = () => `(() => ({
   posters: document.querySelectorAll('.poster').length,
+  /*
+    The Live TV screen is rendered on every route so that its player stays
+    mounted and playback survives navigation. Its toolbar is not part of that
+    bargain: a channel search, a sort and a Sync button used to sit pinned
+    under whatever screen you were actually on.
+  */
+  toolbars: document.querySelectorAll('.toolbar__title').length,
+  toolbarSays: [...document.querySelectorAll('.toolbar__title')].map((h) => h.textContent.trim()),
   sheetOpen: !!document.querySelector('.sheet'),
   favoriteTabs: [...document.querySelectorAll('.favorites__tabs .btn')].map((b) => b.textContent.trim())
 }))()`
@@ -89,6 +97,20 @@ async function main() {
     now.favoriteTabs
   )
   check('and one for series', now.favoriteTabs.includes('Series'), now.favoriteTabs)
+
+  console.log('\nThe Live TV toolbar stays on Live TV')
+  check('Films is reachable', await read(window, nav('Movies')))
+  await settle(900)
+  now = await read(window, view())
+  check(
+    'no channel toolbar under the film grid',
+    !now.toolbarSays.includes('Live TV'),
+    now.toolbarSays
+  )
+  check('Live TV is reachable', await read(window, nav('Live TV')))
+  await settle(900)
+  now = await read(window, view())
+  check('and it is there on Live TV itself', now.toolbarSays.includes('Live TV'), now.toolbarSays)
 
   console.log(failures === 0 ? '\nAll checks passed.\n' : `\n${failures} check(s) failed.\n`)
   app.exit(failures === 0 ? 0 : 1)

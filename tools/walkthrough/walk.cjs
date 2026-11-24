@@ -6,6 +6,15 @@
  * as a person meets it rather than as a tree of components.
  *
  *   xvfb-run -a npx electron --no-sandbox --disable-gpu tools/walkthrough/walk.cjs
+ *
+ * Nine of the ten screens photograph faithfully. **Settings does not yet**:
+ * it reads more of the application's state than anything else, and the
+ * stand-in bridge below has to match every shape exactly or the screen fails
+ * — which it currently does, on a date field. The failure is the fixture's,
+ * not the application's, and the screenshot shows the error boundary doing
+ * its job rather than a blank window, which is worth something on its own.
+ * Settings is better photographed against a real seeded database than a
+ * hand-written bridge, and that is the next piece of work here.
  */
 const { app, BrowserWindow } = require('electron')
 const { join } = require('node:path')
@@ -74,18 +83,16 @@ async function main() {
   // The settings sections, which are the densest screens in the application.
   await read(click('Settings'))
   await settle(900)
-  for (const [heading, file] of [
-    ['Playback', '11-settings-playback'],
-    ['Subtitles', '12-settings-subtitles'],
-    ['Recording', '13-settings-recording'],
-    ['Parental', '14-settings-parental'],
-    ['Metadata', '15-settings-metadata'],
-    ['Advanced', '16-settings-advanced']
-  ]) {
-    const ok = await read(clickAny('button, a, .settings__tab, .tab', heading))
-    await settle(800)
-    if (ok) await shoot(window, file)
-    else console.log(`  (no settings section called ${heading})`)
+  const sections = await read(`JSON.stringify(
+    [...document.querySelectorAll('.settings__nav button, .settings nav button, [role="tab"]')]
+      .map((b) => b.textContent.trim()).filter(Boolean)
+  )`)
+  console.log(`  settings sections: ${sections}`)
+  let n = 11
+  for (const heading of JSON.parse(sections)) {
+    const ok = await read(clickAny('.settings__nav button, .settings nav button, [role="tab"]', heading))
+    await settle(700)
+    if (ok) await shoot(window, `${n++}-settings-${heading.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`)
   }
 
   const missing = await read('window.__walk.missing()')
