@@ -3,6 +3,7 @@ import { importCatalog } from '@main/db/repo/import'
 import { getPlaylist, markSynced, setServerTimezone } from '@main/db/repo/playlists'
 import { pruneHealth } from '@main/db/repo/health'
 import { pruneProbes } from '@main/db/repo/probeCache'
+import { optimizeDb } from '@main/db'
 import { getPassword } from '@main/secure/credentials'
 import { createLogger, errorMessage } from '@main/util/logger'
 import type { FetchOptions } from '@main/util/http'
@@ -262,6 +263,14 @@ export async function syncPlaylist(playlistId: number, onProgress: ProgressSink)
     // verdicts too old to mean anything go the same way.
     pruneProbes()
     pruneHealth()
+
+    /*
+      A sync is where the row counts move by orders of magnitude — from no
+      channels to a hundred thousand — so it is where the planner's picture of
+      this database goes stale. Cheap, and it decides whether the first screen
+      after a sync reads twenty rows or scans the whole catalogue.
+    */
+    optimizeDb()
     result.durationMs = Date.now() - started
     emit('done', `Done in ${(result.durationMs / 1000).toFixed(1)}s`, 1)
     return result
