@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { load } from 'js-yaml'
 
@@ -113,6 +113,99 @@ check(
   unpack
 )
 check('nothing excludes out/', !common.some((pattern) => /^!out\b/.test(pattern)))
+
+/*
+  Everything at the top of the repository has to have been decided about.
+
+  `tools/after-pack.cjs` catches a stray file by reading the archive, which is
+  the check that matters because it works on the artifact. But it only runs
+  during a package, so the answer arrives forty minutes into a release build —
+  which is exactly how it arrived: a release-notes file was added at the root,
+  committed, tagged, and the Linux job failed on it.
+
+  This asks the same question of the working tree, in the unit suite, in
+  milliseconds. Anything at the root must be one of three things: packaged on
+  purpose, excluded on purpose, or dropped by electron-builder itself. A new
+  entry that is none of them fails here and names itself.
+*/
+console.log('\nNothing at the root packages itself')
+
+/** What `tools/after-pack.cjs` expects to find inside the archive. */
+const PACKAGED = new Set(['out', 'node_modules', 'package.json', 'electron-builder.yml', 'resources'])
+
+/**
+ * Names electron-builder drops without being told to.
+ *
+ * Kept short and explicit rather than modelled: if a future version stops
+ * dropping one of these, this test fails and says so, instead of a build
+ * quietly including it.
+ */
+const DROPPED_BY_BUILDER = new Set(['LICENSE', 'LICENCE', 'LICENSE.md', 'LICENSE.txt', '.DS_Store'])
+
+/** Expands `{a,b,c}` into the alternatives it stands for. */
+function expand(pattern: string): string[] {
+  const match = /\{([^{}]*)\}/.exec(pattern)
+  if (!match) return [pattern]
+  return match[1]!
+    .split(',')
+    .flatMap((option) => expand(pattern.replace(match[0], option)))
+}
+
+/**
+ * Whether an exclusion pattern covers a root-level entry.
+ *
+ * Only the pattern shapes the configuration actually uses are understood, and
+ * an unrecognised one fails rather than being ignored — a pattern this cannot
+ * read is a pattern whose entries this test would wrongly report as stray.
+ */
+function covers(pattern: string, entry: string): boolean | null {
+  // Patterns reaching into a directory are covered by the directory's own.
+  if (pattern.includes('/')) return false
+  if (!/^[\w.*{}, +-]+$/.test(pattern)) return null
+  const regex = new RegExp(
+    `^${pattern.replace(/[.+^$()|[\]\\]/g, '\\$&').replace(/\*/g, '.*')}$`
+  )
+  return regex.test(entry)
+}
+
+const exclusions = common.filter((p) => p.startsWith('!')).flatMap((p) => expand(p.slice(1)))
+const unreadable: string[] = []
+const excluded = (entry: string): boolean =>
+  exclusions.some((pattern) => {
+    const result = covers(pattern, entry)
+    if (result === null) unreadable.push(pattern)
+    return result === true
+  })
+
+const rootEntries = readdirSync(root).filter((name) => name !== '.git')
+check('the repository root could be read', rootEntries.length > 0)
+
+const stray = rootEntries.filter(
+  (entry) => !PACKAGED.has(entry) && !DROPPED_BY_BUILDER.has(entry) && !excluded(entry)
+)
+check(
+  'every entry at the root is packaged, excluded, or dropped by the builder',
+  stray.length === 0,
+  stray.length === 0
+    ? undefined
+    : `${stray.join(', ')} — add an exclusion to ALL THREE lists in electron-builder.yml, ` +
+      'or move it under a directory that already has one'
+)
+check('every exclusion pattern could be read', unreadable.length === 0, [...new Set(unreadable)])
+
+/*
+  And the same question of the other two lists, since a platform block
+  replaces the top-level list rather than extending it — so an exclusion added
+  to one of them and not the others is an entry that ships on one platform.
+*/
+for (const [label, list] of [
+  ['Windows', win],
+  ['Linux', linux]
+] as const) {
+  const theirs = new Set(list.filter((p) => p.startsWith('!')))
+  const missing = common.filter((p) => p.startsWith('!') && !theirs.has(p))
+  check(`${label}: carries every exclusion the top-level list has`, missing.length === 0, missing)
+}
 
 console.log(failures === 0 ? '\nAll checks passed.\n' : `\n${failures} check(s) failed.\n`)
 process.exit(failures === 0 ? 0 : 1)
