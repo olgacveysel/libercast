@@ -2,6 +2,7 @@ import type { ContentKind } from '@shared/types'
 import { normalizedKey } from '@main/sources/epgMatch'
 import type { ParsedCategory, ParsedChannel } from '@main/sources/types'
 import { fold, getDb } from '../index'
+import { rebuildGrouping } from './grouping'
 import { createLogger } from '@main/util/logger'
 
 const log = createLogger('import')
@@ -237,6 +238,15 @@ export function importCatalog(
   })
 
   run()
+
+  /*
+    The grouping depends on every provider's names at once — whether a
+    prefixed name may collapse onto its unprefixed form is decided by what
+    the *other* sources offer — so importing one playlist can change how
+    another's channels group. Resolved for the whole catalogue, here, where
+    the names last changed.
+  */
+  rebuildGrouping()
 
   return { categories: categories.length, channels: channels.length, removed, pruneSkipped }
 }

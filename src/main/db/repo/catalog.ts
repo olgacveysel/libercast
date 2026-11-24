@@ -1,5 +1,6 @@
 import type { Category, ChannelQuery, ChannelWithState, ContentKind, EpgProgram } from '@shared/types'
 import { getRules as parentalRules, lockClause } from '@main/secure/parental'
+import { SORT_STRIDE } from './grouping'
 import { EFFECTIVE_EPG_ID } from './epg'
 import { fold, getDb } from '../index'
 import { HEALTH_TTL_MS } from './health'
@@ -173,35 +174,6 @@ const ORDER_BY: Record<NonNullable<ChannelQuery['sort']>, string> = {
 }
 
 /**
- * The grouping key for a merged list.
- *
- * A name that normalises to nothing — a channel called "4K" or "|||" — must
- * not be grouped with every other such name, so those fall back to their own
- * row id and group only with themselves.
- */
-const GROUP_KEY = "CASE WHEN ch.match_key = '' THEN 'id:' || ch.id ELSE ch.match_key END"
-
-/**
- * The key with a short leading word removed, or null when there is not one.
- *
- * Providers organise their lists with a country or language code in front of
- * every name — "TR | Alto Sports 2". The prefix is how that provider sorts its
- * own list, not part of what the channel is, so a list that uses one would
- * otherwise merge with nothing.
- *
- * Three or fewer letters and no digit: long enough to catch tr, uk, de, ger,
- * and short enough to leave real first words alone. A digit disqualifies it
- * because a number at the front identifies the channel.
- */
-const PREFIXLESS = (key: string): string =>
-  `CASE WHEN instr(${key}, ' ') BETWEEN 2 AND 4
-         AND substr(${key}, 1, instr(${key}, ' ') - 1) NOT GLOB '*[0-9]*'
-        THEN substr(${key}, instr(${key}, ' ') + 1) END`
-
-/** The leading word itself, for telling two differently-prefixed feeds apart. */
-const PREFIX = (key: string): string => `substr(${key}, 1, instr(${key}, ' ') - 1)`
-
-/**
  * One row per channel across every source.
  *
  * The copy that represents a group is a favourite first, then whichever source
@@ -222,59 +194,52 @@ const PREFIX = (key: string): string => `substr(${key}, 1, instr(${key}, ' ') - 
  * ones, and the header promised eight channels over a list of seven.
  */
 function mergedCtes(where: string): string {
-  return `WITH visible AS (
-            SELECT ch.id,
-                   ${GROUP_KEY} AS gkey,
-                   ch.playlist_id,
-                   p.sort_order,
-                   CASE WHEN f.channel_id IS NULL THEN 1 ELSE 0 END AS unstarred
+  return `WITH groups AS (
+            /*
+              Every group that survives the filter, with how many providers
+              carry it and which copy speaks for it when nobody has starred
+              one. Both answers come out of a single pass, streamed in group
+              order from the covering index, with no sort and no window
+              function — which is the whole of why this is fast.
+            */
+            SELECT ch.group_key AS gkey,
+                   COUNT(DISTINCT ch.playlist_id) AS source_count,
+                   MIN(ch.playlist_sort * ${SORT_STRIDE} + ch.id) AS fallback
             FROM channels ch
-            JOIN playlists p ON p.id = ch.playlist_id
+            /*
+              Joined because the filter may ask about it — "favourites only"
+              is a condition on this table. SQLite leaves it out of the plan
+              when nothing refers to it, so the ordinary list pays nothing
+              for its presence.
+            */
             LEFT JOIN favorites f ON f.channel_id = ch.id
             WHERE ${where}
+            GROUP BY ch.group_key
           ),
-          keys AS (SELECT DISTINCT gkey FROM visible),
-          /*
-            Which prefixed keys may collapse onto their unprefixed form.
+          starred AS (
+            /*
+              And the groups where somebody has. Driven from "favorites",
+              which holds tens of rows rather than hundreds of thousands, so
+              this costs almost nothing — unlike asking the same question of
+              every channel, which is what sorting by "is it a favourite"
+              used to mean.
 
-            Two conditions, and the second is the one that matters: the
-            unprefixed name has to exist on its own, AND it must be claimed by
-            only one prefix. "UK harbour sports 2" and "DE harbour sports 2"
-            both reduce to "harbour sports 2" — two prefixes, so all three stay
-            apart, because those are different feeds and merging them is the
-            same mistake as merging channel 2 with channel 4.
-          */
-          usable AS (
-            SELECT ${PREFIXLESS('k.gkey')} AS base
-            FROM keys k
-            WHERE ${PREFIXLESS('k.gkey')} IS NOT NULL
-              AND ${PREFIXLESS('k.gkey')} IN (SELECT gkey FROM keys)
-            GROUP BY base
-            HAVING COUNT(DISTINCT ${PREFIX('k.gkey')}) = 1
-          ),
-          canonical AS (
-            SELECT v.id,
-                   COALESCE(
-                     (SELECT u.base FROM usable u WHERE u.base = ${PREFIXLESS('v.gkey')}),
-                     v.gkey
-                   ) AS gkey,
-                   v.playlist_id,
-                   v.sort_order,
-                   v.unstarred
-            FROM visible v
-          ),
-          groups AS (
-            SELECT gkey, COUNT(DISTINCT playlist_id) AS source_count
-            FROM canonical GROUP BY gkey
+              Favourite first matters: starring the copy on your backup
+              provider and then seeing an unstarred row — which un-stars the
+              *other* copy when clicked — is the kind of bug that makes
+              favourites feel broken.
+            */
+            SELECT ch.group_key AS gkey,
+                   MIN(ch.playlist_sort * ${SORT_STRIDE} + ch.id) AS pick
+            FROM channels ch
+            JOIN favorites f ON f.channel_id = ch.id
+            WHERE ${where}
+            GROUP BY ch.group_key
           ),
           chosen AS (
-            SELECT gkey, id FROM (
-              SELECT gkey, id,
-                     ROW_NUMBER() OVER (
-                       PARTITION BY gkey ORDER BY unstarred, sort_order, id
-                     ) AS rn
-              FROM canonical
-            ) WHERE rn = 1
+            SELECT g.gkey, COALESCE(s.pick, g.fallback) % ${SORT_STRIDE} AS id
+            FROM groups g
+            LEFT JOIN starred s ON s.gkey = g.gkey
           )
 `
 }
@@ -300,7 +265,7 @@ function mergedQuery(where: string, order: string): string {
 /** How many rows a merged list will show, counted the same way it groups. */
 function mergedCount(where: string): string {
   return `${mergedCtes(where)}
-          SELECT COUNT(*) AS n FROM (SELECT DISTINCT gkey FROM canonical)`
+          SELECT COUNT(*) AS n FROM groups`
 }
 
 function plainQuery(where: string, order: string): string {
@@ -331,7 +296,8 @@ export function queryChannels(query: ChannelQuery): ChannelWithState[] {
   const rows = query.merge
     ? (getDb()
         .prepare(mergedQuery(sql, order))
-        .all(...params, healthCutoff(), limit, offset) as ChannelRow[])
+        // Named twice in the CTEs above, so bound twice.
+        .all(...params, ...params, healthCutoff(), limit, offset) as ChannelRow[])
     : (getDb()
         .prepare(plainQuery(sql, order))
         .all(healthCutoff(), ...params, limit, offset) as ChannelRow[])
@@ -351,7 +317,9 @@ export function countChannels(query: ChannelQuery): number {
        LEFT JOIN favorites f ON f.channel_id = ch.id
        WHERE ${sql}`
 
-  const row = getDb().prepare(count).get(...params) as { n: number }
+  // The merged count names the filter twice, the plain one once.
+  const bound = query.merge ? [...params, ...params] : params
+  const row = getDb().prepare(count).get(...bound) as { n: number }
   return row.n
 }
 

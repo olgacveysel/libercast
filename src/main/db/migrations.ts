@@ -498,6 +498,84 @@ export const MIGRATIONS: Migration[] = [
 
       CREATE INDEX idx_tmdb_fetched ON tmdb_meta(fetched_at);
     `
+  },
+  {
+    version: 15,
+    name: 'merged-grouping',
+    up: `
+      -- Which group a channel belongs to in the all-sources list, resolved
+      -- once instead of on every read.
+      --
+      -- The merged list collapses the same channel across providers, and
+      -- working out the groups means normalising every name, finding which
+      -- country prefixes may be dropped, and checking that each unprefixed
+      -- form is claimed by only one prefix. That is a pass over the whole
+      -- catalogue, and it was being made again for every page and every
+      -- keystroke: measured at 480 ms a page on 150,000 channels, with
+      -- another 164 for the count beside it.
+      --
+      -- None of it depends on anything that changes between reads. The
+      -- answer is a function of the names and the providers, so it is
+      -- resolved when the catalogue changes and stored here.
+      ALTER TABLE channels ADD COLUMN group_key TEXT NOT NULL DEFAULT '';
+
+      -- The provider's position in the user's own ordering, copied onto the
+      -- row.
+      --
+      -- It lives on the playlist, and reading it there means joining a second
+      -- table to decide which copy of a channel represents its group — which
+      -- is what stops the grouping being answered from an index alone.
+      -- Copied rather than joined, and kept in step when sources are
+      -- reordered.
+      ALTER TABLE channels ADD COLUMN playlist_sort INTEGER NOT NULL DEFAULT 0;
+
+      -- Ordered by group so that counting the providers per group and
+      -- choosing each group's representative are one streamed pass with no
+      -- sort, and covering so that pass never has to touch a row.
+      CREATE INDEX idx_channels_group
+        ON channels(kind, hidden, group_key, playlist_sort, id, playlist_id);
+
+      -- Filled in here rather than left to the next sync.
+      --
+      -- The column defaults to the empty string, and an empty key is a key
+      -- like any other: every channel in the catalogue would share it, and
+      -- the merged list would collapse to a single row until each source
+      -- happened to be refreshed. An upgrade must not break a screen and
+      -- then wait to be rescued.
+      --
+      -- The same resolution rebuildGrouping performs, written out because
+      -- a migration runs against the schema it is upgrading and cannot call
+      -- into code that expects the finished one.
+      UPDATE channels
+         SET playlist_sort = COALESCE(
+               (SELECT p.sort_order FROM playlists p WHERE p.id = channels.playlist_id), 0);
+
+      UPDATE channels
+         SET group_key = (
+               WITH raw AS (
+                 SELECT ch.id,
+                        CASE WHEN ch.match_key = '' THEN 'id:' || ch.id ELSE ch.match_key END AS gkey
+                 FROM channels ch
+               ),
+               keys AS (SELECT DISTINCT gkey FROM raw),
+               usable AS (
+                 SELECT CASE WHEN instr(k.gkey, ' ') BETWEEN 2 AND 4
+                              AND substr(k.gkey, 1, instr(k.gkey, ' ') - 1) NOT GLOB '*[0-9]*'
+                             THEN substr(k.gkey, instr(k.gkey, ' ') + 1) END AS base
+                 FROM keys k
+                 WHERE base IS NOT NULL
+                   AND base IN (SELECT gkey FROM keys)
+                 GROUP BY base
+                 HAVING COUNT(DISTINCT substr(k.gkey, 1, instr(k.gkey, ' ') - 1)) = 1
+               )
+               SELECT COALESCE(
+                        (SELECT u.base FROM usable u
+                          WHERE u.base = CASE WHEN instr(r.gkey, ' ') BETWEEN 2 AND 4
+                                               AND substr(r.gkey, 1, instr(r.gkey, ' ') - 1) NOT GLOB '*[0-9]*'
+                                              THEN substr(r.gkey, instr(r.gkey, ' ') + 1) END),
+                        r.gkey)
+               FROM raw r WHERE r.id = channels.id);
+    `
   }
 ]
 
