@@ -124,6 +124,12 @@ export const de: Record<TranslationKey, string> = {
   'live.showLists': 'Kategorien und Senderliste einblenden',
   'live.resizeCategories': 'Ziehen, um die Kategorieliste zu verbreitern',
   'live.resizeChannels': 'Ziehen, um die Senderliste zu verbreitern',
+  'error.screenTitle': 'Diese Ansicht funktioniert nicht mehr',
+  'error.screenBody': 'Etwas darin konnte nicht dargestellt werden. Der Rest von LiberCast läuft weiter — Sie können woanders hingehen und zurückkommen.',
+  'error.screenRetry': 'Ansicht erneut versuchen',
+  'error.screenDetail': 'Fehler: ',
+  'error.playerTitle': 'Die Wiedergabe funktioniert nicht mehr',
+  'error.playerBody': 'Die Wiedergabe konnte nicht dargestellt werden. Der Rest von LiberCast ist nicht betroffen — erneut versuchen oder einen anderen Sender wählen.',
 
   'sleep.label': 'Sleeptimer',
   'sleep.title': 'Wiedergabe nach einer Weile beenden',

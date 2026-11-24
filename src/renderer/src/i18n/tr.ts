@@ -123,6 +123,12 @@ export const tr: Record<TranslationKey, string> = {
   'live.showLists': 'Kategorileri ve kanal listesini göster',
   'live.resizeCategories': 'Kategori listesini yeniden boyutlandırmak için sürükleyin',
   'live.resizeChannels': 'Kanal listesini yeniden boyutlandırmak için sürükleyin',
+  'error.screenTitle': 'Bu ekran çalışmayı durdurdu',
+  'error.screenBody': 'Ekrandaki bir şey çizilemedi. LiberCast\'in geri kalanı çalışmaya devam ediyor; başka bir yere gidip geri dönebilirsiniz.',
+  'error.screenRetry': 'Bu ekranı yeniden dene',
+  'error.screenDetail': 'Sorun: ',
+  'error.playerTitle': 'Oynatıcı çalışmayı durdurdu',
+  'error.playerBody': 'Oynatma çizilemedi. LiberCast\'in geri kalanı etkilenmedi — yeniden deneyin veya başka bir kanal seçin.',
 
   'sleep.label': 'Uyku',
   'sleep.title': 'Bir süre sonra oynatmayı durdur',

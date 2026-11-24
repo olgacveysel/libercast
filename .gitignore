@@ -25,3 +25,6 @@ Claude outputs/
 .DS_Store
 Thumbs.db
 resources/bin/
+
+# Screenshots from tools/walkthrough
+tools/walkthrough/shots/

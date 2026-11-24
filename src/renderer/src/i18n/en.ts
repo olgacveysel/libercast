@@ -127,6 +127,12 @@ export const en = {
   'live.showLists': 'Show the categories and channel list',
   'live.resizeCategories': 'Drag to resize the category list',
   'live.resizeChannels': 'Drag to resize the channel list',
+  'error.screenTitle': 'This screen stopped working',
+  'error.screenBody': 'Something on it could not be drawn. The rest of LiberCast is still running, so you can go somewhere else and come back.',
+  'error.screenRetry': 'Try this screen again',
+  'error.screenDetail': 'What went wrong: ',
+  'error.playerTitle': 'The player stopped working',
+  'error.playerBody': 'Playback could not be drawn. The rest of LiberCast is unaffected — try again, or choose another channel.',
 
   'sleep.label': 'Sleep',
   'sleep.title': 'Stop playback after a while',

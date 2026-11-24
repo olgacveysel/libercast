@@ -2,6 +2,7 @@ import { useEffect, useState, type JSX } from 'react'
 import { invoke, subscribe } from '@renderer/lib/api'
 import { useAppStore } from '@renderer/store/useAppStore'
 import { Empty } from '@renderer/ui/Empty'
+import { ErrorBoundary } from '@renderer/ui/ErrorBoundary'
 import { Sidebar } from '@renderer/ui/Sidebar'
 import { useSidebarRail } from '@renderer/ui/useSidebarRail'
 import { useSleepTimer } from '@renderer/features/player/useSleepTimer'
@@ -150,6 +151,29 @@ export function App(): JSX.Element {
             <Empty title={t('app.startingUp')} />
           ) : (
             <>
+              {/*
+                One screen failing must not take the application with it.
+
+                React unmounts the whole tree when a render throws and nothing
+                catches it, which does not leave a broken screen — it leaves a
+                blank window with no sidebar and no way back. The key is the
+                route, so walking anywhere else clears the error without this
+                boundary needing to know what a route is.
+
+                The player is deliberately outside it, below: it is mounted
+                once and kept across every route so that watching survives
+                navigation, and an error on an unrelated screen must not close
+                the stream.
+              */}
+              <ErrorBoundary
+                key={route}
+                labels={{
+                  title: t('error.screenTitle'),
+                  body: t('error.screenBody'),
+                  retry: t('error.screenRetry'),
+                  detail: t('error.screenDetail')
+                }}
+              >
               {route === 'home' && (
                 <Home onAddSource={openAddSource} onOpenSearch={() => setShowPalette(true)} />
               )}
@@ -162,6 +186,7 @@ export function App(): JSX.Element {
                 <Library capabilities={capabilities} onOpenSettings={() => setRoute('settings')} />
               )}
               {route === 'settings' && <Settings onAddSource={openAddSource} />}
+              </ErrorBoundary>
 
               {/*
                 Live TV is rendered here whatever route is showing, and told
@@ -171,6 +196,21 @@ export function App(): JSX.Element {
                 is a closed stream, a dropped provider connection, and the
                 match you were watching gone.
               */}
+              <ErrorBoundary
+                /*
+                  Its own, and without a key: the routed screens get a fresh
+                  boundary on every navigation, and the player must not — it
+                  is mounted once and kept alive precisely so that watching
+                  survives moving around. Separate so that a failure in
+                  either one leaves the other working.
+                */
+                labels={{
+                  title: t('error.playerTitle'),
+                  body: t('error.playerBody'),
+                  retry: t('error.screenRetry'),
+                  detail: t('error.screenDetail')
+                }}
+              >
               <LiveTv
                 mode="live"
                 onAddSource={openAddSource}
@@ -178,6 +218,7 @@ export function App(): JSX.Element {
                 onExpand={() => setRoute('live')}
                 onClose={() => setMiniClosed(true)}
               />
+              </ErrorBoundary>
             </>
           )}
         </main>

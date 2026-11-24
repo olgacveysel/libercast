@@ -210,7 +210,7 @@ export function VodDetail({ channel, onClose, onPlay, onToggleFavorite }: Props)
                 ))}
               </div>
 
-              {season?.episodes.map((episode) => {
+              {season?.episodes?.map((episode) => {
                 const progress =
                   episode.durationSecs && episode.positionSecs
                     ? Math.min(1, episode.positionSecs / episode.durationSecs)

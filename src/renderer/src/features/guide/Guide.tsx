@@ -294,7 +294,7 @@ export function Guide({ onAddSource, capabilities }: Props): JSX.Element {
             {loading && !guide ? (
               <div style={{ padding: 20, color: 'var(--text-dim)' }}>{t('guide.loading')}</div>
             ) : (
-              guide?.rows.map((row) => (
+              guide?.rows?.map((row) => (
                 <div key={row.channel.id} className="guide__row">
                   <button
                     className="guide__chan"
@@ -357,7 +357,7 @@ export function Guide({ onAddSource, capabilities }: Props): JSX.Element {
           </div>
         </div>
 
-        {guide && guide.rows.length === PAGE_SIZE && (
+        {guide?.rows?.length === PAGE_SIZE && (
           <div className="dialog__foot" style={{ borderTop: '1px solid var(--border)' }}>
             <button className="btn" onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0}>
               {t('guide.previousPage', { count: PAGE_SIZE })}
