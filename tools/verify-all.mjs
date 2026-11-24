@@ -28,6 +28,18 @@ const BUNDLES = [
     args: []
   },
   {
+    entry: 'test/browser/settings-backend.ts',
+    out: `${cache}/verify-settings/backend.cjs`,
+    args: [
+      '--alias:@main=./src/main',
+      '--alias:@shared=./src/shared',
+      '--external:electron',
+      '--external:better-sqlite3',
+      '--external:ffmpeg-static',
+      '--external:ffprobe-static'
+    ]
+  },
+  {
     entry: 'src/renderer/src/features/player/stall.ts',
     out: `${cache}/verify-stall/stall.cjs`,
     args: []
@@ -88,6 +100,7 @@ const HARNESSES = [
   'verify-vodnav',
   'verify-paneresize',
   'verify-boundary',
+  'verify-settings',
   'verify-pip',
   'verify-mini',
   'verify-tvnav',

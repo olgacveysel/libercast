@@ -132,6 +132,7 @@ export const de: Record<TranslationKey, string> = {
   'error.playerBody': 'Die Wiedergabe konnte nicht dargestellt werden. Der Rest von LiberCast ist nicht betroffen — erneut versuchen oder einen anderen Sender wählen.',
   'vod.directedBy': 'Regie: {name}',
   'vod.cast': 'Mit {names}',
+  'settings.sectionsNav': 'Abschnitte der Einstellungen',
 
   'sleep.label': 'Sleeptimer',
   'sleep.title': 'Wiedergabe nach einer Weile beenden',

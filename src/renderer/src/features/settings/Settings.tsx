@@ -15,6 +15,7 @@ import { AccountPanel } from './AccountPanel'
 import { ParentalSection } from './ParentalSection'
 import { BackupSection } from './BackupSection'
 import { DiagnosticsSection } from './DiagnosticsSection'
+import { SettingsIndex } from './SettingsIndex'
 
 // Teal first: it is the mark's own colour, and the default.
 const ACCENTS = ['#22b58f', '#4f8cff', '#8f6bff', '#35c46b', '#f5a623', '#ff5f57']
@@ -200,6 +201,7 @@ export function Settings({ onAddSource }: Props): JSX.Element {
         <h1 className="toolbar__title">{t('settings.title')}</h1>
       </div>
 
+      <div className="settings-pane">
       <div className="settings">
         {error && (
           <div className="notice notice--error" style={{ marginBottom: 16 }}>
@@ -854,6 +856,16 @@ export function Settings({ onAddSource }: Props): JSX.Element {
 
           <DiagnosticsSection />
         </section>
+      </div>
+
+      {/*
+        Beside the settings rather than above them: the column is 720 pixels
+        because that is a readable measure for the prose it carries, which
+        leaves the space to its right empty on a wide window. The index reads
+        its own entries out of the rendered sections, so adding a section does
+        not mean remembering to add it here too.
+      */}
+      <SettingsIndex />
       </div>
     </>
   )

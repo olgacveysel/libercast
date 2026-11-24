@@ -131,6 +131,7 @@ export const tr: Record<TranslationKey, string> = {
   'error.playerBody': 'Oynatma çizilemedi. LiberCast\'in geri kalanı etkilenmedi — yeniden deneyin veya başka bir kanal seçin.',
   'vod.directedBy': 'Yönetmen: {name}',
   'vod.cast': 'Oyuncular: {names}',
+  'settings.sectionsNav': 'Ayar bölümleri',
 
   'sleep.label': 'Uyku',
   'sleep.title': 'Bir süre sonra oynatmayı durdur',
