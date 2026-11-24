@@ -13,9 +13,12 @@
  *   - `LIKE '%x%'` is not a problem. Searching one provider's catalogue takes
  *     half a millisecond, because `name_folded` is indexed and the search is
  *     anchored to a playlist.
- *   - The merged all-sources CTE really is expensive: 31 ms for the first
- *     page. It earns its cost and nothing cheaper has been found, but it is
- *     the one claim that held.
+ *   - The merged all-sources CTE really is expensive, and far more so than
+ *     first reported here: **465 ms** for one page at 150,000 channels, plus
+ *     193 ms for the count beside it. The first measurement said 31 ms and
+ *     was wrong — it was taken without `merge: true`, so it timed the plain
+ *     query across every provider rather than the CTE at all. The claim was
+ *     not merely right, it was understated.
  *   - And the thing nobody claimed: "what did I watch recently" was scanning
  *     every live channel in the database to return twenty rows — 19 ms on the
  *     screen that opens first, with the right index sitting unused.
