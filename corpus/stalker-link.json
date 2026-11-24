@@ -1,0 +1,174 @@
+{
+  "function": "stalker.link",
+  "about": "Asking a portal for a playable URL, and telling a useless answer from a good one.",
+  "notes": [
+    "Arguments are the helper's name and its arguments: linkAttempts, stripLinkPrefix or hasBlankStreamId.",
+    "A portal matches `create_link` against what it stored, and portals disagree about what that is. There is no way to tell which from outside, so the forms are tried in turn — and the order matters: the stored form first, because most portals want exactly what they sent.",
+    "hasBlankStreamId is why the attempts are needed at all. A portal that did not recognise the cmd answers 200 with a URL that names no channel. It looks like success until ffmpeg opens it."
+  ],
+  "cases": [
+    {
+      "name": "a player hint is stripped",
+      "args": [
+        "stripLinkPrefix",
+        "ffmpeg http://portal.invalid/ch/77"
+      ],
+      "expect": "http://portal.invalid/ch/77"
+    },
+    {
+      "name": "so is ffrt with a number",
+      "args": [
+        "stripLinkPrefix",
+        "ffrt3 http://portal.invalid/ch/77"
+      ],
+      "expect": "http://portal.invalid/ch/77"
+    },
+    {
+      "name": "and the other hints portals use",
+      "args": [
+        "stripLinkPrefix",
+        "mpegts http://portal.invalid/ch/77"
+      ],
+      "expect": "http://portal.invalid/ch/77"
+    },
+    {
+      "name": "a URL with no hint is unchanged",
+      "args": [
+        "stripLinkPrefix",
+        "http://portal.invalid/ch/77"
+      ],
+      "expect": "http://portal.invalid/ch/77"
+    },
+    {
+      "name": "a word that merely starts like a hint is not stripped",
+      "why": "The hint is a whole word followed by a space; `automatic` is part of a path.",
+      "args": [
+        "stripLinkPrefix",
+        "automatic http://portal.invalid/ch/77"
+      ],
+      "expect": "automatic http://portal.invalid/ch/77"
+    },
+    {
+      "name": "the stored form is tried first",
+      "args": [
+        "linkAttempts",
+        "ffmpeg http://localhost/ch/77",
+        null
+      ],
+      "expect": [
+        {
+          "name": "stored",
+          "cmd": "ffmpeg http://localhost/ch/77"
+        },
+        {
+          "name": "without the player hint",
+          "cmd": "http://localhost/ch/77"
+        }
+      ]
+    },
+    {
+      "name": "with a channel id, a canonical form is tried last",
+      "args": [
+        "linkAttempts",
+        "ffmpeg http://localhost/ch/77",
+        "77"
+      ],
+      "expect": [
+        {
+          "name": "stored",
+          "cmd": "ffmpeg http://localhost/ch/77"
+        },
+        {
+          "name": "without the player hint",
+          "cmd": "http://localhost/ch/77"
+        },
+        {
+          "name": "rebuilt from the channel id",
+          "cmd": "ffrt http://localhost/ch/77"
+        }
+      ]
+    },
+    {
+      "name": "a cmd with no hint has nothing to strip",
+      "args": [
+        "linkAttempts",
+        "http://localhost/ch/77",
+        null
+      ],
+      "expect": [
+        {
+          "name": "stored",
+          "cmd": "http://localhost/ch/77"
+        }
+      ]
+    },
+    {
+      "name": "the canonical form is not offered twice",
+      "why": "When the stored cmd already is the canonical one, repeating it spends a request to ask the same question again.",
+      "args": [
+        "linkAttempts",
+        "ffrt http://localhost/ch/77",
+        "77"
+      ],
+      "expect": [
+        {
+          "name": "stored",
+          "cmd": "ffrt http://localhost/ch/77"
+        },
+        {
+          "name": "without the player hint",
+          "cmd": "http://localhost/ch/77"
+        }
+      ]
+    },
+    {
+      "name": "an empty stream parameter is a refusal dressed as a URL",
+      "args": [
+        "hasBlankStreamId",
+        "http://portal.invalid/play/live.php?mac=00:1A:79:12:34:56&stream=&extension=ts"
+      ],
+      "expect": true
+    },
+    {
+      "name": "so is an empty ch_id",
+      "args": [
+        "hasBlankStreamId",
+        "http://portal.invalid/play/live.php?ch_id=&extension=ts"
+      ],
+      "expect": true
+    },
+    {
+      "name": "a whitespace-only parameter counts as empty",
+      "args": [
+        "hasBlankStreamId",
+        "http://portal.invalid/play/live.php?stream=%20&extension=ts"
+      ],
+      "expect": true
+    },
+    {
+      "name": "a real stream id is not blank",
+      "args": [
+        "hasBlankStreamId",
+        "http://portal.invalid/play/live.php?stream=77&extension=ts"
+      ],
+      "expect": false
+    },
+    {
+      "name": "a URL with no such parameter at all is not blank",
+      "why": "Absent is not empty. Plenty of portals answer with a path and no query, and treating that as a refusal would reject every one of them.",
+      "args": [
+        "hasBlankStreamId",
+        "http://portal.invalid/ch/77.ts"
+      ],
+      "expect": false
+    },
+    {
+      "name": "something that is not a URL is not a refusal either",
+      "args": [
+        "hasBlankStreamId",
+        "not a url"
+      ],
+      "expect": false
+    }
+  ]
+}

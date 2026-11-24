@@ -77,6 +77,26 @@
       "file": "xtream-fields.json",
       "function": "xtream.fields",
       "about": "The coercions that turn a panel's JSON into catalogue fields."
+    },
+    {
+      "file": "stalker-identity.json",
+      "function": "stalker.identity",
+      "about": "The MAC a portal is addressed by, and the serial derived from it."
+    },
+    {
+      "file": "stalker-link.json",
+      "function": "stalker.link",
+      "about": "Asking a portal for a playable URL, and spotting a useless answer."
+    },
+    {
+      "file": "stalker-archive.json",
+      "function": "stalker.archive",
+      "about": "Finding the recording that covers a moment."
+    },
+    {
+      "file": "filename-sanitize.json",
+      "function": "filename.sanitize",
+      "about": "A recording's name, made safe for the filesystem."
     }
   ]
 }

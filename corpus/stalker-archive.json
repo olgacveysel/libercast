@@ -1,0 +1,183 @@
+{
+  "function": "stalker.archive",
+  "about": "Finding the recording that covers a moment, in a portal's archive listing.",
+  "notes": [
+    "A portal keeps discrete recordings, each with its own cmd, so replaying a moment means listing the channel's archive and finding the one covering that instant. An Xtream panel builds a URL from a start time and a length and looks nothing up.",
+    "A near miss is accepted within five minutes, deliberately tight. Half an hour of slack would answer a request for the eight o'clock news with whatever was on at half past, which is worse than refusing."
+  ],
+  "cases": [
+    {
+      "name": "a recording containing the moment",
+      "args": [
+        [
+          {
+            "externalId": "1",
+            "cmd": "ffrt http://localhost/archive/1",
+            "startsAt": 1795545000000,
+            "endsAt": 1795548600000,
+            "title": "Programme 1"
+          },
+          {
+            "externalId": "2",
+            "cmd": "ffrt http://localhost/archive/2",
+            "startsAt": 1795548600000,
+            "endsAt": 1795552200000,
+            "title": "Programme 2"
+          }
+        ],
+        1795545600000
+      ],
+      "expect": {
+        "externalId": "1",
+        "cmd": "ffrt http://localhost/archive/1",
+        "startsAt": 1795545000000,
+        "endsAt": 1795548600000,
+        "title": "Programme 1"
+      }
+    },
+    {
+      "name": "the boundary belongs to the later recording",
+      "why": "A recording covers its start and not its end, so two adjacent ones never both contain the same instant.",
+      "args": [
+        [
+          {
+            "externalId": "1",
+            "cmd": "ffrt http://localhost/archive/1",
+            "startsAt": 1795545000000,
+            "endsAt": 1795548600000,
+            "title": "Programme 1"
+          },
+          {
+            "externalId": "2",
+            "cmd": "ffrt http://localhost/archive/2",
+            "startsAt": 1795548600000,
+            "endsAt": 1795552200000,
+            "title": "Programme 2"
+          }
+        ],
+        1795548600000
+      ],
+      "expect": {
+        "externalId": "2",
+        "cmd": "ffrt http://localhost/archive/2",
+        "startsAt": 1795548600000,
+        "endsAt": 1795552200000,
+        "title": "Programme 2"
+      }
+    },
+    {
+      "name": "a moment just before a recording starts is near enough",
+      "args": [
+        [
+          {
+            "externalId": "1",
+            "cmd": "ffrt http://localhost/archive/1",
+            "startsAt": 1795545000000,
+            "endsAt": 1795548600000,
+            "title": "Programme 1"
+          }
+        ],
+        1795544880000
+      ],
+      "expect": {
+        "externalId": "1",
+        "cmd": "ffrt http://localhost/archive/1",
+        "startsAt": 1795545000000,
+        "endsAt": 1795548600000,
+        "title": "Programme 1"
+      }
+    },
+    {
+      "name": "five minutes early is still near enough",
+      "args": [
+        [
+          {
+            "externalId": "1",
+            "cmd": "ffrt http://localhost/archive/1",
+            "startsAt": 1795545000000,
+            "endsAt": 1795548600000,
+            "title": "Programme 1"
+          }
+        ],
+        1795544700000
+      ],
+      "expect": {
+        "externalId": "1",
+        "cmd": "ffrt http://localhost/archive/1",
+        "startsAt": 1795545000000,
+        "endsAt": 1795548600000,
+        "title": "Programme 1"
+      }
+    },
+    {
+      "name": "six minutes early is not",
+      "why": "The tolerance is tight on purpose: answering a request for one programme with the one after it is worse than saying no.",
+      "args": [
+        [
+          {
+            "externalId": "1",
+            "cmd": "ffrt http://localhost/archive/1",
+            "startsAt": 1795545000000,
+            "endsAt": 1795548600000,
+            "title": "Programme 1"
+          }
+        ],
+        1795544640000
+      ],
+      "expect": null
+    },
+    {
+      "name": "the nearest of several is chosen",
+      "args": [
+        [
+          {
+            "externalId": "1",
+            "cmd": "ffrt http://localhost/archive/1",
+            "startsAt": 1795545000000,
+            "endsAt": 1795548600000,
+            "title": "Programme 1"
+          },
+          {
+            "externalId": "2",
+            "cmd": "ffrt http://localhost/archive/2",
+            "startsAt": 1795559400000,
+            "endsAt": 1795563000000,
+            "title": "Programme 2"
+          }
+        ],
+        1795559340000
+      ],
+      "expect": {
+        "externalId": "2",
+        "cmd": "ffrt http://localhost/archive/2",
+        "startsAt": 1795559400000,
+        "endsAt": 1795563000000,
+        "title": "Programme 2"
+      }
+    },
+    {
+      "name": "an archive that does not reach back far enough",
+      "args": [
+        [
+          {
+            "externalId": "1",
+            "cmd": "ffrt http://localhost/archive/1",
+            "startsAt": 1795545000000,
+            "endsAt": 1795548600000,
+            "title": "Programme 1"
+          }
+        ],
+        1794940200000
+      ],
+      "expect": null
+    },
+    {
+      "name": "an empty archive covers nothing",
+      "args": [
+        [],
+        1795545000000
+      ],
+      "expect": null
+    }
+  ]
+}

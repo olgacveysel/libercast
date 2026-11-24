@@ -90,6 +90,10 @@ the time-zone decisions and the deliberate boundaries are written down.
 | `catchup.start` | The start stamp a panel's archive URL carries |
 | `failover.rank` | Which channel from another provider may be played when this one fails |
 | `xtream.fields` | The coercions that turn a panel's JSON into catalogue fields |
+| `stalker.identity` | The MAC a portal is addressed by, and the serial derived from it |
+| `stalker.link` | Asking a portal for a playable URL, and spotting a useless answer |
+| `stalker.archive` | Finding the recording that covers a moment |
+| `filename.sanitize` | A recording's name, made safe for the filesystem |
 
 ## Things worth knowing before you implement any of it
 
@@ -109,6 +113,11 @@ too close, and `xmltv.programme` returning null for a programme with no title,
 are the behaviour — not gaps in the cases. A guide that is confidently wrong
 is harder to diagnose than one that is empty, because nobody thinks to doubt
 it.
+
+**A portal's serial is derived, not invented.** Some portals check that the
+serial and the MAC agree. The relationship is not a secret and not a security
+measure — it is a consistency check — but an implementation deriving it
+differently gets the handshake refused with no useful error.
 
 **Boundaries are decided, not incidental.** A programme that ends at exactly
 the current instant is replayable and is not on air. The two functions use `>`

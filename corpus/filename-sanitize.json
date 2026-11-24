@@ -1,0 +1,107 @@
+{
+  "function": "filename.sanitize",
+  "about": "A recording's name, made safe for the filesystem it will be written to.",
+  "notes": [
+    "Windows rules, because they are the strictest of the platforms LiberCast ships for and a name that satisfies them satisfies the others.",
+    "Path separators become spaces rather than being deleted, so `Film 1/2` does not become `Film 12`.",
+    "Cut to 120 bytes, not 120 characters: filesystem limits are in bytes, and a cut by character count can land halfway through a multi-byte one."
+  ],
+  "cases": [
+    {
+      "name": "an ordinary name is unchanged",
+      "args": [
+        "Channel One - The News (2026-11-24 18-30)"
+      ],
+      "expect": "Channel One - The News (2026-11-24 18-30)"
+    },
+    {
+      "name": "path separators become spaces",
+      "why": "Deleting them would turn `Film 1/2` into `Film 12`, which is a different title rather than a safe one.",
+      "args": [
+        "Film 1/2"
+      ],
+      "expect": "Film 1 2"
+    },
+    {
+      "name": "backslashes and colons too",
+      "args": [
+        "A\\B:C|D"
+      ],
+      "expect": "A B C D"
+    },
+    {
+      "name": "illegal characters are removed",
+      "args": [
+        "What? <Really> \"Yes\" *"
+      ],
+      "expect": "What Really Yes"
+    },
+    {
+      "name": "control characters are removed",
+      "args": [
+        "News\u0007 at ten\u0000"
+      ],
+      "expect": "News at ten"
+    },
+    {
+      "name": "runs of space are collapsed",
+      "args": [
+        "A    B"
+      ],
+      "expect": "A B"
+    },
+    {
+      "name": "trailing dots and spaces are dropped",
+      "why": "Windows strips them on create and then cannot find the file it just wrote.",
+      "args": [
+        "Episode 1..."
+      ],
+      "expect": "Episode 1"
+    },
+    {
+      "name": "a reserved device name is given a suffix",
+      "why": "`CON` is not a filename on Windows, it is the console.",
+      "args": [
+        "CON"
+      ],
+      "expect": "CON_"
+    },
+    {
+      "name": "reserved names are matched whatever the case",
+      "args": [
+        "com1"
+      ],
+      "expect": "com1_"
+    },
+    {
+      "name": "a name merely containing a reserved word is fine",
+      "args": [
+        "Conversation"
+      ],
+      "expect": "Conversation"
+    },
+    {
+      "name": "a name that sanitises to nothing gets one",
+      "why": "An empty filename is not a filename, and failing the recording at this point would lose it.",
+      "args": [
+        "???"
+      ],
+      "expect": "Recording"
+    },
+    {
+      "name": "an empty name gets one too",
+      "args": [
+        ""
+      ],
+      "expect": "Recording"
+    },
+    {
+      "name": "accented characters are kept",
+      "why": "They are legal and they are the name. Stripping them would mangle most of the Turkish and German catalogue.",
+      "args": [
+        "Çınar Kanalı"
+      ],
+      "expect": "Çınar Kanalı"
+    }
+  ]
+}

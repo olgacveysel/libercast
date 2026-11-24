@@ -1,0 +1,140 @@
+{
+  "function": "stalker.identity",
+  "about": "The MAC a portal is addressed by, and the serial a box derives from it.",
+  "notes": [
+    "Arguments are the helper's name and its argument: normalizeMac, isMacAddress or serialFor.",
+    "serialFor is not a secret and not a security measure. Some portals check that the serial and the MAC agree, so it is derived rather than random: the same MAC must always present the same box, which is what a portal pinning a session to a device expects. An implementation deriving it differently gets a handshake refused with no useful error."
+  ],
+  "cases": [
+    {
+      "name": "a MAC already in the usual form is unchanged",
+      "args": [
+        "normalizeMac",
+        "00:1A:79:12:34:56"
+      ],
+      "expect": "00:1A:79:12:34:56"
+    },
+    {
+      "name": "lower case is raised",
+      "args": [
+        "normalizeMac",
+        "00:1a:79:12:34:56"
+      ],
+      "expect": "00:1A:79:12:34:56"
+    },
+    {
+      "name": "hyphens become colons",
+      "args": [
+        "normalizeMac",
+        "00-1A-79-12-34-56"
+      ],
+      "expect": "00:1A:79:12:34:56"
+    },
+    {
+      "name": "no separators at all are accepted",
+      "why": "People paste a MAC out of a panel in whatever form it was shown.",
+      "args": [
+        "normalizeMac",
+        "001a79123456"
+      ],
+      "expect": "00:1A:79:12:34:56"
+    },
+    {
+      "name": "surrounding space is dropped",
+      "args": [
+        "normalizeMac",
+        "  00:1A:79:12:34:56  "
+      ],
+      "expect": "00:1A:79:12:34:56"
+    },
+    {
+      "name": "something that is not twelve hex digits is handed back as typed",
+      "why": "Upper-cased and trimmed, but not reshaped: the caller shows it to the user, and silently reformatting a typo makes it harder to see.",
+      "args": [
+        "normalizeMac",
+        "00:1A:79:12:34"
+      ],
+      "expect": "00:1A:79:12:34"
+    },
+    {
+      "name": "a well-formed MAC is one",
+      "args": [
+        "isMacAddress",
+        "00:1A:79:12:34:56"
+      ],
+      "expect": true
+    },
+    {
+      "name": "so is one with no separators",
+      "args": [
+        "isMacAddress",
+        "001a79123456"
+      ],
+      "expect": true
+    },
+    {
+      "name": "eleven digits is not",
+      "args": [
+        "isMacAddress",
+        "00:1A:79:12:34:5"
+      ],
+      "expect": false
+    },
+    {
+      "name": "thirteen digits is not",
+      "args": [
+        "isMacAddress",
+        "001a791234567"
+      ],
+      "expect": false
+    },
+    {
+      "name": "a word is not",
+      "args": [
+        "isMacAddress",
+        "not a mac"
+      ],
+      "expect": false
+    },
+    {
+      "name": "empty is not",
+      "args": [
+        "isMacAddress",
+        ""
+      ],
+      "expect": false
+    },
+    {
+      "name": "the serial is the last thirteen hex digits",
+      "args": [
+        "serialFor",
+        "00:1A:79:12:34:56"
+      ],
+      "expect": "0001A79123456"
+    },
+    {
+      "name": "separators make no difference to it",
+      "args": [
+        "serialFor",
+        "001a79123456"
+      ],
+      "expect": "0001A79123456"
+    },
+    {
+      "name": "a shorter value is padded to thirteen",
+      "args": [
+        "serialFor",
+        "1A79"
+      ],
+      "expect": "0000000001A79"
+    },
+    {
+      "name": "and it is always upper case",
+      "args": [
+        "serialFor",
+        "aabbccddeeff"
+      ],
+      "expect": "0AABBCCDDEEFF"
+    }
+  ]
+}

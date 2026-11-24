@@ -28,6 +28,9 @@ import { bestMatch, normalizeName, sameChannelName, similarity } from '@main/sou
 import { canReplay, catchupWindowMs, formatStart } from '@shared/catchup'
 import { rankAlternatesDetailed, type AlternateCandidate } from '@main/sources/failover'
 import * as xtream from '@main/sources/xtream'
+import * as stalker from '@main/sources/stalker'
+import { sanitize } from '@shared/filename'
+import type { ParsedArchiveRecord } from '@main/sources/types'
 import { fold } from '@main/db'
 
 let failures = 0
@@ -108,7 +111,26 @@ const FUNCTIONS: Record<string, (...args: never[]) => unknown> = {
     const fn = table[which]
     if (!fn) throw new Error(`no coercion named ${which}`)
     return fn(value as never)
-  }
+  },
+  'stalker.identity': (which: string, value: string) => {
+    const table: Record<string, (v: string) => unknown> = {
+      normalizeMac: stalker.normalizeMac,
+      isMacAddress: stalker.isMacAddress,
+      serialFor: stalker.serialFor
+    }
+    const fn = table[which]
+    if (!fn) throw new Error(`no helper named ${which}`)
+    return fn(value)
+  },
+  'stalker.link': (which: string, a: string, b: string | null) => {
+    if (which === 'stripLinkPrefix') return stalker.stripLinkPrefix(a)
+    if (which === 'hasBlankStreamId') return stalker.hasBlankStreamId(a)
+    if (which === 'linkAttempts') return stalker.linkAttempts(a, b ?? undefined)
+    throw new Error(`no helper named ${which}`)
+  },
+  'stalker.archive': (records: ParsedArchiveRecord[], startsAt: number) =>
+    stalker.archiveCovering(records, startsAt),
+  'filename.sanitize': (value: string) => sanitize(value)
 }
 
 /**
