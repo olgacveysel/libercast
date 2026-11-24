@@ -1,0 +1,56 @@
+{
+  "function": "catchup.window",
+  "about": "How far back an archive reaches, in milliseconds.",
+  "cases": [
+    {
+      "name": "one day",
+      "args": [
+        1
+      ],
+      "expect": 86400000
+    },
+    {
+      "name": "a week",
+      "args": [
+        7
+      ],
+      "expect": 604800000
+    },
+    {
+      "name": "no archive is no window",
+      "args": [
+        0
+      ],
+      "expect": 0
+    },
+    {
+      "name": "a negative number is no window, not a window into the future",
+      "args": [
+        -3
+      ],
+      "expect": 0
+    },
+    {
+      "name": "a fraction is truncated to whole days",
+      "why": "Rounding up would offer a replay the panel refuses.",
+      "args": [
+        2.9
+      ],
+      "expect": 172800000
+    },
+    {
+      "name": "a fraction under a day is no window",
+      "args": [
+        0.5
+      ],
+      "expect": 0
+    },
+    {
+      "name": "nonsense is no window",
+      "args": [
+        null
+      ],
+      "expect": 0
+    }
+  ]
+}

@@ -1,0 +1,128 @@
+{
+  "function": "names.normalize",
+  "about": "A channel name to the words that identify it, as an ordered list.",
+  "notes": [
+    "Quality words, codec names and the generic words for 'channel' are dropped. Digits are kept, because `Alto Sports 2` and `Alto Sports 4` differ by one character and are different channels.",
+    "A feed qualifier takes the number after it with it: `(Hat 1)` is line one of the same channel, and reading that 1 as part of the identity refuses every correct match."
+  ],
+  "cases": [
+    {
+      "name": "a plain name",
+      "args": [
+        "Alto Sports"
+      ],
+      "expect": [
+        "alto",
+        "sports"
+      ]
+    },
+    {
+      "name": "quality words are dropped",
+      "args": [
+        "Alto Sports HD"
+      ],
+      "expect": [
+        "alto",
+        "sports"
+      ]
+    },
+    {
+      "name": "so are the other quality words",
+      "args": [
+        "Alto Sports FHD 1080p HEVC"
+      ],
+      "expect": [
+        "alto",
+        "sports"
+      ]
+    },
+    {
+      "name": "separators become word breaks",
+      "args": [
+        "|DE| Alto/Sports [HD]"
+      ],
+      "expect": [
+        "de",
+        "alto",
+        "sports"
+      ]
+    },
+    {
+      "name": "a channel number is kept",
+      "args": [
+        "Alto Sports 2"
+      ],
+      "expect": [
+        "alto",
+        "sports",
+        "2"
+      ]
+    },
+    {
+      "name": "a feed qualifier takes its number with it",
+      "args": [
+        "Alto Sports 2 (Hat 1)"
+      ],
+      "expect": [
+        "alto",
+        "sports",
+        "2"
+      ]
+    },
+    {
+      "name": "a feed qualifier with no number is just dropped",
+      "args": [
+        "Alto Sports Backup"
+      ],
+      "expect": [
+        "alto",
+        "sports"
+      ]
+    },
+    {
+      "name": "accents are stripped",
+      "args": [
+        "Pôker Gecesi"
+      ],
+      "expect": [
+        "poker",
+        "gecesi"
+      ]
+    },
+    {
+      "name": "the generic words for channel are dropped",
+      "args": [
+        "Alto Sports TV"
+      ],
+      "expect": [
+        "alto",
+        "sports"
+      ]
+    },
+    {
+      "name": "a plus sign is part of a name",
+      "why": "`Sports+` is a different channel from `Sports`, and dropping the sign merges them.",
+      "args": [
+        "Alto Sports+"
+      ],
+      "expect": [
+        "alto",
+        "sports+"
+      ]
+    },
+    {
+      "name": "a name of only noise has no identifying words",
+      "args": [
+        "HD FHD 4K"
+      ],
+      "expect": []
+    },
+    {
+      "name": "an empty name has none either",
+      "args": [
+        ""
+      ],
+      "expect": []
+    }
+  ]
+}

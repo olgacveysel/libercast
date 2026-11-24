@@ -1,0 +1,516 @@
+{
+  "function": "m3u.parse",
+  "about": "A provider playlist to a catalogue of categories and channels.",
+  "notes": [
+    "externalId is the first 16 hex characters of the SHA-1 of the stream URL. It must be derived the same way everywhere: it is what a favourite is stored against, so a different rule loses every favourite the first time the other implementation syncs.",
+    "A second entry with the same URL takes the SHA-1 of `url|title|position`, where `title` is the raw text after the comma on the #EXTINF line (not tvg-name) and `position` is the number of channels already accepted.",
+    "Categories come out sorted by name; channels keep the playlist's order."
+  ],
+  "cases": [
+    {
+      "name": "an ordinary entry",
+      "args": [
+        "#EXTM3U\n#EXTINF:-1 tvg-id=\"one.tv\" tvg-name=\"Channel One\" tvg-logo=\"http://p.invalid/1.png\" group-title=\"News\",Channel One HD\nhttp://p.invalid/live/1.ts\n"
+      ],
+      "expect": {
+        "kind": "live",
+        "categories": [
+          {
+            "externalId": "news",
+            "name": "News"
+          }
+        ],
+        "channels": [
+          {
+            "externalId": "402e2932956f792c",
+            "name": "Channel One",
+            "categoryExternalId": "news",
+            "number": null,
+            "logoUrl": "http://p.invalid/1.png",
+            "epgChannelId": "one.tv",
+            "streamUrl": "http://p.invalid/live/1.ts",
+            "containerExtension": "ts",
+            "isAdult": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "tvg-name wins over the text after the comma",
+      "why": "The text after the comma is a display line and often carries decoration; tvg-name is the name the provider means.",
+      "args": [
+        "#EXTINF:-1 tvg-name=\"Channel One\",|DE| CHANNEL ONE FHD ***\nhttp://p.invalid/live/1.ts\n"
+      ],
+      "expect": {
+        "kind": "live",
+        "categories": [
+          {
+            "externalId": "__uncategorized__",
+            "name": "Uncategorized"
+          }
+        ],
+        "channels": [
+          {
+            "externalId": "402e2932956f792c",
+            "name": "Channel One",
+            "categoryExternalId": "__uncategorized__",
+            "number": null,
+            "logoUrl": null,
+            "epgChannelId": null,
+            "streamUrl": "http://p.invalid/live/1.ts",
+            "containerExtension": "ts",
+            "isAdult": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "the text after the comma is used when there is no tvg-name",
+      "args": [
+        "#EXTINF:-1 group-title=\"News\",Channel One HD\nhttp://p.invalid/live/1.ts\n"
+      ],
+      "expect": {
+        "kind": "live",
+        "categories": [
+          {
+            "externalId": "news",
+            "name": "News"
+          }
+        ],
+        "channels": [
+          {
+            "externalId": "402e2932956f792c",
+            "name": "Channel One HD",
+            "categoryExternalId": "news",
+            "number": null,
+            "logoUrl": null,
+            "epgChannelId": null,
+            "streamUrl": "http://p.invalid/live/1.ts",
+            "containerExtension": "ts",
+            "isAdult": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "#EXTGRP is honoured when there is no group-title",
+      "why": "Older playlists carry the group on its own line instead of as an attribute.",
+      "args": [
+        "#EXTINF:-1,Channel One\n#EXTGRP:Sport\nhttp://p.invalid/live/1.ts\n"
+      ],
+      "expect": {
+        "kind": "live",
+        "categories": [
+          {
+            "externalId": "sport",
+            "name": "Sport"
+          }
+        ],
+        "channels": [
+          {
+            "externalId": "402e2932956f792c",
+            "name": "Channel One",
+            "categoryExternalId": "sport",
+            "number": null,
+            "logoUrl": null,
+            "epgChannelId": null,
+            "streamUrl": "http://p.invalid/live/1.ts",
+            "containerExtension": "ts",
+            "isAdult": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "group-title wins over #EXTGRP when both are present",
+      "args": [
+        "#EXTINF:-1 group-title=\"News\",Channel One\n#EXTGRP:Sport\nhttp://p.invalid/live/1.ts\n"
+      ],
+      "expect": {
+        "kind": "live",
+        "categories": [
+          {
+            "externalId": "news",
+            "name": "News"
+          }
+        ],
+        "channels": [
+          {
+            "externalId": "402e2932956f792c",
+            "name": "Channel One",
+            "categoryExternalId": "news",
+            "number": null,
+            "logoUrl": null,
+            "epgChannelId": null,
+            "streamUrl": "http://p.invalid/live/1.ts",
+            "containerExtension": "ts",
+            "isAdult": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "a channel number is read from tvg-chno",
+      "args": [
+        "#EXTINF:-1 tvg-chno=\"401\" tvg-name=\"Channel One\",x\nhttp://p.invalid/live/1.ts\n"
+      ],
+      "expect": {
+        "kind": "live",
+        "categories": [
+          {
+            "externalId": "__uncategorized__",
+            "name": "Uncategorized"
+          }
+        ],
+        "channels": [
+          {
+            "externalId": "402e2932956f792c",
+            "name": "Channel One",
+            "categoryExternalId": "__uncategorized__",
+            "number": 401,
+            "logoUrl": null,
+            "epgChannelId": null,
+            "streamUrl": "http://p.invalid/live/1.ts",
+            "containerExtension": "ts",
+            "isAdult": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "a number that is not a number is not one",
+      "why": "A provider writing `tvg-chno=\"n/a\"` must not produce NaN, which reaches SQLite as null in one language and as something else in another.",
+      "args": [
+        "#EXTINF:-1 tvg-chno=\"n/a\" tvg-name=\"Channel One\",x\nhttp://p.invalid/live/1.ts\n"
+      ],
+      "expect": {
+        "kind": "live",
+        "categories": [
+          {
+            "externalId": "__uncategorized__",
+            "name": "Uncategorized"
+          }
+        ],
+        "channels": [
+          {
+            "externalId": "402e2932956f792c",
+            "name": "Channel One",
+            "categoryExternalId": "__uncategorized__",
+            "number": null,
+            "logoUrl": null,
+            "epgChannelId": null,
+            "streamUrl": "http://p.invalid/live/1.ts",
+            "containerExtension": "ts",
+            "isAdult": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "the container extension is read from the URL",
+      "args": [
+        "#EXTINF:-1 tvg-name=\"Two\",x\nhttp://p.invalid/live/2.m3u8\n"
+      ],
+      "expect": {
+        "kind": "live",
+        "categories": [
+          {
+            "externalId": "__uncategorized__",
+            "name": "Uncategorized"
+          }
+        ],
+        "channels": [
+          {
+            "externalId": "7509a1d40cce8ae2",
+            "name": "Two",
+            "categoryExternalId": "__uncategorized__",
+            "number": null,
+            "logoUrl": null,
+            "epgChannelId": null,
+            "streamUrl": "http://p.invalid/live/2.m3u8",
+            "containerExtension": "m3u8",
+            "isAdult": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "a URL with no extension has none",
+      "args": [
+        "#EXTINF:-1 tvg-name=\"Three\",x\nhttp://p.invalid/live/3\n"
+      ],
+      "expect": {
+        "kind": "live",
+        "categories": [
+          {
+            "externalId": "__uncategorized__",
+            "name": "Uncategorized"
+          }
+        ],
+        "channels": [
+          {
+            "externalId": "942b76d59d2e386d",
+            "name": "Three",
+            "categoryExternalId": "__uncategorized__",
+            "number": null,
+            "logoUrl": null,
+            "epgChannelId": null,
+            "streamUrl": "http://p.invalid/live/3",
+            "containerExtension": null,
+            "isAdult": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "an adult group marks its channels",
+      "args": [
+        "#EXTINF:-1 group-title=\"XXX Adult\" tvg-name=\"Something\",x\nhttp://p.invalid/live/1.ts\n"
+      ],
+      "expect": {
+        "kind": "live",
+        "categories": [
+          {
+            "externalId": "xxx-adult",
+            "name": "XXX Adult"
+          }
+        ],
+        "channels": [
+          {
+            "externalId": "402e2932956f792c",
+            "name": "Something",
+            "categoryExternalId": "xxx-adult",
+            "number": null,
+            "logoUrl": null,
+            "epgChannelId": null,
+            "streamUrl": "http://p.invalid/live/1.ts",
+            "containerExtension": "ts",
+            "isAdult": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "a word that merely contains an adult word does not",
+      "why": "Matching is on whole words. `Essex` and `Middlesex` are places, and a regional channel disappearing behind the parental lock is a bug nobody reports because they assume the provider dropped it.",
+      "args": [
+        "#EXTINF:-1 group-title=\"Essex Local\" tvg-name=\"Essex\",x\nhttp://p.invalid/live/1.ts\n"
+      ],
+      "expect": {
+        "kind": "live",
+        "categories": [
+          {
+            "externalId": "essex-local",
+            "name": "Essex Local"
+          }
+        ],
+        "channels": [
+          {
+            "externalId": "402e2932956f792c",
+            "name": "Essex",
+            "categoryExternalId": "essex-local",
+            "number": null,
+            "logoUrl": null,
+            "epgChannelId": null,
+            "streamUrl": "http://p.invalid/live/1.ts",
+            "containerExtension": "ts",
+            "isAdult": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "two entries with the same URL both survive",
+      "why": "The id is derived from the URL, so a duplicated link would collapse two channels into one and lose the second. The second gets the SHA-1 of `url|title|position` instead — and `title` there is the text after the comma, not tvg-name, which is the kind of detail a second implementation gets wrong silently and only discovers when favourites move.",
+      "args": [
+        "#EXTINF:-1 tvg-name=\"First\",a\nhttp://p.invalid/dup.ts\n#EXTINF:-1 tvg-name=\"Second\",b\nhttp://p.invalid/dup.ts\n"
+      ],
+      "expect": {
+        "kind": "live",
+        "categories": [
+          {
+            "externalId": "__uncategorized__",
+            "name": "Uncategorized"
+          }
+        ],
+        "channels": [
+          {
+            "externalId": "d65f7e4bb8415ce4",
+            "name": "First",
+            "categoryExternalId": "__uncategorized__",
+            "number": null,
+            "logoUrl": null,
+            "epgChannelId": null,
+            "streamUrl": "http://p.invalid/dup.ts",
+            "containerExtension": "ts",
+            "isAdult": false
+          },
+          {
+            "externalId": "ce4fe86904dd14de",
+            "name": "Second",
+            "categoryExternalId": "__uncategorized__",
+            "number": null,
+            "logoUrl": null,
+            "epgChannelId": null,
+            "streamUrl": "http://p.invalid/dup.ts",
+            "containerExtension": "ts",
+            "isAdult": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "an EXTINF with no URL after it is dropped",
+      "why": "A truncated download ends mid-entry, and a channel with no address is a row that can only fail.",
+      "args": [
+        "#EXTINF:-1 tvg-name=\"Complete\",a\nhttp://p.invalid/live/1.ts\n#EXTINF:-1 tvg-name=\"Truncated\",b\n"
+      ],
+      "expect": {
+        "kind": "live",
+        "categories": [
+          {
+            "externalId": "__uncategorized__",
+            "name": "Uncategorized"
+          }
+        ],
+        "channels": [
+          {
+            "externalId": "402e2932956f792c",
+            "name": "Complete",
+            "categoryExternalId": "__uncategorized__",
+            "number": null,
+            "logoUrl": null,
+            "epgChannelId": null,
+            "streamUrl": "http://p.invalid/live/1.ts",
+            "containerExtension": "ts",
+            "isAdult": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "directives between the entry and its URL are ignored",
+      "why": "#EXTVLCOPT lines are common and must not be mistaken for the stream address.",
+      "args": [
+        "#EXTINF:-1 tvg-name=\"One\",a\n#EXTVLCOPT:http-user-agent=Mozilla\nhttp://p.invalid/live/1.ts\n"
+      ],
+      "expect": {
+        "kind": "live",
+        "categories": [
+          {
+            "externalId": "__uncategorized__",
+            "name": "Uncategorized"
+          }
+        ],
+        "channels": [
+          {
+            "externalId": "402e2932956f792c",
+            "name": "One",
+            "categoryExternalId": "__uncategorized__",
+            "number": null,
+            "logoUrl": null,
+            "epgChannelId": null,
+            "streamUrl": "http://p.invalid/live/1.ts",
+            "containerExtension": "ts",
+            "isAdult": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "categories come out sorted by name",
+      "args": [
+        "#EXTINF:-1 group-title=\"Sport\" tvg-name=\"One\",a\nhttp://p.invalid/live/1.ts\n#EXTINF:-1 group-title=\"News\" tvg-name=\"Two\",b\nhttp://p.invalid/live/2.m3u8\n"
+      ],
+      "expect": {
+        "kind": "live",
+        "categories": [
+          {
+            "externalId": "news",
+            "name": "News"
+          },
+          {
+            "externalId": "sport",
+            "name": "Sport"
+          }
+        ],
+        "channels": [
+          {
+            "externalId": "402e2932956f792c",
+            "name": "One",
+            "categoryExternalId": "sport",
+            "number": null,
+            "logoUrl": null,
+            "epgChannelId": null,
+            "streamUrl": "http://p.invalid/live/1.ts",
+            "containerExtension": "ts",
+            "isAdult": false
+          },
+          {
+            "externalId": "7509a1d40cce8ae2",
+            "name": "Two",
+            "categoryExternalId": "news",
+            "number": null,
+            "logoUrl": null,
+            "epgChannelId": null,
+            "streamUrl": "http://p.invalid/live/2.m3u8",
+            "containerExtension": "m3u8",
+            "isAdult": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "an empty playlist is a catalogue with nothing in it",
+      "why": "Not an error. A provider answering with nothing is handled upstream, where it is distinguished from a provider that genuinely has no channels.",
+      "args": [
+        "#EXTM3U\n"
+      ],
+      "expect": {
+        "kind": "live",
+        "categories": [],
+        "channels": []
+      }
+    },
+    {
+      "name": "text that is not a playlist produces nothing rather than failing",
+      "args": [
+        "<html><body>Access denied</body></html>"
+      ],
+      "expect": {
+        "kind": "live",
+        "categories": [],
+        "channels": []
+      }
+    },
+    {
+      "name": "carriage returns do not become part of the URL",
+      "why": "Most playlists are served with Windows line endings, and a stream URL with a trailing \\r fails to open with a message about the host.",
+      "args": [
+        "#EXTM3U\r\n#EXTINF:-1 tvg-name=\"One\",a\r\nhttp://p.invalid/live/1.ts\r\n"
+      ],
+      "expect": {
+        "kind": "live",
+        "categories": [
+          {
+            "externalId": "__uncategorized__",
+            "name": "Uncategorized"
+          }
+        ],
+        "channels": [
+          {
+            "externalId": "402e2932956f792c",
+            "name": "One",
+            "categoryExternalId": "__uncategorized__",
+            "number": null,
+            "logoUrl": null,
+            "epgChannelId": null,
+            "streamUrl": "http://p.invalid/live/1.ts",
+            "containerExtension": "ts",
+            "isAdult": false
+          }
+        ]
+      }
+    }
+  ]
+}

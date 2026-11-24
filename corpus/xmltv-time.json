@@ -1,0 +1,97 @@
+{
+  "function": "xmltv.time",
+  "about": "An XMLTV timestamp to Unix milliseconds, or null when it is not one.",
+  "notes": [
+    "The stamp is local to the offset it carries, so the offset is subtracted to reach UTC.",
+    "With no offset the stamp is taken as UTC. That is a decision, not a reading of the spec: a guide that is silent about its zone is most often already in UTC, and guessing the viewer's zone would shift every programme by hours on a correct feed."
+  ],
+  "cases": [
+    {
+      "name": "a stamp with a positive offset",
+      "args": [
+        "20261124183000 +0300"
+      ],
+      "expect": 1795534200000
+    },
+    {
+      "name": "a stamp with a negative offset",
+      "args": [
+        "20261124183000 -0500"
+      ],
+      "expect": 1795563000000
+    },
+    {
+      "name": "UTC written as +0000",
+      "args": [
+        "20261124183000 +0000"
+      ],
+      "expect": 1795545000000
+    },
+    {
+      "name": "no offset is taken as UTC",
+      "args": [
+        "20261124183000"
+      ],
+      "expect": 1795545000000
+    },
+    {
+      "name": "seconds are optional",
+      "why": "Plenty of feeds write only to the minute.",
+      "args": [
+        "202611241830 +0000"
+      ],
+      "expect": 1795545000000
+    },
+    {
+      "name": "surrounding space is ignored",
+      "args": [
+        "  20261124183000 +0000  "
+      ],
+      "expect": 1795545000000
+    },
+    {
+      "name": "an offset with a half hour",
+      "why": "India is +0530 and a half-hour error puts every programme in the wrong slot.",
+      "args": [
+        "20261124183000 +0530"
+      ],
+      "expect": 1795525200000
+    },
+    {
+      "name": "a stamp with seconds",
+      "args": [
+        "20261124183045 +0000"
+      ],
+      "expect": 1795545045000
+    },
+    {
+      "name": "empty is not a time",
+      "args": [
+        ""
+      ],
+      "expect": null
+    },
+    {
+      "name": "a sentence is not a time",
+      "args": [
+        "not a time"
+      ],
+      "expect": null
+    },
+    {
+      "name": "an ISO timestamp is not an XMLTV one",
+      "why": "Accepting it would be generous and wrong: the formats disagree about what the digits mean.",
+      "args": [
+        "2026-11-24T18:30:00Z"
+      ],
+      "expect": null
+    },
+    {
+      "name": "too few digits is not a time",
+      "args": [
+        "2026112418 +0000"
+      ],
+      "expect": null
+    }
+  ]
+}

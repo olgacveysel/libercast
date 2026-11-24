@@ -1,0 +1,97 @@
+{
+  "function": "catchup.replay",
+  "about": "Whether a programme can be replayed at a given moment.",
+  "notes": [
+    "Arguments are the programme, the channel's catch-up days, and the current time in Unix milliseconds. Fixing 'now' is what makes this answerable as data.",
+    "All three conditions must hold: the channel keeps an archive, the programme has finished, and it began inside the window. Offering a replay the panel will refuse spends a connection to learn what the listing already said."
+  ],
+  "cases": [
+    {
+      "name": "a programme that finished an hour ago, on a channel with a week",
+      "args": [
+        {
+          "startsAt": 1795537800000,
+          "endsAt": 1795541400000
+        },
+        7,
+        1795545000000
+      ],
+      "expect": true
+    },
+    {
+      "name": "the same programme, on a channel with no archive",
+      "args": [
+        {
+          "startsAt": 1795537800000,
+          "endsAt": 1795541400000
+        },
+        0,
+        1795545000000
+      ],
+      "expect": false
+    },
+    {
+      "name": "a programme still on air cannot be replayed",
+      "why": "It is live, and the two must never both be true for one programme.",
+      "args": [
+        {
+          "startsAt": 1795544400000,
+          "endsAt": 1795545600000
+        },
+        7,
+        1795545000000
+      ],
+      "expect": false
+    },
+    {
+      "name": "a programme that has not started cannot be replayed",
+      "args": [
+        {
+          "startsAt": 1795548600000,
+          "endsAt": 1795552200000
+        },
+        7,
+        1795545000000
+      ],
+      "expect": false
+    },
+    {
+      "name": "a programme older than the window cannot be replayed",
+      "args": [
+        {
+          "startsAt": 1794853800000,
+          "endsAt": 1794857400000
+        },
+        7,
+        1795545000000
+      ],
+      "expect": false
+    },
+    {
+      "name": "a programme that began exactly at the edge of the window still can",
+      "why": "The boundary is inclusive, so a listing and a replay agree about the oldest programme on offer.",
+      "args": [
+        {
+          "startsAt": 1794940200000,
+          "endsAt": 1794943800000
+        },
+        7,
+        1795545000000
+      ],
+      "expect": true
+    },
+    {
+      "name": "a programme that ends exactly now is replayable",
+      "args": [
+        {
+          "startsAt": 1795541400000,
+          "endsAt": 1795545000000
+        },
+        7,
+        1795545000000
+      ],
+      "expect": true,
+      "why": "The instant it ends it is over. This boundary is the counterpart of the one in isOnNow, which requires endsAt > now: at that single instant the programme is neither on air nor unavailable, and the two never overlap. A second implementation choosing >= in either place would make one programme both live and catch-up."
+    }
+  ]
+}

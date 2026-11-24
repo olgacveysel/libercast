@@ -1,0 +1,86 @@
+{
+  "function": "xmltv.channel",
+  "about": "One <channel> block to a guide channel, or null when it is not usable.",
+  "notes": [
+    "The first display-name is the one kept. Feeds list several — a name, a number, sometimes a language variant — and the first is the one meant for people."
+  ],
+  "cases": [
+    {
+      "name": "an ordinary channel",
+      "args": [
+        "<channel id=\"one.tv\"><display-name>Channel One</display-name><icon src=\"http://p.invalid/1.png\" />"
+      ],
+      "expect": {
+        "id": "one.tv",
+        "displayName": "Channel One",
+        "iconUrl": "http://p.invalid/1.png"
+      }
+    },
+    {
+      "name": "an icon is optional",
+      "args": [
+        "<channel id=\"one.tv\"><display-name>Channel One</display-name>"
+      ],
+      "expect": {
+        "id": "one.tv",
+        "displayName": "Channel One",
+        "iconUrl": null
+      }
+    },
+    {
+      "name": "the first display-name is the one kept",
+      "args": [
+        "<channel id=\"one.tv\"><display-name>Channel One</display-name><display-name>401</display-name>"
+      ],
+      "expect": {
+        "id": "one.tv",
+        "displayName": "Channel One",
+        "iconUrl": null
+      }
+    },
+    {
+      "name": "a language attribute does not hide the name",
+      "args": [
+        "<channel id=\"one.tv\"><display-name lang=\"de\">Kanal Eins</display-name>"
+      ],
+      "expect": {
+        "id": "one.tv",
+        "displayName": "Kanal Eins",
+        "iconUrl": null
+      }
+    },
+    {
+      "name": "entities in the name are decoded",
+      "args": [
+        "<channel id=\"one.tv\"><display-name>Rock &amp; Pop</display-name>"
+      ],
+      "expect": {
+        "id": "one.tv",
+        "displayName": "Rock & Pop",
+        "iconUrl": null
+      }
+    },
+    {
+      "name": "no id means no channel",
+      "args": [
+        "<channel><display-name>Channel One</display-name>"
+      ],
+      "expect": null
+    },
+    {
+      "name": "no display name means no channel",
+      "why": "It would be a guide channel nothing could ever be matched to by name, which is what this block exists for.",
+      "args": [
+        "<channel id=\"one.tv\"><icon src=\"http://p.invalid/1.png\" />"
+      ],
+      "expect": null
+    },
+    {
+      "name": "something that is not a tag at all",
+      "args": [
+        "not xml"
+      ],
+      "expect": null
+    }
+  ]
+}

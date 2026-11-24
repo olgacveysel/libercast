@@ -1,0 +1,81 @@
+{
+  "function": "names.fold",
+  "about": "The folded form used for search, for category filtering and for the parental check.",
+  "notes": [
+    "Accents are stripped, case is dropped, and every run of anything else becomes a single space, trimmed at both ends.",
+    "This is the function a channel is hidden by AND the function it is searched by. The two drifting apart is a real bug this project shipped: a channel folded one way for the list and lowercased another way for the check played from a favourite while being invisible everywhere else."
+  ],
+  "cases": [
+    {
+      "name": "lowercases",
+      "args": [
+        "Channel One"
+      ],
+      "expect": "channel one"
+    },
+    {
+      "name": "strips Turkish accents",
+      "args": [
+        "Pôker Gecesi"
+      ],
+      "expect": "poker gecesi"
+    },
+    {
+      "name": "collapses punctuation to a single space",
+      "args": [
+        "Pôker-Gecesi!"
+      ],
+      "expect": "poker gecesi"
+    },
+    {
+      "name": "collapses runs of separators",
+      "args": [
+        "A  ---  B"
+      ],
+      "expect": "a b"
+    },
+    {
+      "name": "trims the ends",
+      "args": [
+        "  |DE| Sport  "
+      ],
+      "expect": "de sport"
+    },
+    {
+      "name": "keeps digits",
+      "args": [
+        "Sport 24/7"
+      ],
+      "expect": "sport 24 7"
+    },
+    {
+      "name": "a name of only punctuation folds to nothing",
+      "args": [
+        "***"
+      ],
+      "expect": ""
+    },
+    {
+      "name": "an empty name folds to nothing",
+      "args": [
+        ""
+      ],
+      "expect": ""
+    },
+    {
+      "name": "German sharp s is not an ASCII letter and becomes a space",
+      "why": "Recorded because it is a real limitation, not an accident: NFD leaves ß alone, so `Straße` and `Strasse` do not fold alike. Any second implementation must match this, right or wrong, or the two disagree about what is hidden.",
+      "args": [
+        "Straße"
+      ],
+      "expect": "stra e"
+    },
+    {
+      "name": "Cyrillic is not ASCII either",
+      "args": [
+        "Первый"
+      ],
+      "expect": ""
+    }
+  ]
+}

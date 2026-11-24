@@ -1,0 +1,196 @@
+{
+  "function": "xmltv.programme",
+  "about": "One <programme> block to a guide entry, or null when it is not usable.",
+  "notes": [
+    "The block arrives without its closing tag, as the streaming scanner hands it over.",
+    "A programme with no stop time is given one hour rather than being dropped: the last entry for a channel very often has none, and dropping it leaves the guide ending early every day."
+  ],
+  "cases": [
+    {
+      "name": "an ordinary programme",
+      "args": [
+        "<programme start=\"20261124183000 +0000\" stop=\"20261124193000 +0000\" channel=\"one.tv\"><title>The News</title><desc>What happened.</desc><category>News</category>"
+      ],
+      "expect": {
+        "channelId": "one.tv",
+        "title": "The News",
+        "description": "What happened.",
+        "category": "News",
+        "startsAt": 1795545000000,
+        "endsAt": 1795548600000
+      }
+    },
+    {
+      "name": "description and category are optional",
+      "args": [
+        "<programme start=\"20261124183000 +0000\" stop=\"20261124193000 +0000\" channel=\"one.tv\"><title>The News</title>"
+      ],
+      "expect": {
+        "channelId": "one.tv",
+        "title": "The News",
+        "description": null,
+        "category": null,
+        "startsAt": 1795545000000,
+        "endsAt": 1795548600000
+      }
+    },
+    {
+      "name": "a missing stop becomes one hour",
+      "args": [
+        "<programme start=\"20261124183000 +0000\" channel=\"one.tv\"><title>The News</title>"
+      ],
+      "expect": {
+        "channelId": "one.tv",
+        "title": "The News",
+        "description": null,
+        "category": null,
+        "startsAt": 1795545000000,
+        "endsAt": 1795548600000
+      }
+    },
+    {
+      "name": "an unreadable stop becomes one hour too",
+      "args": [
+        "<programme start=\"20261124183000 +0000\" stop=\"later\" channel=\"one.tv\"><title>The News</title>"
+      ],
+      "expect": {
+        "channelId": "one.tv",
+        "title": "The News",
+        "description": null,
+        "category": null,
+        "startsAt": 1795545000000,
+        "endsAt": 1795548600000
+      }
+    },
+    {
+      "name": "entities in the title are decoded",
+      "args": [
+        "<programme start=\"20261124183000 +0000\" stop=\"20261124193000 +0000\" channel=\"one.tv\"><title>Rock &amp; Roll</title>"
+      ],
+      "expect": {
+        "channelId": "one.tv",
+        "title": "Rock & Roll",
+        "description": null,
+        "category": null,
+        "startsAt": 1795545000000,
+        "endsAt": 1795548600000
+      }
+    },
+    {
+      "name": "a language attribute on the title does not hide it",
+      "why": "Feeds write <title lang=\"en\">, and reading only the bare tag empties the guide on every feed that does.",
+      "args": [
+        "<programme start=\"20261124183000 +0000\" stop=\"20261124193000 +0000\" channel=\"one.tv\"><title lang=\"en\">The News</title>"
+      ],
+      "expect": {
+        "channelId": "one.tv",
+        "title": "The News",
+        "description": null,
+        "category": null,
+        "startsAt": 1795545000000,
+        "endsAt": 1795548600000
+      }
+    },
+    {
+      "name": "single quotes around attributes are accepted",
+      "args": [
+        "<programme start='20261124183000 +0000' stop='20261124193000 +0000' channel='one.tv'><title>The News</title>"
+      ],
+      "expect": {
+        "channelId": "one.tv",
+        "title": "The News",
+        "description": null,
+        "category": null,
+        "startsAt": 1795545000000,
+        "endsAt": 1795548600000
+      },
+      "why": "XML permits both quote styles and guide feeds use both. Reading only double quotes does not produce a partly-read feed: every programme loses its channel and its start, so the guide comes out empty and looks exactly like a provider that publishes none. This corpus found that bug in the original implementation."
+    },
+    {
+      "name": "no channel means no programme",
+      "args": [
+        "<programme start=\"20261124183000 +0000\" stop=\"20261124193000 +0000\"><title>The News</title>"
+      ],
+      "expect": null
+    },
+    {
+      "name": "no title means no programme",
+      "why": "A guide row with no title is a blank bar nobody can act on.",
+      "args": [
+        "<programme start=\"20261124183000 +0000\" stop=\"20261124193000 +0000\" channel=\"one.tv\"><desc>No title here.</desc>"
+      ],
+      "expect": null
+    },
+    {
+      "name": "an unreadable start means no programme",
+      "args": [
+        "<programme start=\"soon\" channel=\"one.tv\"><title>The News</title>"
+      ],
+      "expect": null
+    },
+    {
+      "name": "a programme that ends before it starts is refused",
+      "args": [
+        "<programme start=\"20261124193000 +0000\" stop=\"20261124183000 +0000\" channel=\"one.tv\"><title>The News</title>"
+      ],
+      "expect": null
+    },
+    {
+      "name": "a zero-length programme is refused",
+      "args": [
+        "<programme start=\"20261124183000 +0000\" stop=\"20261124183000 +0000\" channel=\"one.tv\"><title>The News</title>"
+      ],
+      "expect": null
+    },
+    {
+      "name": "something that is not a tag at all",
+      "args": [
+        "not xml"
+      ],
+      "expect": null
+    },
+    {
+      "name": "spaces around the equals sign are accepted",
+      "args": [
+        "<programme start = \"20261124183000 +0000\" stop=\"20261124193000 +0000\" channel=\"one.tv\"><title>The News</title>"
+      ],
+      "expect": {
+        "channelId": "one.tv",
+        "title": "The News",
+        "description": null,
+        "category": null,
+        "startsAt": 1795545000000,
+        "endsAt": 1795548600000
+      }
+    },
+    {
+      "name": "an attribute whose name ends with the one wanted is not mistaken for it",
+      "why": "`channel=` must not be found inside `sub-channel=`, or the wrong value is read with no sign anything went wrong.",
+      "args": [
+        "<programme sub-channel=\"wrong.tv\" channel=\"one.tv\" start=\"20261124183000 +0000\" stop=\"20261124193000 +0000\"><title>The News</title>"
+      ],
+      "expect": {
+        "channelId": "one.tv",
+        "title": "The News",
+        "description": null,
+        "category": null,
+        "startsAt": 1795545000000,
+        "endsAt": 1795548600000
+      }
+    },
+    {
+      "name": "mixed quote styles in one tag",
+      "args": [
+        "<programme start='20261124183000 +0000' stop=\"20261124193000 +0000\" channel='one.tv'><title>The News</title>"
+      ],
+      "expect": {
+        "channelId": "one.tv",
+        "title": "The News",
+        "description": null,
+        "category": null,
+        "startsAt": 1795545000000,
+        "endsAt": 1795548600000
+      }
+    }
+  ]
+}

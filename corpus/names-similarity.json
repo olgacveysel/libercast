@@ -1,0 +1,92 @@
+{
+  "function": "names.similarity",
+  "about": "How alike two channel names are, from 0 to 1.",
+  "notes": [
+    "Scores are compared to four decimal places. Two languages doing the same arithmetic agree to far more places than anyone needs, but not necessarily to all of them.",
+    "0.82 and above is applied without asking. Note that a regional variant scores 0.95 here: the score alone is not enough to switch channel on, which is why names.same exists beside it."
+  ],
+  "cases": [
+    {
+      "name": "identical names score 1",
+      "args": [
+        "Alto Sports 2",
+        "Alto Sports 2"
+      ],
+      "expect": 1
+    },
+    {
+      "name": "a quality word makes no difference",
+      "args": [
+        "Alto Sports 2 HD",
+        "ALTO SPORTS 2"
+      ],
+      "expect": 1
+    },
+    {
+      "name": "nor does word order",
+      "args": [
+        "Alto Sports 2",
+        "Sports Alto 2"
+      ],
+      "expect": 1
+    },
+    {
+      "name": "a regional variant still scores high",
+      "why": "Recorded because it is the trap: 0.95 is well above the accept threshold, and acting on this score alone would silently switch someone to another country's feed.",
+      "args": [
+        "Alto Sports 2",
+        "Alto Sports 2 Turkey"
+      ],
+      "expect": 0.95
+    },
+    {
+      "name": "a country prefix costs a little",
+      "args": [
+        "|DE| ALTO SPORTS 2 FHD",
+        "Alto Sports 2"
+      ],
+      "expect": 0.95
+    },
+    {
+      "name": "a different number scores nothing at all",
+      "why": "The digit rule, and the reason it is absolute: `Alto Sports 2` and `Alto Sports 4` differ by one character and share every other word.",
+      "args": [
+        "Alto Sports 2",
+        "Alto Sports 4"
+      ],
+      "expect": 0
+    },
+    {
+      "name": "unrelated names score nothing",
+      "args": [
+        "Alto Sports",
+        "Harbour News"
+      ],
+      "expect": 0
+    },
+    {
+      "name": "a singular and a plural are close but not equal",
+      "args": [
+        "Alto Sports",
+        "Alto Sport"
+      ],
+      "expect": 0.8471
+    },
+    {
+      "name": "one word in common out of two",
+      "args": [
+        "Alto Movies",
+        "Alto Music"
+      ],
+      "expect": 0.4235
+    },
+    {
+      "name": "nothing matches an empty name",
+      "args": [
+        "Alto Sports",
+        ""
+      ],
+      "expect": 0
+    }
+  ]
+}

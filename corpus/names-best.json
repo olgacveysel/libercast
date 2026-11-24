@@ -1,0 +1,130 @@
+{
+  "function": "names.best",
+  "about": "Choosing a guide channel for a playlist channel, or refusing to.",
+  "notes": [
+    "Returns the chosen candidate with its score, or null.",
+    "The refusal matters as much as the choice. When the best candidate does not beat the runner-up by 0.06, nothing is returned: a guide that is confidently wrong is harder to diagnose than one that is empty, because nobody thinks to doubt it."
+  ],
+  "cases": [
+    {
+      "name": "a decorated provider name finds its guide channel",
+      "args": [
+        "|DE| ALTO SPORTS 2 FHD",
+        [
+          {
+            "epgChannelId": "alto.sports.2",
+            "displayName": "Alto Sports 2"
+          },
+          {
+            "epgChannelId": "alto.sports.4",
+            "displayName": "Alto Sports 4"
+          },
+          {
+            "epgChannelId": "harbour.news",
+            "displayName": "Harbour News"
+          }
+        ]
+      ],
+      "expect": {
+        "epgChannelId": "alto.sports.2",
+        "displayName": "Alto Sports 2",
+        "score": 0.95
+      }
+    },
+    {
+      "name": "the near neighbour with a different number is not chosen",
+      "why": "Both candidates are present in the case above; the one differing by a digit scores zero, so it never competes.",
+      "args": [
+        "Alto Sports 4 HD",
+        [
+          {
+            "epgChannelId": "alto.sports.2",
+            "displayName": "Alto Sports 2"
+          },
+          {
+            "epgChannelId": "alto.sports.4",
+            "displayName": "Alto Sports 4"
+          },
+          {
+            "epgChannelId": "harbour.news",
+            "displayName": "Harbour News"
+          }
+        ]
+      ],
+      "expect": {
+        "epgChannelId": "alto.sports.4",
+        "displayName": "Alto Sports 4",
+        "score": 1
+      }
+    },
+    {
+      "name": "a name matching nothing gets nothing",
+      "args": [
+        "Completely Different",
+        [
+          {
+            "epgChannelId": "alto.sports.2",
+            "displayName": "Alto Sports 2"
+          },
+          {
+            "epgChannelId": "alto.sports.4",
+            "displayName": "Alto Sports 4"
+          },
+          {
+            "epgChannelId": "harbour.news",
+            "displayName": "Harbour News"
+          }
+        ]
+      ],
+      "expect": null
+    },
+    {
+      "name": "no candidates means no match",
+      "args": [
+        "Alto Sports 2",
+        []
+      ],
+      "expect": null
+    },
+    {
+      "name": "two candidates too close together are refused",
+      "why": "The ambiguity margin. Guessing between them produces a guide that is wrong on a channel nobody is watching closely enough to notice.",
+      "args": [
+        "Alto Sports To",
+        [
+          {
+            "epgChannelId": "a",
+            "displayName": "Alto Sports Two"
+          },
+          {
+            "epgChannelId": "b",
+            "displayName": "Alto Sports Too"
+          }
+        ]
+      ],
+      "expect": null
+    },
+    {
+      "name": "but a perfect match is never ambiguous",
+      "why": "Otherwise a feed listing the same channel twice, once with HD in the name, would match neither.",
+      "args": [
+        "Alto Sports 2",
+        [
+          {
+            "epgChannelId": "a",
+            "displayName": "Alto Sports 2"
+          },
+          {
+            "epgChannelId": "b",
+            "displayName": "Alto Sports 2 HD"
+          }
+        ]
+      ],
+      "expect": {
+        "epgChannelId": "a",
+        "displayName": "Alto Sports 2",
+        "score": 1
+      }
+    }
+  ]
+}

@@ -1,0 +1,92 @@
+{
+  "function": "names.same",
+  "about": "Whether two names are the same channel beyond reasonable doubt.",
+  "notes": [
+    "The identifying words as a multiset, so word order does not matter but an extra word does. This is deliberately stricter than the similarity score: it decides whether a channel is switched to without asking."
+  ],
+  "cases": [
+    {
+      "name": "identical names",
+      "args": [
+        "Alto Sports 2",
+        "Alto Sports 2"
+      ],
+      "expect": true
+    },
+    {
+      "name": "differing only in case",
+      "args": [
+        "Alto Sports 2",
+        "ALTO SPORTS 2"
+      ],
+      "expect": true
+    },
+    {
+      "name": "differing only in a quality word",
+      "args": [
+        "Alto Sports 2 HD",
+        "ALTO SPORTS 2"
+      ],
+      "expect": true
+    },
+    {
+      "name": "differing only in word order",
+      "why": "Providers order words differently and mean the same channel.",
+      "args": [
+        "Alto Sports 2",
+        "Sports Alto 2"
+      ],
+      "expect": true
+    },
+    {
+      "name": "differing only in a feed qualifier",
+      "args": [
+        "Alto Sports 2 (Hat 1)",
+        "Alto Sports 2"
+      ],
+      "expect": true
+    },
+    {
+      "name": "a regional variant is not the same channel",
+      "why": "This pair scores high enough under the subset rule to be switched to silently, which is exactly what must not happen.",
+      "args": [
+        "Alto Sports 2",
+        "Alto Sports 2 Turkey"
+      ],
+      "expect": false
+    },
+    {
+      "name": "a different number is a different channel",
+      "args": [
+        "Alto Sports 2",
+        "Alto Sports 4"
+      ],
+      "expect": false
+    },
+    {
+      "name": "a different name entirely",
+      "args": [
+        "Alto Sports",
+        "Harbour News"
+      ],
+      "expect": false
+    },
+    {
+      "name": "a name with no identifying words matches nothing",
+      "why": "Two names that both reduce to nothing are not thereby the same channel.",
+      "args": [
+        "HD",
+        "4K"
+      ],
+      "expect": false
+    },
+    {
+      "name": "not even itself",
+      "args": [
+        "",
+        ""
+      ],
+      "expect": false
+    }
+  ]
+}

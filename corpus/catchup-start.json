@@ -1,0 +1,78 @@
+{
+  "function": "catchup.start",
+  "about": "The start stamp a panel's archive URL carries: YYYY-MM-DD:HH-MM.",
+  "notes": [
+    "Wall-clock time on the panel's server, in the time zone it reported. The second argument is that zone, or null to use the machine's own.",
+    "Every case here names a zone, so the answer does not depend on where the test runs."
+  ],
+  "cases": [
+    {
+      "name": "UTC",
+      "args": [
+        1795545000000,
+        "UTC"
+      ],
+      "expect": "2026-11-24:18-30"
+    },
+    {
+      "name": "a zone ahead of UTC",
+      "args": [
+        1795545000000,
+        "Europe/Istanbul"
+      ],
+      "expect": "2026-11-24:21-30"
+    },
+    {
+      "name": "a zone behind UTC",
+      "args": [
+        1795545000000,
+        "America/New_York"
+      ],
+      "expect": "2026-11-24:13-30"
+    },
+    {
+      "name": "a half-hour zone",
+      "args": [
+        1795545000000,
+        "Asia/Kolkata"
+      ],
+      "expect": "2026-11-25:00-00"
+    },
+    {
+      "name": "single digits are padded",
+      "args": [
+        1767258180000,
+        "UTC"
+      ],
+      "expect": "2026-01-01:09-03"
+    },
+    {
+      "name": "a zone can push the date to the previous day",
+      "args": [
+        1767222180000,
+        "America/New_York"
+      ],
+      "expect": "2025-12-31:18-03"
+    },
+    {
+      "name": "summer time is applied for the date in question",
+      "why": "Not a fixed offset: the same panel is +0200 in January and +0300 in July, and using the wrong one asks the archive for a programme an hour away.",
+      "args": [
+        1783217400000,
+        "Europe/Berlin"
+      ],
+      "expect": "2026-07-05:04-10"
+    },
+    {
+      "name": "a time that is not a time is refused",
+      "why": "Better to fail here than to build a URL the panel answers with something unexpected. Note what is NOT refused: zero is a real instant, so a second implementation must reject only a time that is not a number at all.",
+      "args": [
+        "not-a-number",
+        "UTC"
+      ],
+      "expect": {
+        "threw": "Invalid catch-up start time"
+      }
+    }
+  ]
+}

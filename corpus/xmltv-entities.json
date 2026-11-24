@@ -1,0 +1,74 @@
+{
+  "function": "xmltv.entities",
+  "about": "XML entity decoding, applied to titles and descriptions.",
+  "notes": [
+    "Only the five XML entities and numeric references. An HTML entity table is not part of XMLTV and decoding one would change text a feed meant literally."
+  ],
+  "cases": [
+    {
+      "name": "the five named entities",
+      "args": [
+        "&lt;a&gt; &amp; &quot;b&quot; &apos;c&apos;"
+      ],
+      "expect": "<a> & \"b\" 'c'"
+    },
+    {
+      "name": "a decimal reference",
+      "args": [
+        "caf&#233;"
+      ],
+      "expect": "café"
+    },
+    {
+      "name": "a hexadecimal reference",
+      "args": [
+        "caf&#xe9;"
+      ],
+      "expect": "café"
+    },
+    {
+      "name": "an uppercase hexadecimal reference",
+      "args": [
+        "caf&#XE9;"
+      ],
+      "expect": "café"
+    },
+    {
+      "name": "text with nothing to decode is unchanged",
+      "args": [
+        "Plain title"
+      ],
+      "expect": "Plain title"
+    },
+    {
+      "name": "an ampersand that is not an entity is left alone",
+      "why": "Feeds write bare ampersands constantly; turning one into a replacement character is worse than leaving it.",
+      "args": [
+        "Rock & Roll"
+      ],
+      "expect": "Rock & Roll"
+    },
+    {
+      "name": "an unknown named entity is left alone",
+      "args": [
+        "5 &deg; outside"
+      ],
+      "expect": "5 &deg; outside"
+    },
+    {
+      "name": "a doubly-escaped ampersand decodes once",
+      "why": "Decoding twice would turn `&amp;lt;` into a tag and let a feed inject markup into the guide.",
+      "args": [
+        "&amp;lt;b&amp;gt;"
+      ],
+      "expect": "&lt;b&gt;"
+    },
+    {
+      "name": "an empty string stays empty",
+      "args": [
+        ""
+      ],
+      "expect": ""
+    }
+  ]
+}

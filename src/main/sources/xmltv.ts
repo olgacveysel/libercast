@@ -43,9 +43,21 @@ export function parseXmltvTime(value: string): number | null {
   return base - offsetMinutes * 60_000
 }
 
+/**
+ * One attribute off an opening tag.
+ *
+ * Both quote styles, because XML permits both and guide feeds use both — and
+ * reading only double quotes does not produce a partly-read feed, it produces
+ * an *empty* one: every programme is dropped for want of a channel and a
+ * start, which looks exactly like a provider that publishes no guide.
+ *
+ * The name must begin a word, or `channel="x"` would also be found inside
+ * `sub-channel="y"` and the wrong value read.
+ */
 function attribute(tag: string, name: string): string | null {
-  const match = new RegExp(`${name}="([^"]*)"`).exec(tag)
-  return match ? match[1]! : null
+  const match = new RegExp(`(?:^|\\s)${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)')`).exec(tag)
+  if (!match) return null
+  return match[1] ?? match[2] ?? null
 }
 
 function element(block: string, name: string): string | null {
