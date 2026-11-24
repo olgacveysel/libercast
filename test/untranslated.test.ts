@@ -74,8 +74,25 @@ function looksLikeEnglish(value: string): boolean {
   if (ALLOWED.has(trimmed)) return false
   // Needs a space between two letters: "Open file" yes, "px" or "16/9" no.
   if (!/[A-Za-z]\s+[A-Za-z]/.test(trimmed)) return false
-  // Template holes and expressions are not literals we can key.
-  if (trimmed.includes('${') || trimmed.includes('{')) return false
+  // A template literal is code, not a literal this can key.
+  if (trimmed.includes('${')) return false
+
+  /*
+    An expression inside JSX is not prose, but the words around it are.
+
+    Skipping anything containing a brace was the old rule, and it made this
+    check unable to fail for most real sentences: almost every user-facing
+    line that mentions a value — "Directed by {name}", "{count} channels
+    hidden" — carries one. One such string shipped in English to the Turkish
+    and German builds, and this test read it and passed.
+
+    So the expressions are removed and what is left is judged. A line that is
+    only an expression leaves nothing and is ignored, which is the case the
+    old rule was reaching for.
+  */
+  const prose = trimmed.replace(/\{[^{}]*\}/g, ' ').trim()
+  if (!/[A-Za-z]\s+[A-Za-z]/.test(prose)) return false
+  if (ALLOWED.has(prose)) return false
   return true
 }
 
@@ -112,9 +129,21 @@ function scan(file: string): Finding[] {
       }
     }
 
-    // A bare JSX text node that opens and closes on the same line.
-    // Text wrapped across lines is caught afterwards, over the whole file.
-    const node = raw.match(/>\s*([A-Za-z][^<>{}\n]*)\s*</)
+    /*
+      A JSX text node that opens and closes on the same line.
+
+      Braces are allowed inside it, and `looksLikeEnglish` strips them: text
+      with a value in the middle of it is still text. Excluding them was a
+      hole big enough for most real sentences to fit through, because almost
+      every user-facing line that mentions something carries one.
+
+      The capture still has to begin with a letter, so a node that is only an
+      expression — `>{count}<` — matches nothing, which is what excluding
+      braces was reaching for.
+
+      Text wrapped across lines is caught afterwards, over the whole file.
+    */
+    const node = raw.match(/>\s*([A-Za-z][^<>\n]*)\s*</)
     if (node?.[1] && looksLikeEnglish(node[1])) {
       found.push({ file, line: index + 1, text: node[1].trim() })
     }

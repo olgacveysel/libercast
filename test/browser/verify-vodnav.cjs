@@ -47,6 +47,8 @@ const view = () => `(() => ({
   toolbars: document.querySelectorAll('.toolbar__title').length,
   toolbarSays: [...document.querySelectorAll('.toolbar__title')].map((h) => h.textContent.trim()),
   sheetOpen: !!document.querySelector('.sheet'),
+  cast: document.querySelector('.sheet__cast')?.textContent?.trim() ?? null,
+  credit: document.querySelector('.sheet__credit')?.textContent?.trim() ?? null,
   favoriteTabs: [...document.querySelectorAll('.favorites__tabs .btn')].map((b) => b.textContent.trim())
 }))()`
 
@@ -97,6 +99,23 @@ async function main() {
     now.favoriteTabs
   )
   check('and one for series', now.favoriteTabs.includes('Series'), now.favoriteTabs)
+
+  console.log('\nWhat the detail sheet credits')
+  check('Films is reachable again', await read(window, nav('Movies')))
+  await settle(900)
+  await read(window, `document.querySelector('.poster').click()`)
+  await settle(1100)
+  now = await read(window, view())
+  /*
+    The cast travels from TMDB through the database and over IPC, and until
+    this check nothing drew it — including on a catalogue a user's own key
+    had paid a request to enrich.
+  */
+  check('the cast is shown', typeof now.cast === 'string' && now.cast.includes('A Name'), now.cast)
+  check('and the director is credited', typeof now.credit === 'string' && now.credit.includes('A Director'), now.credit)
+  check('in the chosen language, not hard-coded English', now.credit !== null && !now.credit.startsWith('Directed by {'), now.credit)
+  await read(window, `document.querySelector('.sheet__close, .sheet button')?.click()`)
+  await settle(600)
 
   console.log('\nThe Live TV toolbar stays on Live TV')
   check('Films is reachable', await read(window, nav('Movies')))

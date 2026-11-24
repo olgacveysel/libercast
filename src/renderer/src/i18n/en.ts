@@ -133,6 +133,8 @@ export const en = {
   'error.screenDetail': 'What went wrong: ',
   'error.playerTitle': 'The player stopped working',
   'error.playerBody': 'Playback could not be drawn. The rest of LiberCast is unaffected — try again, or choose another channel.',
+  'vod.directedBy': 'Directed by {name}',
+  'vod.cast': 'With {names}',
 
   'sleep.label': 'Sleep',
   'sleep.title': 'Stop playback after a while',

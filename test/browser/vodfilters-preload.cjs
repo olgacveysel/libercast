@@ -99,7 +99,7 @@ const answers = {
   // Enough for the detail sheet to open, which is what the navigation check
   // needs something to close.
   'channels:get': (id) => FILMS.find((f) => f.id === id) ?? null,
-  'vod:movieInfo': () => ({ plot: 'A film.', cast: null, director: null, genre: null, runtimeSecs: null }),
+  'vod:movieInfo': () => ({ plot: 'A film.', cast: 'A Name, Another Name', director: 'A Director', genre: null, durationSecs: null }),
   'vod:seriesDetail': () => ({ seasons: [], episodes: [] }),
   'progress:get': () => null,
   'downloads:forItem': () => null,

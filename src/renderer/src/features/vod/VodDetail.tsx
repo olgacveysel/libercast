@@ -132,7 +132,15 @@ export function VodDetail({ channel, onClose, onPlay, onToggleFavorite }: Props)
               details…
             </p>
           ) : (
-            info?.plot && <p className="sheet__plot">{info.plot}</p>
+            <>
+              {info?.plot && <p className="sheet__plot">{info.plot}</p>}
+              {/*
+                The cast was fetched, stored and sent to this screen, and
+                until now nothing drew it — including the cast that a user's
+                own TMDB key spent a request on.
+              */}
+              {info?.cast && <p className="sheet__cast">{t('vod.cast', { names: info.cast })}</p>}
+            </>
           )}
 
           {error && <div className="notice notice--error" style={{ marginBottom: 12 }}>{error}</div>}
@@ -184,7 +192,7 @@ export function VodDetail({ channel, onClose, onPlay, onToggleFavorite }: Props)
             )}
 
             {info?.director && (
-              <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>Directed by {info.director}</span>
+              <span className="sheet__credit">{t('vod.directedBy', { name: info.director })}</span>
             )}
           </div>
         </div>
