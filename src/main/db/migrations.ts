@@ -576,6 +576,28 @@ export const MIGRATIONS: Migration[] = [
                         r.gkey)
                FROM raw r WHERE r.id = channels.id);
     `
+  },
+  {
+    version: 16,
+    name: 'merged-search',
+    up: `
+      -- The same index, now carrying the name it is searched by.
+      --
+      -- Grouping the all-sources list became fast once the index was ordered
+      -- by group and covered everything the grouping needed. Searching it did
+      -- not: the filter is on name_folded, which was not in the index, so a
+      -- search had to fetch every row to read a column it could have been
+      -- handed. 271 ms for one search over 150,000 channels.
+      --
+      -- Carrying the name costs about 9 MB on a catalogue that size, against
+      -- 27 MB for all the other indexes together, and takes the search to
+      -- 83 ms — or 38 for two words, because a more selective filter leaves
+      -- fewer rows to group.
+      DROP INDEX IF EXISTS idx_channels_group;
+
+      CREATE INDEX idx_channels_group
+        ON channels(kind, hidden, group_key, playlist_sort, id, playlist_id, name_folded);
+    `
   }
 ]
 
