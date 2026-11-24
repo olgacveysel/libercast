@@ -79,6 +79,10 @@ async function main(): Promise<void> {
   const { importCatalog } = await import('@main/db/repo/import')
   const { toggleFavorite, markWatched } = await import('@main/db/repo/catalog')
   const { saveProgress } = await import('@main/db/repo/vod')
+  const { insertPrograms, saveState } = await import('@main/db/repo/epg')
+  const { createRecording, updateRecording } = await import('@main/db/repo/recordings')
+  const { createDownload, updateDownload } = await import('@main/db/repo/downloads')
+  const { addReminder } = await import('@main/db/repo/reminders')
 
   getDb()
 
@@ -107,6 +111,72 @@ async function main(): Promise<void> {
       durationSecs: 5400
     })
   )
+
+  /*
+    A guide, some recordings, a download queue and a reminder.
+
+    Without these the Guide, the Library and the Downloads tab photograph
+    their empty states, which are worth seeing once and useless after that.
+    Written through the same repositories the application writes through, so
+    what the screens read is what the application would have produced.
+  */
+  const HOUR = 3_600_000
+  const slot = Math.floor(Date.now() / HOUR) * HOUR - 2 * HOUR
+  const liveRows = getDb()
+    .prepare("SELECT id, name, epg_channel_id AS epg, playlist_id AS playlistId FROM channels WHERE kind = 'live' AND epg_channel_id IS NOT NULL LIMIT 40")
+    .all() as { id: number; name: string; epg: string; playlistId: number }[]
+
+  const titles = ['The News at Six', 'Afternoon Film', 'Match of the Day', 'Documentary Hour', 'Late Review']
+  insertPrograms(
+    panel.id,
+    liveRows.flatMap((row) =>
+      Array.from({ length: 10 }, (_, i) => ({
+        channelId: row.epg,
+        title: titles[(row.id + i) % titles.length]!,
+        description: 'What the guide says about this programme.',
+        category: 'General',
+        startsAt: slot + i * HOUR,
+        endsAt: slot + (i + 1) * HOUR
+      }))
+    )
+  )
+  saveState(panel.id, liveRows.length * 10, liveRows.length, 'http://guide.invalid/xmltv.xml')
+
+  const [first, second, third, fourth] = liveRows
+  if (first && second && third && fourth) {
+    const done = createRecording({
+      channelId: first.id, playlistId: first.playlistId, title: 'Match of the Day',
+      channelName: first.name, startsAt: slot - 30 * HOUR, endsAt: slot - 28 * HOUR, status: 'completed'
+    })
+    updateRecording(done.id, { filePath: 'C:\\Users\\Example\\Videos\\LiberCast\\Match of the Day.mp4', bytes: 2_400_000_000 })
+    createRecording({
+      channelId: second.id, playlistId: second.playlistId, title: 'The News at Six',
+      channelName: second.name, startsAt: slot, endsAt: slot + HOUR, status: 'recording'
+    })
+    createRecording({
+      channelId: third.id, playlistId: third.playlistId, title: 'Afternoon Film',
+      channelName: third.name, startsAt: slot + 6 * HOUR, endsAt: slot + 8 * HOUR, status: 'scheduled'
+    })
+    const bad = createRecording({
+      channelId: fourth.id, playlistId: fourth.playlistId, title: 'Documentary Hour',
+      channelName: fourth.name, startsAt: slot - 50 * HOUR, endsAt: slot - 49 * HOUR, status: 'failed'
+    })
+    updateRecording(bad.id, { error: 'The file did not open afterwards' })
+    addReminder({
+      channelId: third.id, title: 'Late Review', startsAt: slot + 9 * HOUR, endsAt: slot + 10 * HOUR
+    })
+  }
+
+  const filmRows = getDb().prepare("SELECT id, name, playlist_id AS playlistId FROM channels WHERE kind = 'movie' LIMIT 3").all() as { id: number; name: string; playlistId: number }[]
+  filmRows.forEach((film, i) => {
+    const download = createDownload({
+      itemType: 'movie', itemId: film.id, channelId: film.id, playlistId: film.playlistId,
+      title: film.name, subtitle: null, posterUrl: null
+    })
+    if (i === 0) updateDownload(download.id, { status: 'downloading', bytesTotal: 2_100_000_000, bytesDone: 820_000_000 })
+    if (i === 1) updateDownload(download.id, { status: 'completed', bytesTotal: 1_600_000_000, bytesDone: 1_600_000_000, filePath: 'C:\\Users\\Example\\Downloads\\film.mp4' })
+    if (i === 2) updateDownload(download.id, { status: 'paused', bytesTotal: 1_900_000_000, bytesDone: 240_000_000 })
+  })
 
   registerIpcHandlers()
 
